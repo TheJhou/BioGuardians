@@ -1,0 +1,98 @@
+nome_cientifico;nome_popular;categoria;reino;filo;classe;ordem;familia;genero;biomas;estados
+panthera onca;onça-pintada;VU;Animalia;Chordata;Mammalia;Carnivora;Felidae;Panthera;Amazônia,Mata Atlântica;AC,AM,AP,MT,MS,PA,RO,RR,TO,MA,PI,BA,MG,SP,PR,SC,RS
+puma concolor;puma;VU;Animalia;Chordata;Mammalia;Carnivora;Felidae;Puma;Amazônia,Cerrado,Mata Atlântica,Pampa;AC,AM,AP,MT,MS,PA,RO,RR,TO,MA,PI,BA,MG,SP,PR,SC,RS
+ Leopardus pardalis;gato-do-mato;VU;Animalia;Chordata;Mammalia;Carnivora;Felidae;Leopardus;Amazônia,Mata Atlântica,Cerrado,Caatinga;AC,AM,AP,MT,MS,PA,RO,RR,TO,MA,PI,BA,MG,SP,PR,SC,RS
+leopardus tigrinus;gato-do-mato-pequeno;VU;Animalia;Chordata;Mammalia;Carnivora;Felidae;Leopardus;Cerrado,Mata Atlântica,Caatinga;BA,MG,SP,PR,SC,RS,GO,TO,MA,PI
+leopardus colocolo;gato-palheiro;VU;Animalia;Chordata;Mammalia;Carnivora;Felidae;Leopardus;Cerrado,Pampa;RS,SC,PR,SP,MG,GO,MT,MS
+pterodura brasiliensis;mico-leão-dourado;CR;Animalia;Chordata;Mammalia;Primates;Callitrichidae;Pterodura;Mata Atlântica;RJ
+brachyteles arachnoides;muriqui-do-sul;CR;Animalia;Chordata;Mammalia;Primates;Atelidae;Brachyteles;Mata Atlântica;SP,RJ,MG
+brachyteles hypoxanthus;muriqui-do-norte;CR;Animalia;Chordata;Mammalia;Primates;Atelidae;Brachyteles;Mata Atlântica;MG,ES,BA
+sapajus xanthosternos;macaco-prego-de-crista;CR;Animalia;Chordata;Mammalia;Primates;Cebidae;Sapajus;Mata Atlântica;BA,ES
+alouatta guariba;bugio-ruivo;VU;Animalia;Chordata;Mammalia;Primates;Atelidae;Alouatta;Mata Atlântica,Cerrado;BA,MG,ES,RJ,SP,PR,SC,RS
+myrmecophaga tridactyla;tamanduá-bandeira;VU;Animalia;Chordata;Mammalia;Pilosa;Myrmecophagidae;Myrmecophaga;Cerrado,Amazônia,Mata Atlântica,Pantanal;AC,AM,AP,MT,MS,PA,RO,RR,TO,MA,PI,BA,MG,SP,PR,SC,RS,GO
+priodontes maximus;tatu-canastra;VU;Animalia;Chordata;Mammalia;Cingulata;Dasypodidae;Priodontes;Amazônia,Cerrado,Pantanal;AC,AM,AP,MT,MS,PA,RO,RR,TO,GO,MG
+tolypeutes tricinctus;tatu-bola;VU;Animalia;Chordata;Mammalia;Cingulata;Dasypodidae;Tolypeutes;Caatinga,Cerrado;BA,PI,MA,PE,CE,RN,PB,AL,SE,GO,TO,MG
+speothos venaticus;cachorro-vinagre;VU;Animalia;Chordata;Mammalia;Carnivora;Canidae;Speothos;Amazônia,Cerrado,Pantanal,Mata Atlântica;AC,AM,AP,MT,MS,PA,RO,RR,TO,GO,MG,BA,ES
+chytronycteris auritus;morcego-orelhas-tubarão;VU;Animalia;Chordata;Mammalia;Chiroptera;Phyllostomidae;Chytronycteris;Amazônia,Mata Atlântica;AM,AC,RO,PA,MT,BA,MG,SP
+inhauma crepitans;ariramba;VU;Animalia;Chordata;Aves;Gruiformes;Aramidae;Inhauma;Amazônia,Pantanal,Cerrado;AC,AM,AP,MT,MS,PA,RO,RR,TO,GO,MG
+amazona brasiliensis;papagaio-de-cara-roxa;VU;Animalia;Chordata;Aves;Psittaciformes;Psittacidae;Amazona;Mata Atlântica;SP,PR,SC,RJ,ES,BA
+amazona vinacea;papagaio-de-peito-roxo;VU;Animalia;Chordata;Aves;Psittaciformes;Psittacidae;Amazona;Mata Atlântica;SP,PR,SC,RS,RJ,MG,BA,ES
+triclaria malachitacea;sabiá-cica;VU;Animalia;Chordata;Aves;Psittaciformes;Psittacidae;Triclaria;Mata Atlântica;SP,RJ,MG,ES,BA,PR
+spix's tyrannulet;maracanã-do-cerrado;EN;Animalia;Chordata;Aves;Psittaciformes;Psittacidae;Primolius;Caatinga;BA
+primolius maracana;maracanã-verdadeira;VU;Animalia;Chordata;Aves;Psittaciformes;Psittacidae;Primolius;Cerrado,Amazônia,Mata Atlântica;GO,MT,MS,TO,MA,PI,BA,MG,SP,PR
+anodorhynchus hyacinthinus;arara-azul-grande;VU;Animalia;Chordata;Aves;Psittaciformes;Psittacidae;Anodorhynchus;Cerrado,Pantanal,Amazônia;MT,MS,GO,TO,PA,MA,PI,BA
+anodorhynchus leari;arara-azul-de-lear;CR;Animalia;Chordata;Aves;Psittaciformes;Psittacidae;Anodorhynchus;Caatinga;BA
+anodorhynchus glaucus;arara-azul-pequena;CR;Animalia;Chordata;Aves;Psittaciformes;Psittacidae;Anodorhynchus;Pampa,Mata Atlântica;RS,SC,PR,SP,MG
+ara rubrogenys;arara-vermelha;VU;Animalia;Chordata;Aves;Psittaciformes;Psittacidae;Ara;Caatinga,Cerrado;BA,PI,PE,CE,GO,TO,MG
+crax blumenbachii;mutum-do-sudeste;CR;Animalia;Chordata;Aves;Galliformes;Cracidae;Crax;Mata Atlântica;BA,ES,RJ,MG
+crax fasciolata;mutum-de-penacho;VU;Animalia;Chordata;Aves;Galliformes;Cracidae;Crax;Cerrado,Amazônia,Pantanal,Mata Atlântica;GO,MT,MS,TO,PA,MA,PI,BA,MG,SP,PR,SC
+jacana jacana;jaçanã;VU;Animalia;Chordata;Aves;Charadriiformes;Jacanidae;Jacana;Amazônia,Pantanal,Cerrado;AC,AM,AP,MT,MS,PA,RO,RR,TO,GO,MG
+pipile cumanensis;jacutinga;EN;Animalia;Chordata;Aves;Galliformes;Cracidae;Pipile;Mata Atlântica;SP,RJ,ES,BA,PR,SC,RS,MG
+pyrrhura cruentata;tiriba-grave;VU;Animalia;Chordata;Aves;Psittaciformes;Psittacidae;Pyrrhura;Mata Atlântica;BA,ES,MG,RJ,SP
+tigrisoma lineatum;garça-tigre;VU;Animalia;Chordata;Aves;Pelecaniformes;Ardeidae;Tigrisoma;Amazônia,Pantanal,Cerrado,Mata Atlântica;AC,AM,AP,MT,MS,PA,RO,RR,TO,GO,MG,BA,ES,SP
+chelonoidis denticulata;jabuti;VU;Animalia;Chordata;Reptilia;Testudines;Testudinidae;Chelonoidis;Amazônia,Cerrado;AC,AM,AP,MT,PA,RO,RR,TO,MA,PI,BA,MG,GO
+chelonoidis carbonaria;jabuti-piranga;VU;Animalia;Chordata;Reptilia;Testudines;Testudinidae;Chelonoidis;Cerrado,Caatinga,Amazônia,Mata Atlântica;AC,AM,AP,MT,MS,PA,RO,RR,TO,MA,PI,BA,MG,SP,PR,SC,RS,GO
+podocnemis expansa;tracajá;VU;Animalia;Chordata;Reptilia;Testudines;Podocnemididae;Podocnemis;Amazônia,Cerrado;AC,AM,AP,MT,PA,RO,RR,TO,MA,PI,GO
+caiman crocodilus;jacaré-tinga;VU;Animalia;Chordata;Reptilia;Crocodylia;Alligatoridae;Caiman;Amazônia,Cerrado,Pantanal;AC,AM,AP,MT,MS,PA,RO,RR,TO,GO,MG
+melanosuchus niger;jacaré-açu;VU;Animalia;Chordata;Reptilia;Crocodylia;Alligatoridae;Melanosuchus;Amazônia;AC,AM,AP,PA,RO,RR,TO,MT
+liolaemus lutzae;lagarto-de-areia;CR;Animalia;Chordata;Reptilia;Squamata;Liolaemidae;Liolaemus;Mata Atlântica;RJ,SP
+bothrops insularis;cobra-jararaca-ilhoa;CR;Animalia;Chordata;Reptilia;Squamata;Viperidae;Bothrops;Mata Atlântica;SP
+atractus zebrus;coral-falsa;VU;Animalia;Chordata;Reptilia;Squamata;Dipsadidae;Atractus;Mata Atlântica;SP,RJ,ES,MG,BA
+bombonas spiralis;perereca-de-olhos-vermelhos;VU;Animalia;Chordata;Amphibia;Anura;Hylidae;Bombonas;Mata Atlântica;SP,RJ,ES,MG,BA,PR,SC,RS
+fritziana goeldi;perereca-de-goeldi;VU;Animalia;Chordata;Amphibia;Anura;Hemiphractidae;Fritziana;Mata Atlântica;RJ,ES,MG,SP
+brachycephalus ephippium;sapo-pulga-dourado;VU;Animalia;Chordata;Amphibia;Anura;Brachycephalidae;Brachycephalus;Mata Atlântica;RJ,SP
+melanophryniscus moreirae;sapo-de-barriga-vermelha;VU;Animalia;Chordata;Amphibia;Anura;Bufonidae;Melanophryniscus;Cerrado,Mata Atlântica;MG,RJ,SP
+espeleorhinaadspersa;perereca-sapo;VU;Animalia;Chordata;Amphibia;Anura;Cycloramphidae;Espeleorhina;Mata Atlântica;SP,RJ,ES,MG,BA,PR,SC,RS
+proceratophrys boiei;sapo-de-chifre;VU;Animalia;Chordata;Amphibia;Anura;Odontophrynidae;Proceratophrys;Mata Atlântica;SP,RJ,ES,MG,BA,PR,SC,RS
+melanophryniscus simplex;sapo-barriga-vermelha-do-sul;VU;Animalia;Chordata;Amphibia;Anura;Bufonidae;Melanophryniscus;Pampa,Mata Atlântica;RS,SC,PR
+scinax alcatraz;perereca-de-alcatrazes;CR;Animalia;Chordata;Amphibia;Anura;Hylidae;Scinax;Mata Atlântica;SP
+bokermannohyla alvarengai;perereca-de-bokermann;VU;Animalia;Chordata;Amphibia;Anura;Hylidae;Bokermannohyla;Cerrado,Mata Atlântica;MG,GO,BA
+paratelmatobius lutzii;sapo-de-lutz;VU;Animalia;Chordata;Amphibia;Anura;Leptodactylidae;Paratelmatobius;Cerrado,Mata Atlântica;MG,RJ,SP,GO
+cycloramphus boraceiensis;sapo-trovoada;VU;Animalia;Chordata;Amphibia;Anura;Cycloramphidae;Cycloramphus;Mata Atlântica;SP,RJ,ES,MG
+crossodactylus cyclospinus;sapo-rabo-de-faca;VU;Animalia;Chordata;Amphibia;Anura;Hylodidae;Crossodactylus;Mata Atlântica;SP,RJ,ES,MG,BA,PR,SC,RS
+melanophryniscus dorsalis;sapo-de-dorso-vermelho;VU;Animalia;Chordata;Amphibia;Anura;Bufonidae;Melanophryniscus;Pampa,Mata Atlântica;RS,SC,PR
+psyllophryne didactyla;sapo-pulga;VU;Animalia;Chordata;Amphibia;Anura;Brachycephalidae;Psyllophryne;Mata Atlântica;RJ,SP
+sternotherus carinatus;cágado-de-quilha;VU;Animalia;Chordata;Reptilia;Testudines;Kinosternidae;Sternotherus;Amazônia;AM,AC,RO,PA,RR
+rhinella pygmaea;sapo-pigmeu;VU;Animalia;Chordata;Amphibia;Anura;Bufonidae;Rhinella;Mata Atlântica;BA,ES,MG,RJ,SP
+dendropsophus elegans;perereca-elegante;VU;Animalia;Chordata;Amphibia;Anura;Hylidae;Dendropsophus;Mata Atlântica;BA,ES,MG,RJ,SP,PR,SC,RS
+physalaemus soaresi;sapo-de-soares;VU;Animalia;Chordata;Amphibia;Anura;Leptodactylidae;Physalaemus;Mata Atlântica;RJ,SP
+scinax tymbalinus;perereca-do-timbale;VU;Animalia;Chordata;Amphibia;Anura;Hylidae;Scinax;Mata Atlântica;SP,RJ,ES,MG
+ischnocnema parva;sapo-folha;VU;Animalia;Chordata;Amphibia;Anura;Brachycephalidae;Ischnocnema;Mata Atlântica;SP,RJ,ES,MG,BA
+proceratophrys melanopogon;sapo-de-chifre-negro;VU;Animalia;Chordata;Amphibia;Anura;Odontophrynidae;Proceratophrys;Mata Atlântica;SP,RJ,ES,MG,BA
+hypsiboas albomarginatus;perereca-de-barriga-branca;VU;Animalia;Chordata;Amphibia;Anura;Hylidae;Hypsiboas;Mata Atlântica;BA,ES,MG,RJ,SP,PR,SC,RS
+leptodactylus labyrinthicus;sapo-rã-do-labirinto;VU;Animalia;Chordata;Amphibia;Anura;Leptodactylidae;Leptodactylus;Cerrado,Amazônia,Mata Atlântica;AC,AM,AP,MT,MS,PA,RO,RR,TO,GO,MG,BA,ES,SP,RJ,PR,SC,RS
+melanophryniscus montevidadensis;sapo-de-montevidéu;VU;Animalia;Chordata;Amphibia;Anura;Bufonidae;Melanophryniscus;Pampa;RS
+scinax caldarum;perereca-do-caldarium;VU;Animalia;Chordata;Amphibia;Anura;Hylidae;Scinax;Mata Atlântica;BA,ES,MG,RJ,SP
+bokermannohyla circumdata;perereca-de-bokermann-circumdata;VU;Animalia;Chordata;Amphibia;Anura;Hylidae;Bokermannohyla;Cerrado,Mata Atlântica;MG,GO,BA,SP,RJ
+paratelmatobius mantiqueira;sapo-da-mantiqueira;VU;Animalia;Chordata;Amphibia;Anura;Leptodactylidae;Paratelmatobius;Mata Atlântica;MG,RJ,SP
+ischnocnema octavioi;sapo-de-octavio;VU;Animalia;Chordata;Amphibia;Anura;Brachycephalidae;Ischnocnema;Mata Atlântica;RJ,SP,MG
+rhinella crucifer;sapo-rã-do-brejo;VU;Animalia;Chordata;Amphibia;Anura;Bufonidae;Rhinella;Mata Atlântica;BA,ES,MG,RJ,SP,PR,SC,RS
+leptodactylus plaumanni;sapo-de-plaumann;VU;Animalia;Chordata;Amphibia;Anura;Leptodactylidae;Leptodactylus;Mata Atlântica;SC,RS,PR,SP,RJ,MG,ES,BA
+scinax fuscovarius;perereca-do-cerrado;VU;Animalia;Chordata;Amphibia;Anura;Hylidae;Scinax;Cerrado,Mata Atlântica;GO,MT,MS,TO,BA,MG,SP,RJ,ES,PR,SC,RS
+dendropsophus minutus;perereca-pequena;VU;Animalia;Chordata;Amphibia;Anura;Hylidae;Dendropsophus;Amazônia,Cerrado,Mata Atlântica,Caatinga,Pantanal;AC,AM,AP,MT,MS,PA,RO,RR,TO,MA,PI,BA,MG,SP,PR,SC,RS,GO,ES,RJ,PE,CE,RN,PB,AL,SE
+physalaemus cuvieri;sapo-de-cuvier;VU;Animalia;Chordata;Amphibia;Anura;Leptodactylidae;Physalaemus;Cerrado,Mata Atlântica;GO,MT,MS,TO,BA,MG,SP,RJ,ES,PR,SC,RS
+leptodactylus fuscus;sapo-assobiador;VU;Animalia;Chordata;Amphibia;Anura;Leptodactylidae;Leptodactylus;Amazônia,Cerrado,Caatinga,Pantanal,Mata Atlântica;AC,AM,AP,MT,MS,PA,RO,RR,TO,MA,PI,BA,MG,SP,RJ,ES,PR,SC,RS,GO,PE,CE,RN,PB,AL,SE
+scinax hayii;perereca-de-hayii;VU;Animalia;Chordata;Amphibia;Anura;Hylidae;Scinax;Mata Atlântica;BA,ES,MG,RJ,SP,PR,SC,RS
+dendropsophus decipiens;perereca-enganadora;VU;Animalia;Chordata;Amphibia;Anura;Hylidae;Dendropsophus;Mata Atlântica;BA,ES,MG,RJ,SP,PR,SC,RS
+leptodactylus latrans;sapo-rã-manteiga;VU;Animalia;Chordata;Amphibia;Anura;Leptodactylidae;Leptodactylus;Cerrado,Mata Atlântica,Pampa,Pantanal;GO,MT,MS,TO,BA,MG,SP,RJ,ES,PR,SC,RS
+physalaemus spiniger;sapo-espinho;VU;Animalia;Chordata;Amphibia;Anura;Leptodactylidae;Physalaemus;Mata Atlântica;SP,RJ,ES,MG,BA,PR,SC,RS
+scinax similarius;perereca-similis;VU;Animalia;Chordata;Amphibia;Anura;Hylidae;Scinax;Cerrado,Mata Atlântica;GO,MT,MS,TO,BA,MG,SP,RJ,ES,PR,SC,RS
+leptodactylus troglodytes;sapo-troglodita;VU;Animalia;Chordata;Amphibia;Anura;Leptodactylidae;Leptodactylus;Caatinga,Cerrado;BA,PI,PE,CE,RN,PB,AL,SE,GO,TO,MG
+dendropsophus berthalutzae;perereca-de-bertha;VU;Animalia;Chordata;Amphibia;Anura;Hylidae;Dendropsophus;Mata Atlântica;BA,ES,MG,RJ,SP,PR,SC,RS
+physalaemus olfersii;sapo-de-olfers;VU;Animalia;Chordata;Amphibia;Anura;Leptodactylidae;Physalaemus;Mata Atlântica;BA,ES,MG,RJ,SP,PR,SC,RS
+leptodactylus mystacinus;sapo-rã-mascarado;VU;Animalia;Chordata;Amphibia;Anura;Leptodactylidae;Leptodactylus;Cerrado,Mata Atlântica,Caatinga;GO,MT,MS,TO,BA,MG,SP,RJ,ES,PR,SC,RS,PI,PE,CE
+scinax crospedospilus;perereca-do-cerrado-pintada;VU;Animalia;Chordata;Amphibia;Anura;Hylidae;Scinax;Cerrado,Mata Atlântica;GO,MT,MS,TO,BA,MG,SP,RJ,ES,PR,SC,RS
+leptodactylus podicipinus;sapo-rã-pé-de-vaca;VU;Animalia;Chordata;Amphibia;Anura;Leptodactylidae;Leptodactylus;Cerrado,Amazônia,Pantanal,Mata Atlântica;AC,AM,AP,MT,MS,PA,RO,RR,TO,GO,MG,BA,SP,RJ,ES,PR,SC,RS
+dendropsophus elianeae;perereca-de-eliane;VU;Animalia;Chordata;Amphibia;Anura;Hylidae;Dendropsophus;Cerrado,Mata Atlântica;GO,MT,MS,TO,BA,MG,SP,RJ,ES,PR,SC,RS
+leptodactylus pustulatus;sapo-rã-pustuloso;VU;Animalia;Chordata;Amphibia;Anura;Leptodactylidae;Leptodactylus;Cerrado;GO,MT,MS,TO,BA,MG
+scinax duartei;perereca-de-duarte;VU;Animalia;Chordata;Amphibia;Anura;Hylidae;Scinax;Mata Atlântica;BA,ES,MG,RJ,SP,PR,SC,RS
+leptodactylus chaquensis;sapo-rã-do-chaco;VU;Animalia;Chordata;Amphibia;Anura;Leptodactylidae;Leptodactylus;Pantanal,Cerrado,Pampa;MS,MT,GO,RS,SC,PR
+scinax centralis;perereca-do-cerrado-central;VU;Animalia;Chordata;Amphibia;Anura;Hylidae;Scinax;Cerrado;GO,MT,MS,TO,BA,MG
+leptodactylus bufonius;sapo-rã-sapo;VU;Animalia;Chordata;Amphibia;Anura;Leptodactylidae;Leptodactylus;Cerrado,Pantanal;GO,MT,MS,TO,BA,MG
+scinax maracaya;perereca-do-maracá;VU;Animalia;Chordata;Amphibia;Anura;Hylidae;Scinax;Cerrado,Amazônia;GO,MT,MS,TO,PA,AM,AC,RO
+leptodactylus gracilis;sapo-rã-grácil;VU;Animalia;Chordata;Amphibia;Anura;Leptodactylidae;Leptodactylus;Pampa,Mata Atlântica,Cerrado;RS,SC,PR,SP,RJ,MG,ES,BA,GO,MT,MS,TO
+scinax berthae;perereca-de-bertha;VU;Animalia;Chordata;Amphibia;Anura;Hylidae;Scinax;Pampa,Cerrado;RS,SC,PR,SP,GO,MT,MS,TO
+leptodactylus mystaceus;sapo-rã-mascarado-grande;VU;Animalia;Chordata;Amphibia;Anura;Leptodactylidae;Leptodactylus;Mata Atlântica,Cerrado,Amazônia;BA,ES,MG,RJ,SP,PR,SC,RS,GO,MT,MS,TO,PA,AM,AC,RO,RR,AP,MA,PI
+scinax rizzinii;perereca-de-rizzini;VU;Animalia;Chordata;Amphibia;Anura;Hylidae;Scinax;Mata Atlântica;BA,ES,MG,RJ,SP,PR,SC,RS
+leptodactylus notoaktites;sapo-rã-do-sul;VU;Animalia;Chordata;Amphibia;Anura;Leptodactylidae;Leptodactylus;Mata Atlântica;SP,PR,SC,RS,RJ,MG,ES,BA
+scinax argyreornatus;perereca-de-pintas-prateadas;VU;Animalia;Chordata;Amphibia;Anura;Hylidae;Scinax;Mata Atlântica;BA,ES,MG,RJ,SP,PR,SC,RS

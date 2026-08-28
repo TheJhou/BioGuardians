@@ -1,0 +1,7 @@
+node_modules
+.env
+input/cnuc_ucs/*.shp
+input/cnuc_ucs/*.shx
+input/cnuc_ucs/*.dbf
+input/cnuc_ucs/*.prj
+input/cnuc_ucs/*.cpg
