@@ -36,16 +36,16 @@ CREATE TABLE estado (
 CREATE TABLE taxon (
     id          INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     nome        VARCHAR(100) NOT NULL,
-    rank        rank_taxonomia_tipo NOT NULL,
+    "rank"      rank_taxonomia_tipo NOT NULL,
     parent_id   INTEGER,
-    UNIQUE (nome, rank),
+    UNIQUE (nome, "rank"),
     CONSTRAINT taxon_parent_fk
         FOREIGN KEY (parent_id) REFERENCES taxon(id)
         ON DELETE RESTRICT
 ) WITH (fillfactor = 90);
 
 CREATE INDEX idx_taxon_parent ON taxon(parent_id);
-CREATE INDEX idx_taxon_rank   ON taxon(rank);
+CREATE INDEX idx_taxon_rank   ON taxon("rank");
 
 -- ---------- Tabela central: espécie ----------
 

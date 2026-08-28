@@ -123,7 +123,7 @@ BEGIN
 
     INSERT INTO especie (nome_cientifico, nome_popular, categoria_ameaca, genero_id)
     VALUES ('testus testus', 'test species', 'LC',
-            (SELECT id FROM taxon WHERE nome = 'panthera' AND rank = 'genero'))
+            (SELECT id FROM taxon WHERE nome = 'panthera' AND "rank" = 'genero'))
     RETURNING id INTO test_id;
 
     SELECT count(*) INTO final_count FROM log_auditoria WHERE tabela = 'especie';

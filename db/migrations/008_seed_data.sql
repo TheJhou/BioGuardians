@@ -41,17 +41,17 @@ INSERT INTO estado (uf, nome, regiao) VALUES
 
 -- ---------- Taxonomia (hierárquica) ----------
 -- Reino
-INSERT INTO taxon (nome, rank, parent_id) VALUES ('animalia','reino', NULL);
+INSERT INTO taxon (nome, "rank", parent_id) VALUES ('animalia','reino', NULL);
 -- Filos
-INSERT INTO taxon (nome, rank, parent_id)
-    SELECT 'chordata','filo', id FROM taxon WHERE nome='animalia' AND rank='reino';
+INSERT INTO taxon (nome, "rank", parent_id)
+    SELECT 'chordata','filo', id FROM taxon WHERE nome='animalia' AND "rank"='reino';
 -- Classes
-INSERT INTO taxon (nome, rank, parent_id)
+INSERT INTO taxon (nome, "rank", parent_id)
     SELECT v.cls,'classe', t.id
     FROM (VALUES ('mammalia'),('aves')) AS v(cls)
-    JOIN taxon t ON t.nome='chordata' AND t.rank='filo';
+    JOIN taxon t ON t.nome='chordata' AND t."rank"='filo';
 -- Ordens
-INSERT INTO taxon (nome, rank, parent_id)
+INSERT INTO taxon (nome, "rank", parent_id)
     SELECT v.ordem,'ordem', t.id
     FROM (VALUES
         ('mammalia','carnivora'),
@@ -60,9 +60,9 @@ INSERT INTO taxon (nome, rank, parent_id)
         ('mammalia','cetartiodactyla'),
         ('aves','psittaciformes')
     ) AS v(cls, ordem)
-    JOIN taxon t ON t.nome = v.cls AND t.rank='classe';
+    JOIN taxon t ON t.nome = v.cls AND t."rank"='classe';
 -- Famílias
-INSERT INTO taxon (nome, rank, parent_id)
+INSERT INTO taxon (nome, "rank", parent_id)
     SELECT v.familia,'familia', t.id
     FROM (VALUES
         ('carnivora','felidae'),
@@ -74,9 +74,9 @@ INSERT INTO taxon (nome, rank, parent_id)
         ('cetartiodactyla','tayassuidae'),
         ('psittaciformes','psittacidae')
     ) AS v(ordem, familia)
-    JOIN taxon t ON t.nome = v.ordem AND t.rank='ordem';
+    JOIN taxon t ON t.nome = v.ordem AND t."rank"='ordem';
 -- Gêneros
-INSERT INTO taxon (nome, rank, parent_id)
+INSERT INTO taxon (nome, "rank", parent_id)
     SELECT v.genero,'genero', t.id
     FROM (VALUES
         ('felidae','panthera'),
@@ -92,11 +92,11 @@ INSERT INTO taxon (nome, rank, parent_id)
         ('psittacidae','amazona'),
         ('psittacidae','pyrrhura')
     ) AS v(familia, genero)
-    JOIN taxon t ON t.nome = v.familia AND t.rank='familia';
+    JOIN taxon t ON t.nome = v.familia AND t."rank"='familia';
 
 -- ---------- Espécies ----------
 INSERT INTO especie (nome_cientifico, nome_popular, categoria_ameaca, genero_id, descricao)
-SELECT v.nc, v.np, v.cat::categoria_ameaca_tipo, g.id, v.desc
+SELECT v.nc, v.np, v.cat::categoria_ameaca_tipo, g.id, v.descricao
 FROM (VALUES
     ('panthera onca',         'onça-pintada',     'VU',
      'panthera', 'Maior felino das Américas; ameaçado por perda de habitat e caça.'),
@@ -124,8 +124,8 @@ FROM (VALUES
      'amazona', 'Psitacídeo endêmico da Mata Atlântica; tráfico de animais.'),
     ('pyrrhura cruentata',    'tiriba-grande',    'VU',
      'pyrrhura', 'Periquito da Mata Atlântica; restrito a remanescentes.')
-) AS v(nc, np, cat, genero, desc)
-JOIN taxon g ON g.nome = v.genero AND g.rank = 'genero';
+) AS v(nc, np, cat, genero, descricao)
+JOIN taxon g ON g.nome = v.genero AND g."rank" = 'genero';
 
 -- ---------- Espécie <-> Bioma ----------
 INSERT INTO especie_bioma (especie_id, bioma_id)
