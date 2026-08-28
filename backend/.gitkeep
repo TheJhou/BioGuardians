@@ -1,0 +1,5 @@
+# Backend (Node.js + Express)
+Placeholder — será implementado na próxima etapa.
+- API REST que executa SQL parametrizado no PostGIS
+- Endpoints: /especies, /areas, /ocorrencias, /especies/:id/areas-protegidas
+- Conexão via DATABASE_URL (ver .env.example)
