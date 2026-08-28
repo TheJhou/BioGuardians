@@ -43,3 +43,55 @@
 - Taxonomia hierárquica com auto-referência (reino → gênero)
 - Auditoria via trigger genérico (to_jsonb do registro inteiro)
 - Views materializadas com refresh simples (não CONCURRENTLY dentro de função)
+
+## Observabilidade (OpenTelemetry + Grafana stack)
+
+### Arquitetura
+```
+Backend (Node.js) ──OTLP/gRPC──> OTel Collector ──> Prometheus (metrics)
+                                  ├──> Tempo (traces)
+                                  └──> Loki (logs via OTLP/HTTP)
+Grafana (:3000) lê de Prometheus + Tempo + Loki
+```
+
+### Arquivos
+- `backend/src/telemetry/instrumentation.ts` — SDK Node + auto-instrumentações (Express, pg, http)
+- `backend/src/telemetry/logger.ts` — logger OTel nativo (JSON em prod, pretty em dev)
+- `backend/src/telemetry/metrics.ts` — métricas customizadas (cache hit/miss, errors)
+- `backend/src/middleware/requestLogger.ts` — log de cada request HTTP
+- `otel-collector-config.yaml` — config do Collector (receivers, processors, exporters)
+- `observability/prometheus.yml` — scrape config
+- `observability/tempo.yml` — Tempo (local storage)
+- `observability/loki.yml` — Loki (filesystem, OTLP nativo)
+- `observability/grafana/provisioning/` — datasources + dashboard provider
+- `observability/grafana/dashboards/bioguardians-overview.json` — dashboard Fase 1
+- `docker-compose.observability.yml` — overlay (5 serviços)
+
+### Como subir
+```bash
+# Só a aplicação (sem observabilidade)
+docker compose -f docker-compose.prod.yml up -d
+
+# Aplicação + observabilidade
+docker compose -f docker-compose.prod.yml -f docker-compose.observability.yml up -d
+```
+
+### Acesso
+- Grafana: http://localhost:3000 (admin/admin)
+- Prometheus: http://localhost:9090
+- Tempo: http://localhost:3200
+- Loki: http://localhost:3100/ready
+
+### Instrumentação
+- **Auto-instrumentação**: `@opentelemetry/auto-instrumentations-node` instrumenta Express, pg, http automaticamente
+- **Condicional**: só ativa se `OTEL_EXPORTER_OTLP_ENDPOINT` estiver definida (no-op em dev sem overlay)
+- **gRPC**: traces + metrics via gRPC (:4317); logs via HTTP (:4318)
+- **Filtros**: `/api/health` não gera spans (ruído)
+- **Pool DB**: max=20, connectionTimeout=10s, idleTimeout=30s
+
+### Métricas disponíveis
+- `http_server_request_duration_seconds` (histogram) — latency por rota
+- `db_client_operation_duration_seconds` (histogram) — query duration
+- `db_client_connections_usage` (gauge) — pool active/idle
+- `bioguardians_cache_hits_total` / `bioguardians_cache_misses_total` (counter) — cache hit rate
+- `bioguardians_errors_total` (counter) — erros por tipo/status

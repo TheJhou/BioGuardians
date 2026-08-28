@@ -1,0 +1,131 @@
+# ============================================================
+# BioGuardians — Observability Overlay
+# Use with: docker compose -f docker-compose.prod.yml -f docker-compose.observability.yml up -d
+# Or dev:   docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
+#
+# Adds: OTel Collector, Prometheus, Tempo, Loki, Grafana
+# Also injects OTEL_* env vars into the existing backend service.
+# ============================================================
+
+services:
+  # ---------- Backend: inject OTel env vars (merged into existing service) ----------
+  backend:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: http://otel-collector:4318
+      OTEL_SERVICE_NAME: bioguardians-backend
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=production
+    depends_on:
+      otel-collector:
+        condition: service_started
+
+  # ---------- OpenTelemetry Collector ----------
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.110.0
+    container_name: bioguardians-otel-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC (backend → collector)
+      - "4318:4318"   # OTLP HTTP (logs)
+      - "8889:8889"   # Prometheus exporter (scraped by Prometheus)
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:13133/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  # ---------- Prometheus (metrics) ----------
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    container_name: bioguardians-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - bioguardians_prometheus:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=168h"
+      - "--storage.tsdb.path=/prometheus"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  # ---------- Tempo (traces) ----------
+  tempo:
+    image: grafana/tempo:2.6.0
+    container_name: bioguardians-tempo
+    restart: unless-stopped
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./observability/tempo.yml:/etc/tempo.yaml:ro
+      - bioguardians_tempo:/var/tempo
+    ports:
+      - "3200:3200"   # Tempo API (query + UI)
+    # OTLP gRPC :4317 is internal-only (collector → tempo, not exposed to host)
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1"
+
+  # ---------- Loki (logs) ----------
+  loki:
+    image: grafana/loki:3.3.0
+    container_name: bioguardians-loki
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    volumes:
+      - ./observability/loki.yml:/etc/loki/local-config.yaml:ro
+      - bioguardians_loki:/loki
+    ports:
+      - "3100:3100"   # Loki API (query + push)
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1"
+
+  # ---------- Grafana (visualization) ----------
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: bioguardians-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/bioguardians-overview.json
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - bioguardians_grafana:/var/lib/grafana
+    ports:
+      - "3000:3000"   # Grafana UI
+    depends_on:
+      - prometheus
+      - tempo
+      - loki
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+volumes:
+  bioguardians_prometheus:
+  bioguardians_tempo:
+  bioguardians_loki:
+  bioguardians_grafana:

@@ -1,9 +1,13 @@
 import pg from 'pg';
+import { env } from '../config/env.js';
 
 const { Pool } = pg;
 
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  max: env.dbPoolMax,
+  connectionTimeoutMillis: 10_000,
+  idleTimeoutMillis: 30_000,
 });
 
 export async function query<T extends pg.QueryResultRow = pg.QueryResultRow>(

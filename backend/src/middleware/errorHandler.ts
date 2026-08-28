@@ -1,4 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
+import { logger } from '../telemetry/logger.js';
+import { errorCounter } from '../telemetry/metrics.js';
 
 interface AppError extends Error {
   status?: number;
@@ -9,10 +11,24 @@ interface AppError extends Error {
 // and generic errors, returning a consistent JSON response.
 export function errorHandler(
   err: AppError,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction
 ): void {
+  const statusCode = err.status || 500;
+  const errorType = err.code || 'unknown';
+
+  // Log and count every error.
+  logger.error('unhandled_error', {
+    method: req.method,
+    path: req.path,
+    status: statusCode,
+    type: errorType,
+    message: err.message,
+  });
+
+  errorCounter.add(1, { type: errorType, status: String(statusCode) });
+
   // PostgreSQL error codes
   if (err.code === '23505') {
     res.status(409).json({ error: 'Duplicate entry', detail: err.message });
@@ -31,8 +47,7 @@ export function errorHandler(
     return;
   }
 
-  const status = err.status || 500;
-  res.status(status).json({
+  res.status(statusCode).json({
     error: err.message || 'Internal server error',
   });
 }

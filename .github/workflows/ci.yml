@@ -313,11 +313,39 @@ jobs:
             docker-compose.prod.yml \
             ${{ secrets.ORACLE_SSH_USER }}@${{ secrets.ORACLE_SSH_HOST }}:~/bioguardians/docker-compose.prod.yml
 
-      - name: SSH and deploy containers
+      - name: SCP observability files to VM
+        run: |
+          ssh -i ~/.ssh/id_rsa -p ${{ secrets.ORACLE_SSH_PORT || 22 }} \
+            ${{ secrets.ORACLE_SSH_USER }}@${{ secrets.ORACLE_SSH_HOST }} \
+            'mkdir -p ~/bioguardians/observability/grafana/provisioning/datasources \
+                      ~/bioguardians/observability/grafana/provisioning/dashboards \
+                      ~/bioguardians/observability/grafana/dashboards'
+
+          scp -i ~/.ssh/id_rsa -P ${{ secrets.ORACLE_SSH_PORT || 22 }} \
+            docker-compose.observability.yml otel-collector-config.yaml \
+            ${{ secrets.ORACLE_SSH_USER }}@${{ secrets.ORACLE_SSH_HOST }}:~/bioguardians/
+
+          scp -i ~/.ssh/id_rsa -P ${{ secrets.ORACLE_SSH_PORT || 22 }} \
+            observability/prometheus.yml observability/tempo.yml observability/loki.yml \
+            ${{ secrets.ORACLE_SSH_USER }}@${{ secrets.ORACLE_SSH_HOST }}:~/bioguardians/observability/
+
+          scp -i ~/.ssh/id_rsa -P ${{ secrets.ORACLE_SSH_PORT || 22 }} \
+            observability/grafana/provisioning/datasources/datasources.yml \
+            ${{ secrets.ORACLE_SSH_USER }}@${{ secrets.ORACLE_SSH_HOST }}:~/bioguardians/observability/grafana/provisioning/datasources/
+
+          scp -i ~/.ssh/id_rsa -P ${{ secrets.ORACLE_SSH_PORT || 22 }} \
+            observability/grafana/provisioning/dashboards/dashboards.yml \
+            ${{ secrets.ORACLE_SSH_USER }}@${{ secrets.ORACLE_SSH_HOST }}:~/bioguardians/observability/grafana/provisioning/dashboards/
+
+          scp -i ~/.ssh/id_rsa -P ${{ secrets.ORACLE_SSH_PORT || 22 }} \
+            observability/grafana/dashboards/bioguardians-overview.json \
+            ${{ secrets.ORACLE_SSH_USER }}@${{ secrets.ORACLE_SSH_HOST }}:~/bioguardians/observability/grafana/dashboards/
+
+      - name: SSH and deploy containers (app + observability)
         run: |
           ssh -i ~/.ssh/id_rsa -p ${{ secrets.ORACLE_SSH_PORT || 22 }} \
             ${{ secrets.ORACLE_SSH_USER }}@${{ secrets.ORACLE_SSH_HOST }} \
             'cd ~/bioguardians && \
-             sudo docker compose -f docker-compose.prod.yml pull && \
-             sudo docker compose -f docker-compose.prod.yml up -d && \
+             sudo docker compose -f docker-compose.prod.yml -f docker-compose.observability.yml pull && \
+             sudo docker compose -f docker-compose.prod.yml -f docker-compose.observability.yml up -d && \
              sudo docker image prune -f'

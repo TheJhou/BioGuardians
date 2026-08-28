@@ -1,6 +1,7 @@
 import { LRUCache } from 'lru-cache';
 import type { Request, Response, NextFunction } from 'express';
 import { env } from '../config/env.js';
+import { cacheHits, cacheMisses } from '../telemetry/metrics.js';
 
 // L1 in-memory LRU cache for read-heavy endpoints.
 const cache = new LRUCache<string, Record<string, unknown>>({
@@ -33,9 +34,12 @@ export function cacheMiddleware(
     const key = keyFn(req);
     const cached = cache.get(key);
     if (cached) {
+      cacheHits.add(1, { route: req.path });
       res.json(cached);
       return;
     }
+
+    cacheMisses.add(1, { route: req.path });
 
     // Intercept res.json to cache the response before sending.
     const originalJson = res.json.bind(res);

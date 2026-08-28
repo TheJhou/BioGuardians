@@ -16,4 +16,5 @@ export const env = {
     max: parseInt(process.env.CACHE_MAX || '100', 10),
   },
   gbifApiBase: process.env.GBIF_API_BASE || 'https://api.gbif.org/v1',
+  dbPoolMax: parseInt(process.env.DB_POOL_MAX || '20', 10),
 } as const;
