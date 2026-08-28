@@ -25,6 +25,16 @@ interface MapViewProps {
   selectedEspecieId?: number | null;
 }
 
+// Debounce hook: delays calling a function until after wait ms of inactivity.
+function useDebounce<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const handler = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+  return debounced;
+}
+
 export default function MapView({ filters, selectedEspecieId }: MapViewProps) {
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
@@ -40,37 +50,64 @@ export default function MapView({ filters, selectedEspecieId }: MapViewProps) {
   const [error, setError] = useState<string | null>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
 
-  // Load areas (filtered by bioma if provided).
+  // Track current map viewport (bounds + zoom)
+  const [viewport, setViewport] = useState({
+    bbox: '' as string,
+    zoom: zoom,
+  });
+
+  // Debounce viewport changes to avoid hammering the API on every pan/zoom frame.
+  const debouncedViewport = useDebounce(viewport, 500);
+
+  // Update viewport when map is idle (user stopped panning/zooming).
+  const onIdle = useCallback(() => {
+    if (!mapRef.current) return;
+    const bounds = mapRef.current.getBounds();
+    if (!bounds) return;
+    const sw = bounds.getSouthWest();
+    const ne = bounds.getNorthEast();
+    const bbox = `${sw.lng()},${sw.lat()},${ne.lng()},${ne.lat()}`;
+    const z = mapRef.current.getZoom() || zoom;
+    setViewport({ bbox, zoom: z });
+  }, []);
+
+  // Load areas (filtered by bioma + viewport).
   const loadAreas = useCallback(async () => {
+    if (!debouncedViewport.bbox) return;
     try {
       const data = await api.getAreas({
         bioma: filters.bioma,
+        bbox: debouncedViewport.bbox,
+        zoom: debouncedViewport.zoom,
       });
       setAreas(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load areas');
     }
-  }, [filters.bioma]);
+  }, [filters.bioma, debouncedViewport]);
 
-  // Load occurrences (filtered by especie_id if selected).
+  // Load occurrences (filtered by especie_id + viewport).
   const loadOcorrencias = useCallback(async () => {
+    if (!debouncedViewport.bbox) return;
     try {
       const data = await api.getOcorrencias({
         especie_id: selectedEspecieId || undefined,
-        limit: 500,
+        bbox: debouncedViewport.bbox,
+        limit: 1000,
       });
       setOcorrencias(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load occurrences');
     }
-  }, [selectedEspecieId]);
+  }, [selectedEspecieId, debouncedViewport]);
 
   useEffect(() => {
+    if (!debouncedViewport.bbox) return;
     setLoading(true);
     setError(null);
     Promise.all([loadAreas(), loadOcorrencias()])
       .finally(() => setLoading(false));
-  }, [loadAreas, loadOcorrencias]);
+  }, [loadAreas, loadOcorrencias, debouncedViewport]);
 
   // Handle click on a protected area polygon.
   const handleAreaClick = async (areaId: number) => {
@@ -104,6 +141,7 @@ export default function MapView({ filters, selectedEspecieId }: MapViewProps) {
         center={center}
         zoom={zoom}
         onLoad={onLoad}
+        onIdle={onIdle}
         options={{
           mapTypeControl: true,
           streetViewControl: false,

@@ -7,9 +7,10 @@ import { parseParam, getParam } from '../utils/params.js';
 const router = Router();
 
 // GET /api/areas — returns GeoJSON FeatureCollection, cached 30s
+// Supports bbox (minLng,minLat,maxLng,maxLat) and zoom for geometry simplification.
 router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next) => {
   try {
-    const { bioma, esfera, categoria } = req.query;
+    const { bioma, esfera, categoria, bbox, zoom } = req.query;
 
     const conditions: string[] = [];
     const params: unknown[] = [];
@@ -19,7 +20,29 @@ router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next)
     if (esfera) { conditions.push(`a.esfera = $${idx++}`); params.push(esfera); }
     if (categoria) { conditions.push(`a.categoria_uc = $${idx++}`); params.push(categoria); }
 
+    // Bounding box filter: only return areas intersecting the visible map region
+    let bboxCondition = '';
+    if (bbox) {
+      const parts = String(bbox).split(',').map(Number);
+      if (parts.length === 4 && parts.every(n => !isNaN(n))) {
+        conditions.push(`ST_Intersects(a.geom, ST_MakeEnvelope($${idx}, $${idx + 1}, $${idx + 2}, $${idx + 3}, 4326))`);
+        params.push(parts[0], parts[1], parts[2], parts[3]);
+        idx += 4;
+      }
+    }
+
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    // Simplify geometry based on zoom level to reduce payload size.
+    // Higher zoom = more detail, lower zoom = simpler polygons.
+    const zoomLevel = zoom ? parseInt(String(zoom), 10) : 10;
+    // tolerance in degrees: ~0.01 at zoom 15+, ~0.1 at zoom 5
+    const tolerance = Math.max(0.001, 0.1 / Math.pow(2, (zoomLevel - 5) / 2));
+    const geomExpr = `ST_SimplifyPreserveTopology(a.geom, $${idx++})`;
+    params.push(tolerance);
+
+    // Limit results to prevent massive responses
+    const limitClause = `LIMIT 500`;
 
     const { rows } = await query(
       `SELECT json_build_object(
@@ -30,7 +53,7 @@ router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next)
              SELECT json_build_object(
                'type', 'Feature',
                'id', a.id,
-               'geometry', ST_AsGeoJSON(a.geom)::json,
+               'geometry', ST_AsGeoJSON(${geomExpr})::json,
                'properties', json_build_object(
                  'nome', a.nome,
                  'categoria_uc', a.categoria_uc,
@@ -41,6 +64,7 @@ router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next)
              ) AS feature
              FROM area_protegida a
              ${where}
+             ${limitClause}
            ) sub
          ), '[]'::json)
        ) AS geojson`,

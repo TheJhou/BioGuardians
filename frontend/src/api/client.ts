@@ -116,12 +116,16 @@ export const api = {
   },
 
   // Areas
-  async getAreas(params?: { bioma?: number; esfera?: string; categoria?: string }):
-    Promise<GeoJSONFeatureCollection> {
+  async getAreas(params?: {
+    bioma?: number; esfera?: string; categoria?: string;
+    bbox?: string; zoom?: number;
+  }): Promise<GeoJSONFeatureCollection> {
     const qs = new URLSearchParams();
     if (params?.bioma) qs.set('bioma', String(params.bioma));
     if (params?.esfera) qs.set('esfera', params.esfera);
     if (params?.categoria) qs.set('categoria', params.categoria);
+    if (params?.bbox) qs.set('bbox', params.bbox);
+    if (params?.zoom) qs.set('zoom', String(params.zoom));
     const query = qs.toString();
     return fetchApi<GeoJSONFeatureCollection>(`/areas${query ? `?${query}` : ''}`);
   },
@@ -154,12 +158,14 @@ export const api = {
   },
 
   // Ocorrencias
-  async getOcorrencias(params?: { especie_id?: number; fonte?: string; limit?: number }):
-    Promise<GeoJSONFeatureCollection<OcorrenciaProperties>> {
+  async getOcorrencias(params?: {
+    especie_id?: number; fonte?: string; limit?: number; bbox?: string;
+  }): Promise<GeoJSONFeatureCollection<OcorrenciaProperties>> {
     const qs = new URLSearchParams();
     if (params?.especie_id) qs.set('especie_id', String(params.especie_id));
     if (params?.fonte) qs.set('fonte', params.fonte);
     if (params?.limit) qs.set('limit', String(params.limit));
+    if (params?.bbox) qs.set('bbox', params.bbox);
     const query = qs.toString();
     return fetchApi<GeoJSONFeatureCollection<OcorrenciaProperties>>(
       `/ocorrencias${query ? `?${query}` : ''}`

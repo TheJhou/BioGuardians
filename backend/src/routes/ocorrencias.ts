@@ -8,9 +8,10 @@ import { parseParam, getParam } from '../utils/params.js';
 const router = Router();
 
 // GET /api/ocorrencias?especie_id=42 — returns GeoJSON FeatureCollection
+// Supports bbox (minLng,minLat,maxLng,maxLat) to filter by visible map region.
 router.get('/', async (req, res, next) => {
   try {
-    const { especie_id, fonte, limit } = req.query;
+    const { especie_id, fonte, limit, bbox } = req.query;
 
     const conditions: string[] = [];
     const params: unknown[] = [];
@@ -24,9 +25,17 @@ router.get('/', async (req, res, next) => {
       conditions.push(`o.fonte = $${idx++}`);
       params.push(fonte);
     }
+    if (bbox) {
+      const parts = String(bbox).split(',').map(Number);
+      if (parts.length === 4 && parts.every(n => !isNaN(n))) {
+        conditions.push(`ST_Intersects(o.geom, ST_MakeEnvelope($${idx}, $${idx + 1}, $${idx + 2}, $${idx + 3}, 4326))`);
+        params.push(parts[0], parts[1], parts[2], parts[3]);
+        idx += 4;
+      }
+    }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-    const limitClause = limit ? `LIMIT $${idx++}` : 'LIMIT 500';
+    const limitClause = limit ? `LIMIT $${idx++}` : 'LIMIT 1000';
     if (limit) params.push(parseParam(limit));
 
     const { rows } = await query(
