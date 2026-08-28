@@ -4,6 +4,10 @@
 -- database features (PostGIS, triggers, views, functions) work.
 -- Used by CI (GitHub Actions) and can be run manually.
 --
+-- These tests validate STRUCTURE, not data. Data is loaded
+-- separately via the data loading scripts (MMA, CNUC, GBIF,
+-- speciesLink) and is not expected in CI ephemeral databases.
+--
 -- Usage:
 --   psql -U bioguard -d bioguardians -f db/tests/smoke_test.sql
 --
@@ -36,8 +40,8 @@ BEGIN
     END IF;
 END $$;
 
--- ---------- Test 2: Seed data was loaded ----------
-\echo 'Test 2: Checking seed data counts...'
+-- ---------- Test 2: Reference data was loaded ----------
+\echo 'Test 2: Checking reference data counts...'
 DO $$
 BEGIN
     IF (SELECT count(*) FROM categoria_ameaca) < 6 THEN
@@ -49,81 +53,51 @@ BEGIN
     IF (SELECT count(*) FROM estado) < 27 THEN
         RAISE EXCEPTION 'estado not fully loaded (expected 27)';
     END IF;
-    IF (SELECT count(*) FROM taxon) < 20 THEN
-        RAISE EXCEPTION 'taxon not fully loaded';
-    END IF;
-    IF (SELECT count(*) FROM especie) < 13 THEN
-        RAISE EXCEPTION 'especie not fully loaded (expected 13)';
-    END IF;
-    IF (SELECT count(*) FROM area_protegida) < 9 THEN
-        RAISE EXCEPTION 'area_protegida not fully loaded (expected 9)';
-    END IF;
-    IF (SELECT count(*) FROM ocorrencia) < 21 THEN
-        RAISE EXCEPTION 'ocorrencia not fully loaded (expected 21)';
-    END IF;
 END $$;
 
--- ---------- Test 3: Spatial query (ST_Contains) ----------
-\echo 'Test 3: Testing ST_Contains spatial query...'
+-- ---------- Test 3: Spatial functions exist ----------
+\echo 'Test 3: Checking spatial functions exist...'
 DO $$
 DECLARE
-    result_count integer;
+    func_count integer;
 BEGIN
-    -- Area 1 = Parque Nacional do Iguaçu (should contain panthera onca)
-    SELECT count(*) INTO result_count FROM especies_em_area(1);
-    IF result_count = 0 THEN
-        RAISE EXCEPTION 'especies_em_area(1) returned 0 species - spatial query not working';
+    SELECT count(*) INTO func_count FROM pg_proc
+    WHERE proname IN ('especies_em_area', 'areas_protegem_especie', 'refresh_dashboard');
+    IF func_count < 3 THEN
+        RAISE EXCEPTION 'Missing spatial functions (expected 3, got %)', func_count;
     END IF;
 END $$;
 
--- ---------- Test 4: Reverse spatial query ----------
-\echo 'Test 4: Testing areas_protegem_especie function...'
+-- ---------- Test 4: Materialized views exist ----------
+\echo 'Test 4: Checking materialized views exist...'
 DO $$
 DECLARE
-    result_count integer;
+    mv_count integer;
 BEGIN
-    SELECT count(*) INTO result_count FROM areas_protegem_especie(
-        (SELECT id FROM especie WHERE nome_cientifico = 'panthera onca')
-    );
-    IF result_count = 0 THEN
-        RAISE EXCEPTION 'areas_protegem_especie returned 0 areas for panthera onca';
+    SELECT count(*) INTO mv_count FROM pg_matviews
+    WHERE matviewname IN ('dashboard_stats', 'especies_por_uc', 'ranking_especies_categoria', 'ucs_por_esfera');
+    IF mv_count < 4 THEN
+        RAISE EXCEPTION 'Missing materialized views (expected 4, got %)', mv_count;
     END IF;
 END $$;
 
--- ---------- Test 5: Materialized views ----------
-\echo 'Test 5: Testing materialized views...'
-DO $$
-BEGIN
-    IF (SELECT total_especies FROM dashboard_stats) < 13 THEN
-        RAISE EXCEPTION 'dashboard_stats.total_especies < 13';
-    END IF;
-    IF (SELECT total_areas FROM dashboard_stats) < 9 THEN
-        RAISE EXCEPTION 'dashboard_stats.total_areas < 9';
-    END IF;
-    IF (SELECT count(*) FROM especies_por_uc) = 0 THEN
-        RAISE EXCEPTION 'especies_por_uc is empty';
-    END IF;
-    IF (SELECT count(*) FROM ranking_especies_categoria) = 0 THEN
-        RAISE EXCEPTION 'ranking_especies_categoria is empty';
-    END IF;
-    IF (SELECT count(*) FROM ucs_por_esfera) = 0 THEN
-        RAISE EXCEPTION 'ucs_por_esfera is empty';
-    END IF;
-END $$;
-
--- ---------- Test 6: Audit trigger fires on INSERT ----------
-\echo 'Test 6: Testing audit trigger on INSERT...'
+-- ---------- Test 5: Audit trigger fires on INSERT ----------
+\echo 'Test 5: Testing audit trigger on INSERT...'
 DO $$
 DECLARE
     initial_count bigint;
     final_count bigint;
     test_id integer;
+    test_genero_id integer;
 BEGIN
+    -- Create a minimal taxonomy chain for the test species
+    INSERT INTO taxon (nome, "rank") VALUES ('testgenus_smoke', 'genero')
+    RETURNING id INTO test_genero_id;
+
     SELECT count(*) INTO initial_count FROM log_auditoria WHERE tabela = 'especie';
 
     INSERT INTO especie (nome_cientifico, nome_popular, categoria_ameaca, genero_id)
-    VALUES ('testus testus', 'test species', 'LC',
-            (SELECT id FROM taxon WHERE nome = 'panthera' AND "rank" = 'genero'))
+    VALUES ('testus smokeus', 'test species', 'LC', test_genero_id)
     RETURNING id INTO test_id;
 
     SELECT count(*) INTO final_count FROM log_auditoria WHERE tabela = 'especie';
@@ -131,12 +105,13 @@ BEGIN
         RAISE EXCEPTION 'Audit trigger did not fire on INSERT into especie';
     END IF;
 
-    -- Clean up test data (DELETE also triggers audit, which is fine)
+    -- Clean up test data
     DELETE FROM especie WHERE id = test_id;
+    DELETE FROM taxon WHERE id = test_genero_id;
 END $$;
 
--- ---------- Test 7: Geometry validation trigger ----------
-\echo 'Test 7: Testing geometry validation trigger...'
+-- ---------- Test 6: Geometry validation trigger ----------
+\echo 'Test 6: Testing geometry validation trigger...'
 DO $$
 BEGIN
     -- Valid geometry should work
@@ -161,8 +136,8 @@ BEGIN
     END;
 END $$;
 
--- ---------- Test 8: Migration journal ----------
-\echo 'Test 8: Testing migration journal...'
+-- ---------- Test 7: Migration journal ----------
+\echo 'Test 7: Testing migration journal...'
 DO $$
 DECLARE
     migration_count integer;
@@ -170,6 +145,18 @@ BEGIN
     SELECT count(*) INTO migration_count FROM schema_migrations;
     IF migration_count < 8 THEN
         RAISE EXCEPTION 'schema_migrations has % entries (expected at least 8)', migration_count;
+    END IF;
+END $$;
+
+-- ---------- Test 8: PostGIS extension ----------
+\echo 'Test 8: Checking PostGIS extension...'
+DO $$
+DECLARE
+    postgis_version text;
+BEGIN
+    SELECT postgis_scripts_installed() INTO postgis_version;
+    IF postgis_version IS NULL THEN
+        RAISE EXCEPTION 'PostGIS extension not installed';
     END IF;
 END $$;
 
