@@ -45,7 +45,7 @@ jobs:
           sudo apt-get install -y -qq postgresql-client
 
       - name: Run migrations
-        run: sh db/migrate.sh
+        run: bash db/migrate.sh
 
       - name: Run smoke tests
         env:
@@ -53,5 +53,5 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -h localhost -U "$DB_USER" -d "$DB_NAME" -f db/tests/smoke_test.sql
 
       - name: Verify migration idempotency
-        run: sh db/migrate.sh
+        run: bash db/migrate.sh
         # Second run should skip all migrations (already applied)

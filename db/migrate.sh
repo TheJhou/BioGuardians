@@ -19,7 +19,7 @@
 #   DB_NAME     (required)
 #   MIGRATIONS_DIR (default: ./migrations relative to script)
 # ============================================================
-set -euo pipefail
+set -eu
 
 # ---------- Configuration ----------
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

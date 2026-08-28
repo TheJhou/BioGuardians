@@ -31,7 +31,7 @@ services:
       DB_NAME: ${DB_NAME:?DB_NAME is required}
     volumes:
       - ./db:/db:ro
-    entrypoint: ["sh", "/db/migrate.sh"]
+    entrypoint: ["bash", "/db/migrate.sh"]
     restart: "no"
 
 volumes:
