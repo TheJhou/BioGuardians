@@ -299,6 +299,14 @@ jobs:
             ${{ secrets.ORACLE_SSH_USER }}@${{ secrets.ORACLE_SSH_HOST }} \
             'mkdir -p ~/bioguardians'
 
+      - name: Create .env on VM with database credentials
+        run: |
+          ssh -i ~/.ssh/id_rsa -p ${{ secrets.ORACLE_SSH_PORT || 22 }} \
+            ${{ secrets.ORACLE_SSH_USER }}@${{ secrets.ORACLE_SSH_HOST }} \
+            "printf 'DB_USER=%s\nDB_PASSWORD=%s\nDB_NAME=%s\nDB_PORT=%s\nCORS_ORIGIN=http://localhost\nVITE_API_URL=http://localhost:3001/api\n' \
+            '${{ secrets.DB_USER }}' '${{ secrets.DB_PASSWORD }}' '${{ secrets.DB_NAME }}' '${{ secrets.DB_PORT }}' \
+            > ~/bioguardians/.env"
+
       - name: SCP docker-compose.prod.yml to VM
         run: |
           scp -i ~/.ssh/id_rsa -P ${{ secrets.ORACLE_SSH_PORT || 22 }} \
@@ -310,6 +318,6 @@ jobs:
           ssh -i ~/.ssh/id_rsa -p ${{ secrets.ORACLE_SSH_PORT || 22 }} \
             ${{ secrets.ORACLE_SSH_USER }}@${{ secrets.ORACLE_SSH_HOST }} \
             'cd ~/bioguardians && \
-             docker compose -f docker-compose.prod.yml pull && \
-             docker compose -f docker-compose.prod.yml up -d && \
-             docker image prune -f'
+             sudo docker compose -f docker-compose.prod.yml pull && \
+             sudo docker compose -f docker-compose.prod.yml up -d && \
+             sudo docker image prune -f'
