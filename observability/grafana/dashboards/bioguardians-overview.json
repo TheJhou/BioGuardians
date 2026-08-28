@@ -743,6 +743,43 @@
         "y": 30
       },
       "id": 11,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "displayMode": "auto",
+            "filterable": true
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Duration"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true
+      },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "query": "{resource.service.name=\"bioguardians-backend\"}",
@@ -750,8 +787,8 @@
           "refId": "A"
         }
       ],
-      "title": "Request Traces (rotas, queries, tempo)",
-      "type": "traces"
+      "title": "Request Traces (rotas, duração, queries)",
+      "type": "table"
     }
   ],
   "refresh": "10s",
