@@ -36,4 +36,5 @@ BEGIN
   END LOOP;
 END $$;
 
-SELECT pg_reload_conf();
+-- Note: ALTER DATABASE settings take effect on the next connection.
+-- No pg_reload_conf() needed (it requires superuser privileges).
