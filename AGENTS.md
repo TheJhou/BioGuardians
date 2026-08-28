@@ -5,27 +5,36 @@
 - **Backend**: Node.js + Express (próxima etapa)
 - **Frontend**: React + Vite + Google Maps (próxima etapa)
 - **Infra**: Docker Compose ou instalação nativa (Oracle Cloud VM)
+- **CI/CD**: GitHub Actions (migrations + smoke tests)
 
-## Setup do banco
-- Schema SQL em `db/schema/` (7 arquivos numerados, executam em ordem alfabética)
-- Seed sintético em `db/seed/01_seed.sql`
-- Docker: `docker compose up -d db` (roda tudo automaticamente)
-- Nativo: ver README.md "Opção B"
+## Migrations
+- Sistema customizado em `db/migrate.sh` (sem ferramentas de terceiros)
+- Arquivos SQL em `db/migrations/` (numerados, aplicados em ordem)
+- Journal table: `schema_migrations` (filename + checksum SHA-256)
+- Cada migration roda em transação atômica
+- Idempotente: rodar de novo pula o já aplicado
+- Hash detecta adulteração de migrations já aplicadas
+- Comandos: `sh db/migrate.sh`, `--status`, `--dry-run`
 
 ## Comandos úteis
 - Subir banco (Docker): `docker compose up -d db`
-- Resetar banco: `docker compose down -v && docker compose up -d db`
+- Aplicar migrations (Docker): `docker compose run --rm migrate`
+- Aplicar migrations (nativo): `sh db/migrate.sh`
+- Status das migrations: `sh db/migrate.sh --status`
+- Smoke tests: `psql -U bioguard -d bioguardians -f db/tests/smoke_test.sql`
+- Resetar banco: `docker compose down -v && docker compose up -d db && docker compose run --rm migrate`
 - Conectar: `psql -U bioguard -d bioguardians`
 - Refresh views: `SELECT refresh_dashboard();`
 
-## Estrutura do schema
-1. `01_extensions.sql` — PostGIS, pgcrypto
-2. `02_enums_domains.sql` — enums (categoria_ameaca, esfera, etc.) e domínios
-3. `03_tables.sql` — tabelas em 3FN com constraints e FKs
-4. `04_indexes.sql` — GIST (espaciais) + B-tree (filtros)
-5. `05_functions.sql` — funções PL/pgSQL e SQL (consultas espaciais, refresh)
-6. `06_triggers.sql` — auditoria, validação de geometria, timestamps
-7. `07_materialized_views.sql` — dashboard_stats, especies_por_uc, rankings
+## Estrutura do banco (migrations)
+1. `001_extensions.sql` — PostGIS, pgcrypto
+2. `002_enums_domains.sql` — enums (categoria_ameaca, esfera, etc.) e domínios
+3. `003_tables.sql` — tabelas em 3FN com constraints e FKs
+4. `004_indexes.sql` — GIST (espaciais) + B-tree (filtros)
+5. `005_functions.sql` — funções PL/pgSQL e SQL (consultas espaciais, refresh)
+6. `006_triggers.sql` — auditoria, validação de geometria, timestamps
+7. `007_materialized_views.sql` — dashboard_stats, especies_por_uc, rankings
+8. `008_seed_data.sql` — dados sintéticos (13 espécies, 9 UCs, 21 ocorrências)
 
 ## Decisões de modelagem
 - SRID 4326 (WGS84) para todas as geometrias
@@ -34,3 +43,8 @@
 - Taxonomia hierárquica com auto-referência (reino → gênero)
 - Auditoria via trigger genérico (to_jsonb do registro inteiro)
 - Views materializadas com refresh simples (não CONCURRENTLY dentro de função)
+
+## Regras de commit
+- Mensagens sempre em inglês
+- Conventional commits com semântica (feat:, fix:, chore:, docs:, refactor:)
+- Sem rodapé "Generated with Devin" / "Co-Authored-By"
