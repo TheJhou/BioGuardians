@@ -681,19 +681,14 @@
       "pluginVersion": "11.4.0",
       "targets": [
         {
-          "expr": "db_client_connections_usage{state=\"used\"}",
-          "legendFormat": "active",
+          "expr": "db_client_connection_count",
+          "legendFormat": "open connections",
           "refId": "A"
         },
         {
-          "expr": "db_client_connections_usage{state=\"idle\"}",
-          "legendFormat": "idle",
+          "expr": "db_client_connection_pending_requests",
+          "legendFormat": "pending requests",
           "refId": "B"
-        },
-        {
-          "expr": "db_client_connections_max",
-          "legendFormat": "max",
-          "refId": "C"
         }
       ],
       "title": "DB Connection Pool",
