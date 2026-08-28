@@ -303,7 +303,7 @@ jobs:
         run: |
           ssh -i ~/.ssh/id_rsa -p ${{ secrets.ORACLE_SSH_PORT || 22 }} \
             ${{ secrets.ORACLE_SSH_USER }}@${{ secrets.ORACLE_SSH_HOST }} \
-            "printf 'DB_USER=%s\nDB_PASSWORD=%s\nDB_NAME=%s\nDB_PORT=%s\nCORS_ORIGIN=http://localhost\nVITE_API_URL=http://localhost:3001/api\n' \
+            "printf 'DB_USER=%s\nDB_PASSWORD=%s\nDB_NAME=%s\nDB_PORT=%s\n' \
             '${{ secrets.DB_USER }}' '${{ secrets.DB_PASSWORD }}' '${{ secrets.DB_NAME }}' '${{ secrets.DB_PORT }}' \
             > ~/bioguardians/.env"
 

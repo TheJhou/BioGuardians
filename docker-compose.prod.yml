@@ -3,9 +3,9 @@
 # Used on the Oracle VM. References pre-built images from GHCR.
 # PostgreSQL runs NATIVELY on the VM (not in Docker).
 #
-# GitHub Actions SCPs this file to the VM and runs:
-#   docker compose -f docker-compose.prod.yml pull
-#   docker compose -f docker-compose.prod.yml up -d
+# Frontend (nginx) proxies /api to the backend container.
+# Access: http://<VM_IP>:8080
+# API:    http://<VM_IP>:8080/api/health
 # ============================================================
 
 services:
@@ -15,11 +15,9 @@ services:
     container_name: bioguardians-backend
     restart: unless-stopped
     environment:
-      # Connect to native PostgreSQL on the VM host.
-      # host.docker.internal resolves to the host IP via extra_hosts below.
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@host.docker.internal:${DB_PORT}/${DB_NAME}
       PORT: 3001
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
+      CORS_ORIGIN: "*"
       GBIF_API_BASE: https://api.gbif.org/v1
     ports:
       - "3001:3001"
@@ -37,7 +35,7 @@ services:
           memory: 512M
           cpus: "1"
 
-  # ---------- Frontend (nginx) ----------
+  # ---------- Frontend (nginx + proxy reverso) ----------
   frontend:
     image: ghcr.io/thejhou/bioguardians-frontend:latest
     container_name: bioguardians-frontend
@@ -45,10 +43,8 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-    environment:
-      VITE_API_URL: ${VITE_API_URL:-http://localhost:3001/api}
     ports:
-      - "80:80"
+      - "8080:80"
     deploy:
       resources:
         limits:
