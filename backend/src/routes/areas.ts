@@ -24,23 +24,26 @@ router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next)
     const { rows } = await query(
       `SELECT json_build_object(
          'type', 'FeatureCollection',
-         'features', COALESCE(json_agg(
-           json_build_object(
-             'type', 'Feature',
-             'id', a.id,
-             'geometry', ST_AsGeoJSON(a.geom)::json,
-             'properties', json_build_object(
-               'nome', a.nome,
-               'categoria_uc', a.categoria_uc,
-               'esfera', a.esfera,
-               'bioma_id', a.bioma_id,
-               'area_ha', a.area_ha
-             )
-           )
+         'features', COALESCE((
+           SELECT json_agg(feature)
+           FROM (
+             SELECT json_build_object(
+               'type', 'Feature',
+               'id', a.id,
+               'geometry', ST_AsGeoJSON(a.geom)::json,
+               'properties', json_build_object(
+                 'nome', a.nome,
+                 'categoria_uc', a.categoria_uc,
+                 'esfera', a.esfera,
+                 'bioma_id', a.bioma_id,
+                 'area_ha', a.area_ha
+               )
+             ) AS feature
+             FROM area_protegida a
+             ${where}
+           ) sub
          ), '[]'::json)
-       ) AS geojson
-       FROM area_protegida a
-       ${where}`,
+       ) AS geojson`,
       params
     );
 

@@ -32,29 +32,32 @@ router.get('/', async (req, res, next) => {
     const { rows } = await query(
       `SELECT json_build_object(
          'type', 'FeatureCollection',
-         'features', COALESCE(json_agg(
-           json_build_object(
-             'type', 'Feature',
-             'id', o.id,
-             'geometry', ST_AsGeoJSON(o.geom)::json,
-             'properties', json_build_object(
-               'especie_id', o.especie_id,
-               'lat', o.lat,
-               'lon', o.lon,
-               'data_evento', o.data_evento,
-               'fonte', o.fonte,
-               'base_registro', o.base_registro,
-               'nome_cientifico', e.nome_cientifico,
-               'categoria_ameaca', e.categoria_ameaca
-             )
-           )
+         'features', COALESCE((
+           SELECT json_agg(feature)
+           FROM (
+             SELECT json_build_object(
+               'type', 'Feature',
+               'id', o.id,
+               'geometry', ST_AsGeoJSON(o.geom)::json,
+               'properties', json_build_object(
+                 'especie_id', o.especie_id,
+                 'lat', o.lat,
+                 'lon', o.lon,
+                 'data_evento', o.data_evento,
+                 'fonte', o.fonte,
+                 'base_registro', o.base_registro,
+                 'nome_cientifico', e.nome_cientifico,
+                 'categoria_ameaca', e.categoria_ameaca
+               )
+             ) AS feature
+             FROM ocorrencia o
+             JOIN especie e ON e.id = o.especie_id
+             ${where}
+             ORDER BY o.data_evento DESC NULLS LAST
+             ${limitClause}
+           ) sub
          ), '[]'::json)
-       ) AS geojson
-       FROM ocorrencia o
-       JOIN especie e ON e.id = o.especie_id
-       ${where}
-       ORDER BY o.data_evento DESC NULLS LAST
-       ${limitClause}`,
+       ) AS geojson`,
       params
     );
 
