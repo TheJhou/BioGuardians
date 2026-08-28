@@ -1,23 +1,16 @@
 // ============================================================
 // BioGuardians - Load CNUC protected areas from shapefile
 //
-// Loads protected areas (UCs) from CNUC/MMA shapefile using
-// shp2pgsql (from PostGIS) and psql.
+// Uses the 'shapefile' Node.js library to read .shp files
+// directly — no shp2pgsql needed.
 //
 // Usage:
 //   node load_cnuc_ucs.mjs
 //   node load_cnuc_ucs.mjs --dir=input/cnuc_ucs
-//   node load_cnuc_ucs.mjs --file=input/cnuc_ucs/uc.shp
+//   node load_cnuc_ucs.mjs --file=input/cnuc_ucs/ucs.shp
 //
-// Prerequisites:
-//   - shp2pgsql (bundled with PostGIS)
-//   - psql (PostgreSQL client)
-//   - Shapefile downloaded from CNUC (http://cnuc.mma.gov.br/)
-//
-// The script:
-//   1. Runs shp2pgsql to convert shapefile to SQL
-//   2. Transforms SRID to 4326 if needed
-//   3. Inserts into area_protegida with idempotent ON CONFLICT
+// Input: Shapefile from CNUC/MMA (http://cnuc.mma.gov.br/)
+//        Extract .shp, .shx, .dbf, .prj to input/cnuc_ucs/
 //
 // Idempotent: uses ON CONFLICT (nome) DO NOTHING.
 // ============================================================
@@ -25,9 +18,9 @@
 import { existsSync, readdirSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { execSync } from 'child_process';
 import dotenv from 'dotenv';
 import pg from 'pg';
+import shapefile from 'shapefile';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: resolve(__dirname, '../../.env') });
@@ -47,25 +40,73 @@ function findShpFile(dir) {
   return shp ? resolve(dir, shp) : null;
 }
 
-function mapCategoriaUC(categoria) {
-  // CNUC categories map to our enum
-  const cat = (categoria || '').toLowerCase();
-  if (cat.includes('proteção integral') || cat.includes('protecao integral')) {
+// Map CNUC "grupo" to our categoria_uc_tipo enum
+function mapCategoriaUC(grupo) {
+  const g = (grupo || '').toLowerCase();
+  if (g.includes('proteção integral') || g.includes('protecao integral')) {
     return 'protecao_integral';
   }
-  if (cat.includes('uso sustentável') || cat.includes('uso sustentavel')) {
+  if (g.includes('uso sustentável') || g.includes('uso sustentavel')) {
     return 'uso_sustentavel';
   }
-  return 'protecao_integral'; // default
+  return 'protecao_integral';
 }
 
+// Map CNUC "esfera" to our esfera_tipo enum
 function mapEsfera(esfera) {
   const e = (esfera || '').toLowerCase();
   if (e.includes('federal')) return 'federal';
   if (e.includes('estadual')) return 'estadual';
   if (e.includes('municipal')) return 'municipal';
   if (e.includes('particular') || e.includes('privada')) return 'particular';
-  return 'federal'; // default
+  return 'federal';
+}
+
+// Detect bioma from the fields (amazonia, caatinga, cerrado, matlantica, pampa, pantanal, marinho)
+function detectBioma(props, biomaMap) {
+  const biomaFields = [
+    { field: 'amazonia', nome: 'Amazônia' },
+    { field: 'caatinga', nome: 'Caatinga' },
+    { field: 'cerrado', nome: 'Cerrado' },
+    { field: 'matlantica', nome: 'Mata Atlântica' },
+    { field: 'pampa', nome: 'Pampa' },
+    { field: 'pantanal', nome: 'Pantanal' },
+    { field: 'marinho', nome: 'Marinho' },
+  ];
+
+  for (const b of biomaFields) {
+    const val = props[b.field];
+    if (val && parseFloat(val) > 0) {
+      return biomaMap.get(b.nome.toLowerCase());
+    }
+  }
+  return null;
+}
+
+// Convert GeoJSON geometry to WKT for PostGIS
+function geometryToWKT(geometry) {
+  if (!geometry) return null;
+
+  const { type, coordinates } = geometry;
+
+  if (type === 'Polygon') {
+    const rings = coordinates.map(ring =>
+      `(${ring.map(p => `${p[0]} ${p[1]}`).join(', ')})`
+    ).join(', ');
+    return `POLYGON(${rings})`;
+  }
+
+  if (type === 'MultiPolygon') {
+    const polygons = coordinates.map(poly => {
+      const rings = poly.map(ring =>
+        `(${ring.map(p => `${p[0]} ${p[1]}`).join(', ')})`
+      ).join(', ');
+      return `(${rings})`;
+    }).join(', ');
+    return `MULTIPOLYGON(${polygons})`;
+  }
+
+  return null;
 }
 
 async function main() {
@@ -82,7 +123,7 @@ async function main() {
   if (!shpFile) {
     if (!existsSync(inputDir)) {
       console.error(`ERROR: Input directory not found: ${inputDir}`);
-      console.error('   Download CNUC shapefile from http://cnuc.mma.gov.br/');
+      console.error('   Download CNUC shapefile from https://dados.mma.gov.br/dataset/unidadesdeconservacao');
       console.error('   Extract to: scripts/data/input/cnuc_ucs/');
       process.exit(1);
     }
@@ -91,142 +132,106 @@ async function main() {
 
   if (!shpFile || !existsSync(shpFile)) {
     console.error(`ERROR: No .shp file found in ${inputDir}`);
-    console.error('   Download CNUC shapefile from http://cnuc.mma.gov.br/');
+    console.error('   Download CNUC shapefile from https://dados.mma.gov.br/dataset/unidadesdeconservacao');
     process.exit(1);
   }
 
   console.log('==> BioGuardians — CNUC Protected Areas Loader');
   console.log(`   Shapefile: ${shpFile}`);
 
-  // Check shp2pgsql is available
-  try {
-    execSync('which shp2pgsql', { stdio: 'pipe' });
-  } catch {
-    console.error('ERROR: shp2pgsql not found. Install PostGIS:');
-    console.error('   Ubuntu: sudo apt install postgis');
-    console.error('   macOS:  brew install postgis');
-    process.exit(1);
-  }
-
   const client = await pool.connect();
 
   try {
-    // Step 1: Load shapefile into a temporary table using shp2pgsql
-    // shp2pgsql converts shapefile to SQL, transforms to SRID 4326
-    console.log('   Converting shapefile to SQL with shp2pgsql...');
+    // Cache bioma IDs
+    const { rows: biomas } = await client.query('SELECT id, lower(nome) as nome FROM bioma');
+    const biomaMap = new Map(biomas.map(b => [b.nome, b.id]));
 
-    const tempTable = 'tmp_cnuc_import';
-    const shp2sql = execSync(
-      `shp2pgsql -s 4326 -d -I "${shpFile}" ${tempTable}`,
-      { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 }
-    );
+    // Open shapefile
+    const source = await shapefile.open(shpFile);
 
-    // Execute the generated SQL to create temp table
-    await client.query(`DROP TABLE IF EXISTS ${tempTable} CASCADE;`);
-    // Split and execute statements (shp2pgsql outputs multiple statements)
-    const statements = shp2sql.split(/;\s*\n/).filter(s => s.trim());
-    for (const stmt of statements) {
-      await client.query(stmt);
-    }
+    let total = 0;
+    let inserted = 0;
+    let skipped = 0;
+    let errors = 0;
+    let noGeom = 0;
 
-    console.log('   Temporary table created. Mapping columns...');
+    console.log('   Reading records...');
 
-    // Step 2: Inspect columns in temp table
-    const { rows: columns } = await client.query(`
-      SELECT column_name FROM information_schema.columns
-      WHERE table_name = $1 ORDER BY ordinal_position
-    `, [tempTable]);
+    while (true) {
+      const { done, value } = await source.read();
+      if (done) break;
 
-    const colNames = columns.map(c => c.column_name.toLowerCase());
-    console.log(`   Columns: ${colNames.join(', ')}`);
+      total++;
+      const props = value.properties;
 
-    // Try to identify column names (CNUC shapefiles vary)
-    const nomeCol = colNames.find(c => c.includes('nome') || c.includes('name')) || colNames[0];
-    const categoriaCol = colNames.find(c => c.includes('categoria') || c.includes('category') || c.includes('tipo'));
-    const esferaCol = colNames.find(c => c.includes('esfera') || c.includes('admin') || c.includes('esfera'));
-    const areaCol = colNames.find(c => c.includes('area') || c.includes('ha'));
-    const biomaCol = colNames.find(c => c.includes('bioma') || c.includes('biome'));
-    const geomCol = colNames.find(c => c === 'geom' || c === 'the_geom' || c === 'geometry');
-
-    console.log(`   Mapped: nome=${nomeCol}, categoria=${categoriaCol}, esfera=${esferaCol}, area=${areaCol}, geom=${geomCol}`);
-
-    // Step 3: Insert into area_protegida from temp table
-    // Convert geometry to MULTIPOLYGON if needed
-    const { rowCount } = await client.query(`
-      INSERT INTO area_protegida (nome, categoria_uc, esfera, area_ha, geom)
-      SELECT
-        ${nomeCol}::varchar,
-        CASE
-          WHEN ${categoriaCol}::text ILIKE '%proteção integral%' OR ${categoriaCol}::text ILIKE '%protecao integral%'
-            THEN 'protecao_integral'::categoria_uc_tipo
-          WHEN ${categoriaCol}::text ILIKE '%uso sustentável%' OR ${categoriaCol}::text ILIKE '%uso sustentavel%'
-            THEN 'uso_sustentavel'::categoria_uc_tipo
-          ELSE 'protecao_integral'::categoria_uc_tipo
-        END,
-        CASE
-          WHEN ${esferaCol}::text ILIKE '%federal%' THEN 'federal'::esfera_tipo
-          WHEN ${esferaCol}::text ILIKE '%estadual%' THEN 'estadual'::esfera_tipo
-          WHEN ${esferaCol}::text ILIKE '%municipal%' THEN 'municipal'::esfera_tipo
-          WHEN ${esferaCol}::text ILIKE '%particular%' OR ${esferaCol}::text ILIKE '%privada%'
-            THEN 'particular'::esfera_tipo
-          ELSE 'federal'::esfera_tipo
-        END,
-        CASE
-          WHEN ${areaCol} IS NOT NULL AND ${areaCol}::numeric > 0
-            THEN ${areaCol}::numeric(12,2)
-          ELSE NULL
-        END,
-        ST_Multi(${geomCol})::geometry(MULTIPOLYGON, 4326)
-      FROM ${tempTable}
-      WHERE ${nomeCol} IS NOT NULL
-      ON CONFLICT (nome) DO NOTHING
-    `);
-
-    console.log(`   Inserted: ${rowCount} protected areas`);
-
-    // Step 4: Try to link biomas if bioma column exists
-    if (biomaCol) {
-      console.log('   Linking biomas...');
-      const { rows: biomas } = await client.query('SELECT id, lower(nome) as nome FROM bioma');
-      const biomaMap = new Map(biomas.map(b => [b.nome, b.id]));
-
-      const { rows: ucs } = await client.query(`
-        SELECT a.id, lower(t.${biomaCol}) as bioma_nome
-        FROM area_protegida a
-        JOIN ${tempTable} t ON a.nome = t.${nomeCol}::varchar
-        WHERE t.${biomaCol} IS NOT NULL
-      `);
-
-      let linked = 0;
-      for (const uc of ucs) {
-        const biomaId = biomaMap.get(uc.bioma_nome?.trim());
-        if (biomaId) {
-          await client.query(
-            'UPDATE area_protegida SET bioma_id = $1 WHERE id = $2',
-            [biomaId, uc.id]
-          );
-          linked++;
-        }
+      // Skip non-UC records (e.g. zona de amortecimento)
+      if (props.limite && props.limite.toLowerCase() !== 'uc') {
+        continue;
       }
-      console.log(`   Linked biomas: ${linked}`);
-    }
 
-    // Step 5: Cleanup temp table
-    await client.query(`DROP TABLE IF EXISTS ${tempTable} CASCADE;`);
-    console.log('   Cleaned up temporary table');
+      // Skip inactive UCs
+      if (props.situacao && props.situacao.toLowerCase() !== 'ativo') {
+        continue;
+      }
+
+      const nome = (props.nome_uc || '').trim();
+      if (!nome) {
+        errors++;
+        continue;
+      }
+
+      // Convert geometry to WKT
+      const wkt = geometryToWKT(value.geometry);
+      if (!wkt) {
+        noGeom++;
+        continue;
+      }
+
+      const categoria = mapCategoriaUC(props.grupo);
+      const esfera = mapEsfera(props.esfera);
+      const areaHa = props.ha_total ? parseFloat(props.ha_total) : null;
+      const biomaId = detectBioma(props, biomaMap);
+
+      try {
+        // Insert with ST_GeomFromText to convert WKT to geometry
+        const { rowCount } = await client.query(
+          `INSERT INTO area_protegida (nome, categoria_uc, esfera, bioma_id, area_ha, geom)
+           VALUES ($1, $2, $3, $4, $5, ST_Multi(ST_GeomFromText($6, 4326))::geometry(MULTIPOLYGON, 4326))
+           ON CONFLICT (nome) DO NOTHING`,
+          [nome, categoria, esfera, biomaId, areaHa, wkt]
+        );
+
+        if (rowCount > 0) {
+          inserted++;
+        } else {
+          skipped++;
+        }
+      } catch (err) {
+        if (errors < 5) {
+          console.warn(`   ERROR: ${nome} — ${err.message}`);
+        }
+        errors++;
+      }
+
+      if (total % 100 === 0) {
+        console.log(`   Processed ${total} records... (inserted: ${inserted}, skipped: ${skipped}, errors: ${errors})`);
+      }
+    }
 
     // Refresh dashboard
+    console.log('');
     console.log('   Refreshing dashboard views...');
     await client.query('SELECT refresh_dashboard()');
 
     console.log('');
-    console.log('==> Done! Protected areas loaded successfully.');
+    console.log('==> Summary:');
+    console.log(`   Total records: ${total}`);
+    console.log(`   Inserted:      ${inserted}`);
+    console.log(`   Skipped:       ${skipped} (already existed)`);
+    console.log(`   No geometry:   ${noGeom}`);
+    console.log(`   Errors:        ${errors}`);
   } catch (err) {
     console.error('FATAL:', err.message);
-    // Cleanup on error
-    try {
-      await client.query('DROP TABLE IF EXISTS tmp_cnuc_import CASCADE;');
-    } catch {}
     process.exit(1);
   } finally {
     client.release();

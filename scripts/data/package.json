@@ -11,8 +11,9 @@
     "load:all": "node load_mma_especies.mjs && node load_gbif_ocorrencias.mjs && node load_specieslink_ocorrencias.mjs"
   },
   "dependencies": {
-    "pg": "^8.13.0",
+    "csv-parse": "^5.6.0",
     "dotenv": "^16.4.5",
-    "csv-parse": "^5.6.0"
+    "pg": "^8.13.0",
+    "shapefile": "^0.6.6"
   }
 }
