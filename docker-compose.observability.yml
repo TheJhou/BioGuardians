@@ -31,12 +31,8 @@ services:
       - "4317:4317"   # OTLP gRPC (backend → collector)
       - "4318:4318"   # OTLP HTTP (logs)
       - "8889:8889"   # Prometheus exporter (scraped by Prometheus)
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:13133/"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
+    # Health check removed: collector image does not include wget/curl.
+    # Restart policy keeps it alive.
     deploy:
       resources:
         limits:
