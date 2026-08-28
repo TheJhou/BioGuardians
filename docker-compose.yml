@@ -4,15 +4,15 @@ services:
     container_name: bioguardians-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-bioguard}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bioguard}
-      POSTGRES_DB: ${POSTGRES_DB:-bioguardians}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required, copy .env.example to .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required, copy .env.example to .env}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required, copy .env.example to .env}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - bioguardians_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bioguard} -d ${POSTGRES_DB:-bioguardians}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -26,9 +26,9 @@ services:
     environment:
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
-      POSTGRES_USER: ${POSTGRES_USER:-bioguard}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bioguard}
-      POSTGRES_DB: ${POSTGRES_DB:-bioguardians}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
     volumes:
       - ./db:/db:ro
     entrypoint: ["sh", "/db/migrate.sh"]

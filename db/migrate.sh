@@ -11,12 +11,12 @@
 #   ./db/migrate.sh --status        # show migration status
 #   ./db/migrate.sh --dry-run       # show what would be applied
 #
-# Environment:
+# Environment (all required except HOST and PORT):
 #   POSTGRES_HOST     (default: localhost)
 #   POSTGRES_PORT     (default: 5432)
-#   POSTGRES_USER     (default: bioguard)
-#   POSTGRES_PASSWORD (default: bioguard)
-#   POSTGRES_DB       (default: bioguardians)
+#   POSTGRES_USER     (required)
+#   POSTGRES_PASSWORD (required)
+#   POSTGRES_DB       (required)
 #   MIGRATIONS_DIR    (default: ./migrations relative to script)
 # ============================================================
 set -euo pipefail
@@ -26,9 +26,15 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MIGRATIONS_DIR="${MIGRATIONS_DIR:-$SCRIPT_DIR/migrations}"
 DB_HOST="${POSTGRES_HOST:-localhost}"
 DB_PORT="${POSTGRES_PORT:-5432}"
-DB_USER="${POSTGRES_USER:-bioguard}"
-DB_NAME="${POSTGRES_DB:-bioguardians}"
-export PGPASSWORD="${POSTGRES_PASSWORD:-bioguard}"
+
+# Credenciais são obrigatórias — sem defaults hardcoded.
+: "${POSTGRES_USER:?POSTGRES_USER is required (set in .env or environment)}"
+: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required (set in .env or environment)}"
+: "${POSTGRES_DB:?POSTGRES_DB is required (set in .env or environment)}"
+
+DB_USER="$POSTGRES_USER"
+DB_NAME="$POSTGRES_DB"
+export PGPASSWORD="$POSTGRES_PASSWORD"
 
 PSQL_BASE="psql -v ON_ERROR_STOP=1 -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME""
 

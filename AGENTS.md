@@ -21,9 +21,9 @@
 - Aplicar migrations (Docker): `docker compose run --rm migrate`
 - Aplicar migrations (nativo): `sh db/migrate.sh`
 - Status das migrations: `sh db/migrate.sh --status`
-- Smoke tests: `psql -U bioguard -d bioguardians -f db/tests/smoke_test.sql`
+- Smoke tests: `psql -f db/tests/smoke_test.sql` (credenciais via .env)
 - Resetar banco: `docker compose down -v && docker compose up -d db && docker compose run --rm migrate`
-- Conectar: `psql -U bioguard -d bioguardians`
+- Conectar: `psql -d $POSTGRES_DB -U $POSTGRES_USER`
 - Refresh views: `SELECT refresh_dashboard();`
 
 ## Estrutura do banco (migrations)
@@ -43,8 +43,3 @@
 - Taxonomia hierárquica com auto-referência (reino → gênero)
 - Auditoria via trigger genérico (to_jsonb do registro inteiro)
 - Views materializadas com refresh simples (não CONCURRENTLY dentro de função)
-
-## Regras de commit
-- Mensagens sempre em inglês
-- Conventional commits com semântica (feat:, fix:, chore:, docs:, refactor:)
-- Sem rodapé "Generated with Devin" / "Co-Authored-By"
