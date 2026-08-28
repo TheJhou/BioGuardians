@@ -1,25 +1,8 @@
 -- ============================================================
--- BioGuardians - 09 Performance & Otimizacoes
--- Parallel query, full-text search, indices compostos,
--- configuracao de memoria para container 2GB.
+-- BioGuardians - 10 Performance: FTS, Composite Indexes
+-- Full-text search, composite indexes, and statistics.
+-- Runs inside a transaction (no ALTER SYSTEM here).
 -- ============================================================
-
--- ---------- Parallel Query ----------
--- Habilita queries paralelas para ST_Contains, scans e aggregates.
-ALTER SYSTEM SET max_worker_processes = 8;
-ALTER SYSTEM SET max_parallel_workers = 4;
-ALTER SYSTEM SET max_parallel_workers_per_gather = 2;
-ALTER SYSTEM SET parallel_setup_cost = 100;
-ALTER SYSTEM SET parallel_tuple_cost = 0.03;
-ALTER SYSTEM SET min_parallel_table_scan_size = '8MB';
-ALTER SYSTEM SET min_parallel_index_scan_size = '512kB';
-
--- ---------- Configuracao de Memoria ----------
--- Otimizado para container com 2GB RAM.
-ALTER SYSTEM SET shared_buffers = '256MB';
-ALTER SYSTEM SET effective_cache_size = '1GB';
-ALTER SYSTEM SET work_mem = '8MB';
-ALTER SYSTEM SET maintenance_work_mem = '128MB';
 
 -- ---------- Full-Text Search (busca composta) ----------
 -- Coluna gerada que combina nome_cientifico + nome_popular + descricao.
@@ -37,7 +20,6 @@ ALTER TABLE especie ADD COLUMN tsv_busca tsvector
 CREATE INDEX idx_especie_busca_fts ON especie USING GIN (tsv_busca);
 
 -- Funcao de busca composta com relevancia (ts_rank).
--- Retorna especies ordenadas por relevancia.
 CREATE OR REPLACE FUNCTION buscar_especies(p_busca TEXT)
     RETURNS TABLE (
         especie_id        INTEGER,

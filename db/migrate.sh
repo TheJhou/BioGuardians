@@ -155,16 +155,31 @@ cmd_migrate() {
         fi
 
         log "APPLY   $filename"
-        # Apply migration + record journal entry in a single transaction.
-        # If the SQL fails, the transaction rolls back and the journal
-        # entry is NOT recorded, so the migration can be retried.
-        $PSQL_BASE <<EOF
+
+        # Check if migration requests no transaction (e.g. ALTER SYSTEM).
+        # Migrations starting with "-- @no-transaction" run without BEGIN/COMMIT.
+        local use_transaction=true
+        if head -1 "$f" | grep -q '@no-transaction'; then
+            use_transaction=false
+        fi
+
+        if $use_transaction; then
+            # Apply migration + record journal entry in a single transaction.
+            # If the SQL fails, the transaction rolls back and the journal
+            # entry is NOT recorded, so the migration can be retried.
+            $PSQL_BASE <<EOF
 BEGIN;
 \i $f
 INSERT INTO schema_migrations (filename, checksum)
 VALUES ('$filename', '$hash');
 COMMIT;
 EOF
+        else
+            # Run without transaction (required for ALTER SYSTEM, REFRESH
+            # CONCURRENTLY, etc). Journal entry is recorded separately.
+            $PSQL_BASE -v ON_ERROR_STOP=1 -f "$f"
+            $PSQL_BASE -c "INSERT INTO schema_migrations (filename, checksum) VALUES ('$filename', '$hash');"
+        fi
         applied_count=$((applied_count + 1))
     done
 
