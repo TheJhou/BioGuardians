@@ -146,8 +146,8 @@ O GitHub Actions roda a cada push/PR:
 3. **frontend-build** — typecheck + build do frontend TypeScript
 4. **deploy-migrations** (so push na main) — aplica migrations no banco de producao (Oracle VM)
 5. **build-and-push** (so push na main) — builda imagens Docker e publica no GHCR:
-   - `ghcr.io/thejhoudev/bioguardians-backend:latest`
-   - `ghcr.io/thejhoudev/bioguardians-frontend:latest`
+   - `ghcr.io/thejhou/bioguardians-backend:latest`
+   - `ghcr.io/thejhou/bioguardians-frontend:latest`
 6. **deploy-app** (so push na main) — SSH na Oracle VM, SCP do `docker-compose.prod.yml`,
    `docker compose pull && docker compose up -d`
 
@@ -165,7 +165,7 @@ GitHub Actions
   |
   v (main only)
 deploy-migrations --> psql na Oracle VM
-build-and-push    --> ghcr.io/thejhoudev/bioguardians-{backend,frontend}:latest
+build-and-push    --> ghcr.io/thejhou/bioguardians-{backend,frontend}:latest
   |
   v
 deploy-app --> SSH na Oracle VM

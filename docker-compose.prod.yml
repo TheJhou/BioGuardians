@@ -11,7 +11,7 @@
 services:
   # ---------- Backend API ----------
   backend:
-    image: ghcr.io/thejhoudev/bioguardians-backend:latest
+    image: ghcr.io/thejhou/bioguardians-backend:latest
     container_name: bioguardians-backend
     restart: unless-stopped
     environment:
@@ -39,7 +39,7 @@ services:
 
   # ---------- Frontend (nginx) ----------
   frontend:
-    image: ghcr.io/thejhoudev/bioguardians-frontend:latest
+    image: ghcr.io/thejhou/bioguardians-frontend:latest
     container_name: bioguardians-frontend
     restart: unless-stopped
     depends_on:
