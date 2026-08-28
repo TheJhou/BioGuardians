@@ -4,7 +4,7 @@
 
 Sistema de banco de dados espacial (PostgreSQL + PostGIS) para gestão de
 espécies ameaçadas e áreas protegidas no Brasil, com uma aplicação web simples
-(Node.js + React + Google Maps) como interface de demonstração do banco.
+(Node.js + React + MapTiler Cloud) como interface de demonstração do banco.
 
 ---
 
@@ -14,7 +14,7 @@ espécies ameaçadas e áreas protegidas no Brasil, com uma aplicação web simp
 - **Tema**: Gestão de biodiversidade e espécies ameaçadas (tema bio sustentável)
 - **Foco**: Banco de dados (modelagem, persistência, consultas, integridade).
   A aplicação web é uma camada fina de demonstração.
-- **Stack**: PostgreSQL + PostGIS, Node.js, React, Google Maps API
+- **Stack**: PostgreSQL + PostGIS, Node.js, React, MapTiler Cloud
 - **Recorte geográfico**: Brasil
 - **Abordagem de dados**: Híbrida (carga inicial estática + consulta em tempo
   real ao GBIF)
@@ -106,7 +106,7 @@ geográficos com dados de espécies.
   geometria válida)
 - Triggers para auditoria (log de alterações) e validações automáticas
 - Índices espaciais (GIST) e convencionais para performance
-- Interface web de demonstração: mapa Google Maps com polígonos das UCs +
+- Interface web de demonstração: mapa MapTiler Cloud com polígonos das UCs +
   marcadores de ocorrências, CRUD, filtros, dashboard
 
 ### Fora do escopo
@@ -152,7 +152,7 @@ geográficos com dados de espécies.
         │ JSON / GeoJSON
         ▼
 ┌─────────────────────────────────────────────────────────────┐
-│         React + Google Maps (interface de demo)             │
+│         React + MapTiler Cloud (interface de demo)          │
 │  - Mapa com polígonos das UCs                               │
 │  - Marcadores de ocorrências                                │
 │  - Filtros (categoria, bioma, estado)                       │
@@ -164,7 +164,7 @@ geográficos com dados de espécies.
 
 1. Usuário abre o mapa → React chama `GET /areas` → API roda
    `SELECT id, nome, categoria, ST_AsGeoJSON(geom) FROM area_protegida` →
-   retorna GeoJSON → Google Maps desenha os polígonos
+   retorna GeoJSON → MapTiler Cloud desenha os polígonos
 2. Usuário filtra "espécies criticamente ameaçadas (CR)" →
    `GET /especies?categoria=CR` → API roda query com JOIN → retorna lista
 3. Usuário clica numa espécie → `GET /ocorrencias?especie_id=42` → API busca

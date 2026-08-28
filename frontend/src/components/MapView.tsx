@@ -1,19 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  GoogleMap, useJsApiLoader, Polygon, Marker, InfoWindow,
-} from '@react-google-maps/api';
+import { Map, Source, Layer, Popup, NavigationControl } from 'react-map-gl/maplibre';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import { api } from '../api/client.js';
 import { MAP_DEFAULTS, getCategoryColor, getUcCategoryColor } from '../constants/index.js';
 import type {
   GeoJSONFeatureCollection, OcorrenciaProperties,
-  EspecieEmArea,
+  EspecieEmArea, GeoJSONFeature, GeoJSONPoint, GeoJSONPolygon,
 } from '../types/index.js';
 
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
-
-const containerStyle = { width: '100%', height: '100%' };
-const center = MAP_DEFAULTS.center;
-const zoom = MAP_DEFAULTS.zoom;
+const MAPTILER_API_KEY = import.meta.env.VITE_MAPTILER_API_KEY || '';
 
 interface MapViewProps {
   filters: {
@@ -35,40 +30,46 @@ function useDebounce<T>(value: T, delay: number): T {
   return debounced;
 }
 
-export default function MapView({ filters, selectedEspecieId }: MapViewProps) {
-  const { isLoaded } = useJsApiLoader({
-    id: 'google-map-script',
-    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
-  });
+// Convert lat/lng center object to react-map-gl initial view.
+const INITIAL_VIEW = {
+  longitude: MAP_DEFAULTS.center.lng,
+  latitude: MAP_DEFAULTS.center.lat,
+  zoom: MAP_DEFAULTS.zoom,
+};
 
+export default function MapView({ filters, selectedEspecieId }: MapViewProps) {
   const [areas, setAreas] = useState<GeoJSONFeatureCollection | null>(null);
   const [ocorrencias, setOcorrencias] = useState<GeoJSONFeatureCollection<OcorrenciaProperties> | null>(null);
   const [selectedAreaId, setSelectedAreaId] = useState<number | null>(null);
   const [selectedAreaSpecies, setSelectedAreaSpecies] = useState<EspecieEmArea[]>([]);
-  const [selectedOcorrencia, setSelectedOcorrencia] = useState<number | null>(null);
+  const [selectedOcorrencia, setSelectedOcorrencia] = useState<GeoJSONFeature<OcorrenciaProperties> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const mapRef = useRef<google.maps.Map | null>(null);
 
-  // Track current map viewport (bounds + zoom)
+  // Viewport state (bbox + zoom) updated when map stops moving.
   const [viewport, setViewport] = useState({
-    bbox: '' as string,
-    zoom: zoom,
+    bbox: '',
+    zoom: MAP_DEFAULTS.zoom,
+    longitude: INITIAL_VIEW.longitude,
+    latitude: INITIAL_VIEW.latitude,
   });
-
-  // Debounce viewport changes to avoid hammering the API on every pan/zoom frame.
   const debouncedViewport = useDebounce(viewport, 500);
+  const mapRef = useRef<any>(null);
 
-  // Update viewport when map is idle (user stopped panning/zooming).
-  const onIdle = useCallback(() => {
-    if (!mapRef.current) return;
-    const bounds = mapRef.current.getBounds();
-    if (!bounds) return;
+  const handleMoveEnd = useCallback((evt: any) => {
+    const map = evt.target;
+    const bounds = map.getBounds();
     const sw = bounds.getSouthWest();
     const ne = bounds.getNorthEast();
-    const bbox = `${sw.lng()},${sw.lat()},${ne.lng()},${ne.lat()}`;
-    const z = mapRef.current.getZoom() || zoom;
-    setViewport({ bbox, zoom: z });
+    const bbox = `${sw.lng},${sw.lat},${ne.lng},${ne.lat}`;
+    const zoom = map.getZoom();
+    const center = map.getCenter();
+    setViewport({
+      bbox,
+      zoom,
+      longitude: center.lng,
+      latitude: center.lat,
+    });
   }, []);
 
   // Load areas (filtered by bioma + viewport).
@@ -80,7 +81,21 @@ export default function MapView({ filters, selectedEspecieId }: MapViewProps) {
         bbox: debouncedViewport.bbox,
         zoom: debouncedViewport.zoom,
       });
-      setAreas(data);
+      // Enrich features with color for the map layer.
+      const colored = {
+        ...data,
+        features: data.features.map((feature) => {
+          const props = feature.properties as { categoria_uc?: string };
+          return {
+            ...feature,
+            properties: {
+              ...props,
+              color: getUcCategoryColor(props.categoria_uc ?? ''),
+            },
+          };
+        }),
+      };
+      setAreas(colored as GeoJSONFeatureCollection);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load areas');
     }
@@ -95,7 +110,20 @@ export default function MapView({ filters, selectedEspecieId }: MapViewProps) {
         bbox: debouncedViewport.bbox,
         limit: 1000,
       });
-      setOcorrencias(data);
+      const colored = {
+        ...data,
+        features: data.features.map((feature) => {
+          const props = feature.properties as OcorrenciaProperties;
+          return {
+            ...feature,
+            properties: {
+              ...props,
+              color: getCategoryColor(props.categoria_ameaca),
+            },
+          };
+        }),
+      };
+      setOcorrencias(colored as GeoJSONFeatureCollection<OcorrenciaProperties>);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load occurrences');
     }
@@ -109,110 +137,109 @@ export default function MapView({ filters, selectedEspecieId }: MapViewProps) {
       .finally(() => setLoading(false));
   }, [loadAreas, loadOcorrencias, debouncedViewport]);
 
-  // Handle click on a protected area polygon.
-  const handleAreaClick = async (areaId: number) => {
-    setSelectedAreaId(areaId);
-    setSelectedOcorrencia(null);
-    try {
-      const species = await api.getEspeciesEmArea(areaId);
-      setSelectedAreaSpecies(species);
-    } catch {
-      setSelectedAreaSpecies([]);
+  // Handle click on a protected area polygon or occurrence point.
+  const handleClick = async (evt: any) => {
+    const features: any[] = evt.features || [];
+    const areaFeature = features.find((f) => f.layer.id === 'areas-fill');
+    const ocorrenciaFeature = features.find((f) => f.layer.id === 'ocorrencias-circle');
+
+    if (areaFeature) {
+      const areaId = areaFeature.properties.id as number;
+      setSelectedAreaId(areaId);
+      setSelectedOcorrencia(null);
+      try {
+        const species = await api.getEspeciesEmArea(areaId);
+        setSelectedAreaSpecies(species);
+      } catch {
+        setSelectedAreaSpecies([]);
+      }
+    } else if (ocorrenciaFeature) {
+      setSelectedOcorrencia(ocorrenciaFeature as unknown as GeoJSONFeature<OcorrenciaProperties>);
+      setSelectedAreaId(null);
     }
   };
 
-  const onLoad = (map: google.maps.Map): void => {
-    mapRef.current = map;
-  };
+  // Compute popup position for selected area (centroid of polygon).
+  const areaPopupPosition = (() => {
+    if (!selectedAreaId || !areas) return null;
+    const area = areas.features.find((f) => f.id === selectedAreaId);
+    if (!area || area.geometry.type !== 'Polygon') return null;
+    const coords = (area.geometry as GeoJSONPolygon).coordinates[0];
+    const avgLng = coords.reduce((s, [lng]) => s + lng, 0) / coords.length;
+    const avgLat = coords.reduce((s, [, lat]) => s + lat, 0) / coords.length;
+    return { longitude: avgLng, latitude: avgLat };
+  })();
 
-  if (!isLoaded) {
-    return <div className="map-loading">Loading Google Maps...</div>;
-  }
+  const occurrencePopupPosition = (() => {
+    if (!selectedOcorrencia || selectedOcorrencia.geometry.type !== 'Point') return null;
+    const [lng, lat] = (selectedOcorrencia.geometry as GeoJSONPoint).coordinates;
+    return { longitude: lng, latitude: lat };
+  })();
 
   if (error) {
     return <div className="map-error">Error: {error}</div>;
   }
 
   return (
-    <div className="map-container">
+    <div className="map-container" style={{ width: '100%', height: '100%' }}>
       {loading && <div className="map-overlay">Loading...</div>}
-      <GoogleMap
-        mapContainerStyle={containerStyle}
-        center={center}
-        zoom={zoom}
-        onLoad={onLoad}
-        onIdle={onIdle}
-        options={{
-          mapTypeControl: true,
-          streetViewControl: false,
-          fullscreenControl: true,
-        }}
+      <Map
+        ref={mapRef}
+        initialViewState={INITIAL_VIEW}
+        style={{ width: '100%', height: '100%' }}
+        mapStyle={`https://api.maptiler.com/maps/streets/style.json?key=${MAPTILER_API_KEY}`}
+        onMoveEnd={handleMoveEnd}
+        onClick={handleClick}
+        interactiveLayerIds={['areas-fill', 'ocorrencias-circle']}
       >
+        <NavigationControl position="top-right" />
+
         {/* Protected area polygons */}
-        {areas?.features.map((feature) => {
-          if (feature.geometry.type !== 'Polygon') return null;
-          const props = feature.properties as {
-            nome: string; categoria_uc: string; esfera: string; area_ha: number;
-          };
-          const paths = feature.geometry.coordinates[0].map(
-            ([lng, lat]) => ({ lat, lng })
-          );
-          const color = getUcCategoryColor(props.categoria_uc);
-          return (
-            <Polygon
-              key={feature.id}
-              paths={paths}
-              options={{
-                fillColor: color,
-                fillOpacity: 0.3,
-                strokeColor: color,
-                strokeWeight: 2,
+        {areas && (
+          <Source id="areas" type="geojson" data={areas}>
+            <Layer
+              id="areas-fill"
+              type="fill"
+              paint={{
+                'fill-color': ['get', 'color'],
+                'fill-opacity': 0.3,
               }}
-              onClick={() => handleAreaClick(feature.id!)}
             />
-          );
-        })}
+            <Layer
+              id="areas-line"
+              type="line"
+              paint={{
+                'line-color': ['get', 'color'],
+                'line-width': 2,
+              }}
+            />
+          </Source>
+        )}
 
         {/* Occurrence markers */}
-        {ocorrencias?.features.map((feature) => {
-          if (feature.geometry.type !== 'Point') return null;
-          const [lng, lat] = feature.geometry.coordinates;
-          const props = feature.properties;
-          const color = getCategoryColor(props.categoria_ameaca);
-          return (
-            <Marker
-              key={feature.id}
-              position={{ lat, lng }}
-              icon={{
-                path: google.maps.SymbolPath.CIRCLE,
-                scale: 6,
-                fillColor: color,
-                fillOpacity: 1,
-                strokeColor: '#fff',
-                strokeWeight: 1,
-              }}
-              onClick={() => {
-                setSelectedOcorrencia(feature.id!);
-                setSelectedAreaId(null);
+        {ocorrencias && (
+          <Source id="ocorrencias" type="geojson" data={ocorrencias}>
+            <Layer
+              id="ocorrencias-circle"
+              type="circle"
+              paint={{
+                'circle-color': ['get', 'color'],
+                'circle-radius': 6,
+                'circle-stroke-color': '#fff',
+                'circle-stroke-width': 1,
               }}
             />
-          );
-        })}
+          </Source>
+        )}
 
-        {/* InfoWindow for selected area */}
-        {selectedAreaId && (
-          <InfoWindow
-            position={(() => {
-              const area = areas?.features.find((f) => f.id === selectedAreaId);
-              if (area && area.geometry.type === 'Polygon') {
-                const coords = area.geometry.coordinates[0];
-                const avgLng = coords.reduce((s, [lng]) => s + lng, 0) / coords.length;
-                const avgLat = coords.reduce((s, [, lat]) => s + lat, 0) / coords.length;
-                return { lat: avgLat, lng: avgLng };
-              }
-              return center;
-            })()}
-            onCloseClick={() => setSelectedAreaId(null)}
+        {/* Popup for selected area */}
+        {areaPopupPosition && (
+          <Popup
+            longitude={areaPopupPosition.longitude}
+            latitude={areaPopupPosition.latitude}
+            anchor="top"
+            onClose={() => setSelectedAreaId(null)}
+            closeButton
           >
             <div className="info-window">
               <h4>Especies protegidas nesta UC</h4>
@@ -232,36 +259,38 @@ export default function MapView({ filters, selectedEspecieId }: MapViewProps) {
                 </ul>
               )}
             </div>
-          </InfoWindow>
+          </Popup>
         )}
 
-        {/* InfoWindow for selected occurrence */}
-        {selectedOcorrencia && (() => {
-          const occ = ocorrencias?.features.find((f) => f.id === selectedOcorrencia);
-          if (!occ || occ.geometry.type !== 'Point') return null;
-          const [lng, lat] = occ.geometry.coordinates;
-          const props = occ.properties;
-          return (
-            <InfoWindow
-              position={{ lat, lng }}
-              onCloseClick={() => setSelectedOcorrencia(null)}
-            >
-              <div className="info-window">
-                <h4>{props.nome_cientifico}</h4>
-                <p>
-                  <span className={`cat-badge cat-${props.categoria_ameaca.toLowerCase()}`}>
-                    {props.categoria_ameaca}
-                  </span>
-                </p>
-                <p>Data: {props.data_evento || 'N/A'}</p>
-                <p>Fonte: {props.fonte}</p>
-                {props.base_registro && <p>Base: {props.base_registro}</p>}
-                <p>Coords: {props.lat.toFixed(4)}, {props.lon.toFixed(4)}</p>
-              </div>
-            </InfoWindow>
-          );
-        })()}
-      </GoogleMap>
+        {/* Popup for selected occurrence */}
+        {occurrencePopupPosition && selectedOcorrencia && (
+          <Popup
+            longitude={occurrencePopupPosition.longitude}
+            latitude={occurrencePopupPosition.latitude}
+            anchor="top"
+            onClose={() => setSelectedOcorrencia(null)}
+            closeButton
+          >
+            <div className="info-window">
+              <h4>{selectedOcorrencia.properties.nome_cientifico}</h4>
+              <p>
+                <span className={`cat-badge cat-${selectedOcorrencia.properties.categoria_ameaca.toLowerCase()}`}>
+                  {selectedOcorrencia.properties.categoria_ameaca}
+                </span>
+              </p>
+              <p>Data: {selectedOcorrencia.properties.data_evento || 'N/A'}</p>
+              <p>Fonte: {selectedOcorrencia.properties.fonte}</p>
+              {selectedOcorrencia.properties.base_registro && (
+                <p>Base: {selectedOcorrencia.properties.base_registro}</p>
+              )}
+              <p>
+                Coords: {selectedOcorrencia.properties.lat.toFixed(4)},{' '}
+                {selectedOcorrencia.properties.lon.toFixed(4)}
+              </p>
+            </div>
+          </Popup>
+        )}
+      </Map>
     </div>
   );
 }

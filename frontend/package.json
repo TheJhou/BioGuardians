@@ -1,7 +1,7 @@
 {
   "name": "bioguardians-frontend",
   "version": "1.0.0",
-  "description": "BioGuardians frontend - React + Google Maps + Chart.js",
+  "description": "BioGuardians frontend - React + MapTiler Cloud + Chart.js",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,11 +10,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@react-google-maps/api": "^2.20.0",
     "chart.js": "^4.4.0",
+    "maplibre-gl": "^5.0.0",
     "react": "^19.0.0",
     "react-chartjs-2": "^5.2.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-map-gl": "^8.0.0"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

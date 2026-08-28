@@ -3,7 +3,7 @@
 ## Stack
 - **Database**: PostgreSQL 16 + PostGIS 3.4
 - **Backend**: Node.js + Express (próxima etapa)
-- **Frontend**: React + Vite + Google Maps (próxima etapa)
+- **Frontend**: React + Vite + MapTiler Cloud (próxima etapa)
 - **Infra**: Docker Compose ou instalação nativa (Oracle Cloud VM)
 - **CI/CD**: GitHub Actions (migrations + smoke tests)
 

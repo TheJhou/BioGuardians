@@ -88,7 +88,7 @@ services:
         condition: service_healthy
     environment:
       VITE_API_URL: ${VITE_API_URL:-http://localhost:3001/api}
-      VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY:?VITE_GOOGLE_MAPS_API_KEY is required}
+      VITE_MAPTILER_API_KEY: ${VITE_MAPTILER_API_KEY:?VITE_MAPTILER_API_KEY is required}
     ports:
       - "5173:80"
     deploy:

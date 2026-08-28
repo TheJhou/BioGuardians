@@ -2,7 +2,7 @@
 
 Sistema de banco de dados espacial (PostgreSQL + PostGIS) para gestão de
 **especies ameacadas** e **areas protegidas** no Brasil, com aplicacao web
-(Node.js + React + Google Maps) como camada fina de demonstracao.
+(Node.js + React + MapTiler Cloud) como camada fina de demonstracao.
 
 > Projeto da disciplina de **Banco de Dados** — foco em modelagem, persistencia,
 > consultas espaciais, integridade e recursos avancados de BD.
@@ -39,7 +39,7 @@ BioGuardians/
 │   │   └── routes/               # referencias, especies, areas, ocorrencias, dashboard
 │   ├── Dockerfile
 │   └── package.json
-├── frontend/                     # React + Vite + TypeScript + Google Maps
+├── frontend/                     # React + Vite + TypeScript + MapTiler Cloud
 │   ├── src/
 │   │   ├── main.tsx              # entry point
 │   │   ├── App.tsx               # layout com tabs
@@ -59,7 +59,7 @@ BioGuardians/
 
 ```bash
 cp .env.example .env
-# edite .env com suas credenciais e Google Maps API key
+# edite .env com suas credenciais e MapTiler API key
 
 docker compose up -d db           # sobe PostgreSQL + PostGIS
 docker compose run --rm migrate   # aplica as migrations
