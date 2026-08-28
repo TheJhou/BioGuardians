@@ -15,7 +15,7 @@ INSERT INTO categoria_ameaca (codigo, nome, descricao, ordem_prioridade) VALUES
     ('DD', 'Dados Insuficientes',   'Informação inadequada para avaliação.',    6);
 
 -- ---------- Biomas ----------
-INSERT INTO bioma (id, nome, descricao) VALUES
+INSERT INTO bioma (id, nome, descricao) OVERRIDING SYSTEM VALUE VALUES
     (1, 'Amazônia',     'Maior floresta tropical do mundo.' ),
     (2, 'Mata Atlântica','Floresta tropical costeira, altamente fragmentada.'),
     (3, 'Cerrado',      'Savana tropical, hotspot de biodiversidade.'),
