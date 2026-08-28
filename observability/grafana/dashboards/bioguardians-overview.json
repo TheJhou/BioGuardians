@@ -745,7 +745,7 @@
       "id": 11,
       "targets": [
         {
-          "query": "{service.name=\"bioguardians-backend\"}",
+          "query": "{resource.service.name=\"bioguardians-backend\"}",
           "queryType": "traceql",
           "refId": "A"
         }
