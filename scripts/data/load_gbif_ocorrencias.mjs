@@ -107,7 +107,20 @@ async function main() {
           }
 
           // Insert occurrence
-          const dataEvento = occ.eventDate ? occ.eventDate.split('T')[0] : null;
+          // GBIF eventDate can be: "2023-01-15", "2023-01-15T00:00:00",
+          // "2023" (year only), "2023-01" (year-month), or
+          // "2023-01-01/2023-12-31" (range). Normalize to YYYY-MM-DD.
+          let dataEvento = null;
+          if (occ.eventDate) {
+            const raw = occ.eventDate.split('T')[0].split('/')[0].trim();
+            if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+              dataEvento = raw;
+            } else if (/^\d{4}-\d{2}$/.test(raw)) {
+              dataEvento = raw + '-01';
+            } else if (/^\d{4}$/.test(raw)) {
+              dataEvento = raw + '-01-01';
+            }
+          }
           const baseRegistro = occ.institutionCode || occ.collectionCode || null;
 
           await client.query(

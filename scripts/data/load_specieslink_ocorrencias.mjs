@@ -1,15 +1,20 @@
 // ============================================================
 // BioGuardians - Load speciesLink occurrences via API
 //
-// Fetches georeferenced occurrences from speciesLink for
-// species already in the database. Inserts into ocorrencia.
+// Uses the new speciesLink API (specieslink.net/ws/1.0/) which
+// requires an API key. Get one at:
+//   https://specieslink.net/ws/1.0/
+//
+// Set the API key in .env:
+//   SPLINK_API_KEY=your_api_key_here
+//
+// If no API key is set, the script skips with a warning.
+// GBIF already aggregates much of speciesLink's data, so this
+// script is optional.
 //
 // Usage:
-//   node load_specieslink_ocorrencias.mjs                    # all active species
-//   node load_specieslink_ocorrencias.mjs --especie="panthera onca"  # specific
-//
-// speciesLink API: https://api.splink.org.br/records
-// Documentation: https://www.splink.org.br/api
+//   node load_specieslink_ocorrencias.mjs
+//   node load_specieslink_ocorrencias.mjs --especie="panthera onca"
 //
 // Idempotent: checks if (especie_id, lat, lon, fonte) already exists.
 // ============================================================
@@ -31,34 +36,35 @@ const pool = new Pool({
   database: process.env.DB_NAME,
 });
 
-const SPLINK_BASE = 'https://api.splink.org.br/records';
+const SPLINK_BASE = 'https://specieslink.net/ws/1.0/search';
+const SPLINK_API_KEY = process.env.SPLINK_API_KEY || '';
 
 async function fetchSplinkOccurrences(scientificName, limit = 50) {
-  // speciesLink API: search by scientific name with geographic filter
-  const url = `${SPLINK_BASE}/search?scientificname=${encodeURIComponent(scientificName)}&format=json&limit=${limit}`;
+  const params = new URLSearchParams({
+    scientificname: scientificName,
+    format: 'json',
+    limit: String(limit),
+    apikey: SPLINK_API_KEY,
+  });
 
+  const url = `${SPLINK_BASE}?${params}`;
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`speciesLink API returned ${response.status}`);
+    const text = await response.text();
+    throw new Error(`speciesLink API ${response.status}: ${text}`);
   }
 
   const data = await response.json();
-  // speciesLink returns array of records
+  // speciesLink returns GeoJSON FeatureCollection
+  if (data.features) {
+    return data.features.map(f => ({
+      decimalLatitude: f.geometry?.coordinates?.[1],
+      decimalLongitude: f.geometry?.coordinates?.[0],
+      eventDate: f.properties?.eventDate || f.properties?.dateIdentified,
+      institutionCode: f.properties?.institutionCode,
+    }));
+  }
   return Array.isArray(data) ? data : (data.result || []);
-}
-
-function parseSplinkRecord(record) {
-  // speciesLink record fields vary; extract coordinates
-  const lat = parseFloat(record.decimalLatitude || record.latitude || '');
-  const lon = parseFloat(record.decimalLongitude || record.longitude || '');
-
-  if (isNaN(lat) || isNaN(lon)) return null;
-  if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
-
-  const eventDate = record.eventDate || record.collectorDate || null;
-  const institutionCode = record.institutionCode || record.institution || null;
-
-  return { lat, lon, eventDate, institutionCode };
 }
 
 async function main() {
@@ -68,10 +74,25 @@ async function main() {
   console.log('==> BioGuardians — speciesLink Occurrences Loader');
   console.log(`   API: ${SPLINK_BASE}`);
 
+  if (!SPLINK_API_KEY) {
+    console.log('');
+    console.log('   WARNING: No SPLINK_API_KEY found in .env');
+    console.log('   The speciesLink API requires an API key.');
+    console.log('   Get one at: https://specieslink.net/ws/1.0/');
+    console.log('   Then add to .env: SPLINK_API_KEY=your_key');
+    console.log('');
+    console.log('   NOTE: GBIF already aggregates much of speciesLink data,');
+    console.log('   so this script is optional.');
+    console.log('');
+    console.log('   Skipping speciesLink load.');
+    process.exit(0);
+  }
+
+  console.log(`   API key: ${SPLINK_API_KEY.substring(0, 4)}...`);
+
   const client = await pool.connect();
 
   try {
-    // Get species to process
     let speciesQuery = "SELECT id, nome_cientifico FROM especie WHERE status = 'ativo' ORDER BY nome_cientifico";
     let speciesParams = [];
 
@@ -102,15 +123,22 @@ async function main() {
         let inserted = 0, skipped = 0;
 
         for (const record of occurrences) {
-          const parsed = parseSplinkRecord(record);
-          if (!parsed) continue;
+          const lat = typeof record.decimalLatitude === 'number'
+            ? record.decimalLatitude
+            : parseFloat(record.decimalLatitude || '');
+          const lon = typeof record.decimalLongitude === 'number'
+            ? record.decimalLongitude
+            : parseFloat(record.decimalLongitude || '');
+
+          if (isNaN(lat) || isNaN(lon)) continue;
+          if (lat < -90 || lat > 90 || lon < -180 || lon > 180) continue;
 
           // Check if already exists (idempotent)
           const { rows: existing } = await client.query(
             `SELECT 1 FROM ocorrencia
              WHERE especie_id = $1 AND lat = $2 AND lon = $3 AND fonte = 'specieslink'
              LIMIT 1`,
-            [esp.id, parsed.lat, parsed.lon]
+            [esp.id, lat, lon]
           );
 
           if (existing.length > 0) {
@@ -118,13 +146,24 @@ async function main() {
             continue;
           }
 
-          // Insert occurrence
-          const dataEvento = parsed.eventDate ? parsed.eventDate.split('T')[0] : null;
+          // Normalize date
+          let dataEvento = null;
+          const rawDate = record.eventDate || '';
+          if (rawDate) {
+            const raw = rawDate.split('T')[0].split('/')[0].trim();
+            if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+              dataEvento = raw;
+            } else if (/^\d{4}-\d{2}$/.test(raw)) {
+              dataEvento = raw + '-01';
+            } else if (/^\d{4}$/.test(raw)) {
+              dataEvento = raw + '-01-01';
+            }
+          }
 
           await client.query(
             `INSERT INTO ocorrencia (especie_id, lat, lon, geom, data_evento, fonte, base_registro)
              VALUES ($1, $2, $3, ST_SetSRID(ST_MakePoint($3, $2), 4326), $4, 'specieslink', $5)`,
-            [esp.id, parsed.lat, parsed.lon, dataEvento, parsed.institutionCode]
+            [esp.id, lat, lon, dataEvento, record.institutionCode || null]
           );
 
           inserted++;
