@@ -2,26 +2,38 @@
 -- ============================================================
 -- BioGuardians - 09 Database Performance Configuration
 --
--- Uses ALTER DATABASE (not ALTER SYSTEM) so it works in any
--- environment (CI ephemeral, production) without superuser
--- privileges. The database owner can set these.
+-- Idempotent: only sets parameters that differ from desired value.
+-- Uses DO block with dynamic SQL to resolve database name at runtime.
 --
 -- Postmaster-level settings (max_worker_processes, shared_buffers,
--- max_parallel_workers) must be set in postgresql.conf manually
--- on the production server. See README for details.
+-- max_parallel_workers) must be set in postgresql.conf manually.
 -- ============================================================
 
--- ---------- Parallel Query (user-context, take effect immediately) ----------
-ALTER DATABASE current_database() SET max_parallel_workers_per_gather = 2;
-ALTER DATABASE current_database() SET parallel_setup_cost = 100;
-ALTER DATABASE current_database() SET parallel_tuple_cost = 0.03;
-ALTER DATABASE current_database() SET min_parallel_table_scan_size = '8MB';
-ALTER DATABASE current_database() SET min_parallel_index_scan_size = '512kB';
+DO $$
+DECLARE
+  db_name text := current_database();
+  rec record;
+BEGIN
+  -- Define desired settings as a temp table-like structure.
+  FOR rec IN
+    SELECT * FROM (VALUES
+      ('max_parallel_workers_per_gather', '2'),
+      ('parallel_setup_cost', '100'),
+      ('parallel_tuple_cost', '0.03'),
+      ('min_parallel_table_scan_size', '8MB'),
+      ('min_parallel_index_scan_size', '512kB'),
+      ('effective_cache_size', '1GB'),
+      ('work_mem', '8MB'),
+      ('maintenance_work_mem', '128MB')
+    ) AS t(name, value)
+  LOOP
+    -- Only apply if the parameter exists and current value differs.
+    IF EXISTS (SELECT 1 FROM pg_settings WHERE name = rec.name)
+       AND (SELECT setting FROM pg_settings WHERE name = rec.name) <> rec.value
+    THEN
+      EXECUTE format('ALTER DATABASE %I SET %I = %L', db_name, rec.name, rec.value);
+    END IF;
+  END LOOP;
+END $$;
 
--- ---------- Memory (user-context, take effect on next connection) ----------
-ALTER DATABASE current_database() SET effective_cache_size = '1GB';
-ALTER DATABASE current_database() SET work_mem = '8MB';
-ALTER DATABASE current_database() SET maintenance_work_mem = '128MB';
-
--- Reload configuration so connection-level defaults are refreshed.
 SELECT pg_reload_conf();
