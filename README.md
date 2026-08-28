@@ -144,7 +144,70 @@ O GitHub Actions roda a cada push/PR:
 1. **validate** — container PostGIS efemero + migrations + smoke tests + idempotencia
 2. **backend-build** — typecheck + build do backend TypeScript
 3. **frontend-build** — typecheck + build do frontend TypeScript
-4. **deploy** (so push na main) — aplica migrations no banco de producao (Oracle VM)
+4. **deploy-migrations** (so push na main) — aplica migrations no banco de producao (Oracle VM)
+5. **build-and-push** (so push na main) — builda imagens Docker e publica no GHCR:
+   - `ghcr.io/thejhoudev/bioguardians-backend:latest`
+   - `ghcr.io/thejhoudev/bioguardians-frontend:latest`
+6. **deploy-app** (so push na main) — SSH na Oracle VM, SCP do `docker-compose.prod.yml`,
+   `docker compose pull && docker compose up -d`
+
+### Pipeline visual
+
+```
+main
+  |
+  v
+GitHub Actions
+  |
+  +-- validate (ephemeral PostGIS)
+  +-- backend-build (typecheck)
+  +-- frontend-build (typecheck)
+  |
+  v (main only)
+deploy-migrations --> psql na Oracle VM
+build-and-push    --> ghcr.io/thejhoudev/bioguardians-{backend,frontend}:latest
+  |
+  v
+deploy-app --> SSH na Oracle VM
+  |           scp docker-compose.prod.yml
+  |           docker compose pull
+  |           docker compose up -d
+  v
+Portainer (gerenciamento manual dos containers)
+```
+
+### Secrets necessarios no GitHub
+
+| Secret | Uso |
+|--------|-----|
+| `DB_USER` | Usuario do PostgreSQL |
+| `DB_PASSWORD` | Senha do PostgreSQL |
+| `DB_NAME` | Nome do banco |
+| `DB_HOST` | Host do banco de producao (Oracle VM) |
+| `DB_PORT` | Porta do banco de producao |
+| `ORACLE_SSH_HOST` | IP/hostname da Oracle VM |
+| `ORACLE_SSH_USER` | Usuario SSH da VM |
+| `ORACLE_SSH_KEY` | Chave privada SSH (PEM) da VM |
+| `ORACLE_SSH_PORT` | (opcional) Porta SSH, default 22 |
+
+> `GITHUB_TOKEN` e automatico — nao precisa configurar. Tem permissao
+> `packages: write` para publicar no GHCR.
+
+### VM: .env para o compose.prod
+
+Na VM, em `~/bioguardians/.env`:
+
+```bash
+DB_USER=bioguard
+DB_PASSWORD=sua_senha
+DB_NAME=bioguardians
+DB_PORT=5432
+CORS_ORIGIN=http://localhost
+VITE_API_URL=http://localhost:3001/api
+```
+
+> O PostgreSQL roda nativamente na VM. O backend no container
+> conecta via `host.docker.internal` (configurado no compose.prod.yml).
 
 ## API Endpoints
 
