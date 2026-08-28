@@ -1,5 +1,10 @@
 import type { NextFunction, Request, Response } from 'express';
+import { trace } from '@opentelemetry/api';
 import { logger } from '../telemetry/logger.js';
+
+function getTraceId(): string | undefined {
+  return trace.getActiveSpan()?.spanContext().traceId;
+}
 
 // Logs every /api request on response finish.
 // Captures req.path BEFORE next() — Express restores req.path after mount
@@ -10,7 +15,14 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
     const startTime = Date.now();
     res.on('finish', () => {
       const duration_ms = Date.now() - startTime;
-      const meta = { method: req.method, path, status: res.statusCode, duration_ms };
+      const traceId = getTraceId();
+      const meta = {
+        method: req.method,
+        path,
+        status: res.statusCode,
+        duration_ms,
+        ...(traceId ? { trace_id: traceId } : {}),
+      };
 
       if (res.statusCode >= 500) {
         logger.error('http_request', meta);

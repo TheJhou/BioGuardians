@@ -724,12 +724,34 @@
       "pluginVersion": "11.4.0",
       "targets": [
         {
-          "expr": "{service_name=\"bioguardians-backend\"} |= \"\" ",
+          "expr": "{service_name=\"bioguardians-backend\"} |= \"http_request\"",
           "refId": "A"
         }
       ],
-      "title": "Application Logs",
+      "title": "HTTP Request Logs (com duração)",
       "type": "logs"
+    },
+    {
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 30
+      },
+      "id": 11,
+      "targets": [
+        {
+          "query": "{service.name=\"bioguardians-backend\"}",
+          "queryType": "traceql",
+          "refId": "A"
+        }
+      ],
+      "title": "Request Traces (rotas, queries, tempo)",
+      "type": "traces"
     }
   ],
   "refresh": "10s",
