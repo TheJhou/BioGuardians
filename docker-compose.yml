@@ -1,8 +1,10 @@
 services:
+  # ---------- Database (PostgreSQL + PostGIS) ----------
   db:
     image: postgis/postgis:16-3.4
     container_name: bioguardians-db
     restart: unless-stopped
+    shm_size: 512mb
     environment:
       POSTGRES_USER: ${DB_USER:?DB_USER is required, copy .env.example to .env}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required, copy .env.example to .env}
@@ -16,7 +18,13 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "2"
 
+  # ---------- Migration runner (one-shot) ----------
   migrate:
     image: postgres:16-alpine
     container_name: bioguardians-migrate
@@ -33,6 +41,61 @@ services:
       - ./db:/db:ro
     entrypoint: ["bash", "/db/migrate.sh"]
     restart: "no"
+
+  # ---------- Backend API (Node.js + Express) ----------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bioguardians-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+      PORT: 3001
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+      CACHE_TTL_MS: ${CACHE_TTL_MS:-30000}
+      CACHE_MAX: ${CACHE_MAX:-100}
+      GBIF_API_BASE: https://api.gbif.org/v1
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./backend/src:/app/src:ro
+    command: ["npx", "tsx", "watch", "src/index.ts"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3001/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1"
+
+  # ---------- Frontend (React + Vite dev server) ----------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: bioguardians-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:3001/api}
+      VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY:?VITE_GOOGLE_MAPS_API_KEY is required}
+    ports:
+      - "5173:80"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1"
 
 volumes:
   bioguardians_pgdata:

@@ -1,6 +1,0 @@
-# Frontend (React + Vite + Google Maps)
-Placeholder — será implementado na próxima etapa.
-- Mapa com polígonos das UCs (GeoJSON)
-- Marcadores de ocorrências
-- Filtros (categoria, bioma, estado) e dashboard
-- Consome a API Node.js
