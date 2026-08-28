@@ -1,0 +1,25 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: bioguardians-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-bioguard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bioguard}
+      POSTGRES_DB: ${POSTGRES_DB:-bioguardians}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - bioguardians_pgdata:/var/lib/postgresql/data
+      # Scripts SQL acessíveis ao init (somente leitura).
+      - ./db:/db:ro
+      # Entry point: roda 00_init.sh na 1ª inicialização.
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bioguard} -d ${POSTGRES_DB:-bioguardians}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  bioguardians_pgdata:

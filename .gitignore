@@ -1,0 +1,21 @@
+# Ambiente
+.env
+.env.local
+
+# Node
+node_modules/
+dist/
+build/
+*.log
+npm-debug.log*
+
+# Docker
+bioguardians_pgdata/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
