@@ -168,6 +168,14 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq postgresql-client
 
+      - name: Debug database connection
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          psql --version
+          echo "Testing psql connection..."
+          psql "$DATABASE_URL" -c "SELECT 1" || true
+
       - name: Aplica migrations
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
