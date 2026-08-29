@@ -57,6 +57,7 @@ router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next)
                'id', a.id,
                'geometry', ST_AsGeoJSON(${geomExpr}, 5)::json,
                'properties', json_build_object(
+                 'id', a.id,
                  'nome', a.nome,
                  'categoria_uc', a.categoria_uc,
                  'esfera', a.esfera,
@@ -87,6 +88,7 @@ router.get('/:id', validateId, async (req, res, next) => {
          'id', a.id,
          'geometry', ST_AsGeoJSON(a.geom)::json,
          'properties', json_build_object(
+           'id', a.id,
            'nome', a.nome,
            'categoria_uc', a.categoria_uc,
            'esfera', a.esfera,
