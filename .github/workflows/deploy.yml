@@ -170,21 +170,33 @@ jobs:
 
       - name: Debug database connection
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
         run: |
           psql --version
           echo "Testing psql connection..."
-          psql "$DATABASE_URL" -c "SELECT 1" || true
+          PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "${DB_PORT:-5432}" -U "$DB_USER" -d "$DB_NAME" -c "SELECT 1" || true
 
       - name: Aplica migrations
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
         run: bash db/migrate.sh
 
       - name: Smoke tests
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: psql -v ON_ERROR_STOP=1 "${{ secrets.DATABASE_URL }}" -f db/tests/smoke_test.sql
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+        run: PGPASSWORD="${{ secrets.DB_PASSWORD }}" psql -v ON_ERROR_STOP=1 -h "${{ secrets.DB_HOST }}" -p "${{ secrets.DB_PORT }}" -U "${{ secrets.DB_USER }}" -d "${{ secrets.DB_NAME }}" -f db/tests/smoke_test.sql
 
   generate-stack:
     name: Generate stack
@@ -197,9 +209,16 @@ jobs:
         env:
           IMAGE:                  ${{ needs.prepare.outputs.image }}
           PROJECT_NAME:           ${{ needs.prepare.outputs.project_name }}
-          DATABASE_URL:           ${{ secrets.DATABASE_URL }}
           GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
-        run: envsubst < stack.yml > stack.rendered.yml
+        run: |
+          DB_HOST='${{ secrets.DB_HOST }}'
+          DB_PORT='${{ secrets.DB_PORT || '5432' }}'
+          DB_USER='${{ secrets.DB_USER }}'
+          DB_PASSWORD='${{ secrets.DB_PASSWORD }}'
+          DB_NAME='${{ secrets.DB_NAME }}'
+          DB_PASSWORD_ENC=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$DB_PASSWORD'))")
+          export DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD_ENC}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+          envsubst < stack.yml > stack.rendered.yml
 
       - name: Upload stack renderizada
         uses: actions/upload-artifact@v4
