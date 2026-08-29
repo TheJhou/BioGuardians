@@ -11,12 +11,14 @@
 #   ./db/migrate.sh --status        # show migration status
 #   ./db/migrate.sh --dry-run       # show what would be applied
 #
-# Environment (all required except HOST and PORT):
-#   DB_HOST     (default: localhost)
-#   DB_PORT     (default: 5432)
-#   DB_USER     (required)
-#   DB_PASSWORD (required)
-#   DB_NAME     (required)
+# Environment:
+#   DATABASE_URL (preferred; psql connection string)
+#   Or, if DATABASE_URL is not set:
+#     DB_HOST     (default: localhost)
+#     DB_PORT     (default: 5432)
+#     DB_USER     (required)
+#     DB_PASSWORD (required)
+#     DB_NAME     (required)
 #   MIGRATIONS_DIR (default: ./migrations relative to script)
 # ============================================================
 set -eu
@@ -24,17 +26,22 @@ set -eu
 # ---------- Configuration ----------
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MIGRATIONS_DIR="${MIGRATIONS_DIR:-$SCRIPT_DIR/migrations}"
-DB_HOST="${DB_HOST:-localhost}"
-DB_PORT="${DB_PORT:-5432}"
 
-# Credenciais são obrigatórias — sem defaults hardcoded.
-: "${DB_USER:?DB_USER is required (set in .env or environment)}"
-: "${DB_PASSWORD:?DB_PASSWORD is required (set in .env or environment)}"
-: "${DB_NAME:?DB_NAME is required (set in .env or environment)}"
+if [ -n "${DATABASE_URL:-}" ]; then
+  PSQL_BASE="psql -v ON_ERROR_STOP=1 $DATABASE_URL"
+  CONN_LABEL="$DATABASE_URL"
+else
+  DB_HOST="${DB_HOST:-localhost}"
+  DB_PORT="${DB_PORT:-5432}"
 
-export PGPASSWORD="$DB_PASSWORD"
+  : "${DB_USER:?DB_USER is required (set in .env or environment)}"
+  : "${DB_PASSWORD:?DB_PASSWORD is required (set in .env or environment)}"
+  : "${DB_NAME:?DB_NAME is required (set in .env or environment)}"
 
-PSQL_BASE="psql -v ON_ERROR_STOP=1 -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME""
+  export PGPASSWORD="$DB_PASSWORD"
+  PSQL_BASE="psql -v ON_ERROR_STOP=1 -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME""
+  CONN_LABEL="$DB_HOST:$DB_PORT"
+fi
 
 # ---------- Helpers ----------
 log()   { echo "   $*"; }
@@ -43,7 +50,7 @@ die()   { echo "ERROR: $*" >&2; exit 1; }
 
 # Wait for database to be ready
 wait_for_db() {
-    header "Waiting for database at $DB_HOST:$DB_PORT..."
+    header "Waiting for database at $CONN_LABEL..."
     for i in $(seq 1 30); do
         if $PSQL_BASE -t -A -c "SELECT 1" >/dev/null 2>&1; then
             log "Database is ready."
@@ -52,7 +59,7 @@ wait_for_db() {
         log "Attempt $i/30..."
         sleep 1
     done
-    die "Could not connect to database at $DB_HOST:$DB_PORT after 30 attempts."
+    die "Could not connect to database at $CONN_LABEL after 30 attempts."
 }
 
 # Ensure journal table exists

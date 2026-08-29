@@ -170,17 +170,13 @@ jobs:
 
       - name: Aplica migrations
         env:
-          DB_HOST: ${{ secrets.DB_HOST }}
-          DB_PORT: ${{ secrets.DB_PORT }}
-          DB_USER: ${{ secrets.DB_USER }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          DB_NAME: ${{ secrets.DB_NAME }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: bash db/migrate.sh
 
       - name: Smoke tests
         env:
-          PGPASSWORD: ${{ secrets.DB_PASSWORD }}
-        run: psql -v ON_ERROR_STOP=1 -h "${{ secrets.DB_HOST }}" -p "${{ secrets.DB_PORT }}" -U "${{ secrets.DB_USER }}" -d "${{ secrets.DB_NAME }}" -f db/tests/smoke_test.sql
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: psql -v ON_ERROR_STOP=1 "${{ secrets.DATABASE_URL }}" -f db/tests/smoke_test.sql
 
   generate-stack:
     name: Generate stack
