@@ -26,6 +26,14 @@ export interface Taxon {
   parent_id: number | null;
 }
 
+export interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  per_page: number;
+  total_pages: number;
+}
+
 export interface Especie {
   id: number;
   nome_cientifico: string;

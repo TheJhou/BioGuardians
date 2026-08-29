@@ -3,13 +3,15 @@ import { query } from '../db/pool.js';
 import { validateId } from '../middleware/validateId.js';
 import { cacheInvalidateAll } from '../cache/cache.js';
 import { parseParam, getParam } from '../utils/params.js';
+import { paginate, getPaginationParams } from '../utils/paginate.js';
 
 const router = Router();
 
-// GET /api/especies?categoria=CR&bioma=1&estado=SP&status=ativo&busca=onca
+// GET /api/especies?categoria=CR&bioma=1&estado=SP&status=ativo&busca=onca&page=1&per_page=20
 router.get('/', async (req, res, next) => {
   try {
     const { categoria, bioma, estado, status, busca } = req.query;
+    const { page, perPage, offset } = getPaginationParams(req.query);
 
     // Full-text search takes priority when 'busca' is provided.
     if (busca && typeof busca === 'string') {
@@ -17,7 +19,7 @@ router.get('/', async (req, res, next) => {
         'SELECT * FROM buscar_especies($1)',
         [busca]
       );
-      res.json(rows);
+      res.json(paginate(rows, page, perPage, rows.length));
       return;
     }
 
@@ -49,13 +51,22 @@ router.get('/', async (req, res, next) => {
 
     const { rows } = await query(
       `SELECT e.id, e.nome_cientifico, e.nome_popular, e.categoria_ameaca,
-              e.status, e.criado_em, e.atualizado_em
+              e.status, e.criado_em, e.atualizado_em,
+              COUNT(*) OVER() AS full_count
        FROM especie e
        ${where}
-       ORDER BY e.nome_cientifico`,
-      params
+       ORDER BY e.nome_cientifico
+       LIMIT $${idx++} OFFSET $${idx++}`,
+      [...params, perPage, offset]
     );
-    res.json(rows);
+
+    const total = rows.length > 0 ? Number(rows[0].full_count) : 0;
+    const data = rows.map((r: any) => {
+      const { full_count, ...rest } = r;
+      return rest;
+    });
+
+    res.json(paginate(data, page, perPage, total));
   } catch (err) { next(err); }
 });
 

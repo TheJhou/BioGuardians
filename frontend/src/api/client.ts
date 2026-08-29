@@ -1,7 +1,7 @@
 import type {
   Bioma, Estado, Categoria, Taxon, Especie, EspecieBusca,
   GeoJSONFeatureCollection, OcorrenciaProperties, DashboardData,
-  EspecieEmArea, AreaProtegeEspecie,
+  EspecieEmArea, AreaProtegeEspecie, PaginatedResponse,
 } from '../types/index.js';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
@@ -74,15 +74,18 @@ export const api = {
   // Especies
   async getEspecies(params?: {
     categoria?: string; bioma?: number; estado?: string; status?: string; busca?: string;
-  }): Promise<Especie[] | EspecieBusca[]> {
+    page?: number; per_page?: number;
+  }): Promise<PaginatedResponse<Especie | EspecieBusca>> {
     const qs = new URLSearchParams();
     if (params?.categoria) qs.set('categoria', params.categoria);
     if (params?.bioma) qs.set('bioma', String(params.bioma));
     if (params?.estado) qs.set('estado', params.estado);
     if (params?.status) qs.set('status', params.status);
     if (params?.busca) qs.set('busca', params.busca);
+    if (params?.page) qs.set('page', String(params.page));
+    if (params?.per_page) qs.set('per_page', String(params.per_page));
     const query = qs.toString();
-    return fetchApi<Especie[]>(`/especies${query ? `?${query}` : ''}`);
+    return fetchApi<PaginatedResponse<Especie | EspecieBusca>>(`/especies${query ? `?${query}` : ''}`);
   },
 
   async getEspecie(id: number): Promise<Especie> {

@@ -1,31 +1,40 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/client.js';
-import { useEffect } from 'react';
 import type { Especie } from '../types/index.js';
+import StatCard from '../components/ui/StatCard.js';
 
-const mockSpecies: Especie[] = [
-  { id: 1, nome_cientifico: 'Panthera onca', nome_popular: 'Onça-pintada', categoria_ameaca: 'VU', status: 'ativo' },
-  { id: 2, nome_cientifico: 'Ara ararauna', nome_popular: 'Arara-azul-grande', categoria_ameaca: 'LC', status: 'ativo' },
-];
+const PLACEHOLDER = '/placeholder-animal.png';
 
 export default function SpeciesPage() {
-  const [species, setSpecies] = useState<Especie[]>([]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [result, setResult] = useState<{ data: Especie[]; total: number; total_pages: number } | null>(null);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Especie | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    api.getEspecies({})
-      .then((data) => { setSpecies(Array.isArray(data) ? data as Especie[] : mockSpecies); })
-      .catch(() => setSpecies(mockSpecies))
-      .finally(() => setLoading(false));
-  }, []);
+  const page = Math.max(1, Number(searchParams.get('page') || 1));
+  const perPage = 20;
 
-  const filtered = species.filter((s) =>
-    s.nome_cientifico.toLowerCase().includes(search.toLowerCase()) ||
-    (s.nome_popular && s.nome_popular.toLowerCase().includes(search.toLowerCase()))
-  );
+  useEffect(() => {
+    const busca = searchParams.get('busca') || undefined;
+    setSearchParams({ page: String(page), ...(busca ? { busca } : {}) }, { replace: true });
+
+    setLoading(true);
+    api.getEspecies({ busca, page, per_page: perPage })
+      .then(setResult)
+      .catch(() => setResult({ data: [], total: 0, total_pages: 0 }))
+      .finally(() => setLoading(false));
+  }, [searchParams]);
+
+  const handleSearch = () => {
+    setSearchParams({ page: '1', ...(search ? { busca: search } : {}) });
+  };
+
+  const goToPage = (p: number) => {
+    const busca = searchParams.get('busca');
+    setSearchParams({ page: String(p), ...(busca ? { busca } : {}) });
+  };
 
   if (loading) return <div className="loading">Carregando espécies...</div>;
 
@@ -38,16 +47,28 @@ export default function SpeciesPage() {
             placeholder="Buscar espécie..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
           />
+          <button onClick={handleSearch} className="filter-apply">Buscar</button>
         </div>
+
+        <div className="species-stats">
+          {result && (
+            <>
+              <StatCard value={result.total} label="Total de espécies" variant="info" />
+              <StatCard value={result.total_pages} label="Páginas" variant="info" />
+            </>
+          )}
+        </div>
+
         <div className="species-list">
-          {filtered.map((s) => (
+          {result?.data.map((s) => (
             <div
               key={s.id}
               className={`species-item ${selected?.id === s.id ? 'active' : ''}`}
               onClick={() => setSelected(s)}
             >
-              <img className="species-thumb" src="/placeholder-animal.png" alt={s.nome_popular || ''} />
+              <img className="species-thumb" src={PLACEHOLDER} alt={s.nome_popular || ''} />
               <div className="species-info">
                 <span className="species-name">{s.nome_popular || s.nome_cientifico}</span>
                 <span className="species-scientific">{s.nome_cientifico}</span>
@@ -56,20 +77,29 @@ export default function SpeciesPage() {
             </div>
           ))}
         </div>
-        <div className="pagination">
-          <button className="page-btn">1</button>
-          <button className="page-btn">2</button>
-          <button className="page-btn">3</button>
-          <button className="page-btn">4</button>
-          <button className="page-btn">5</button>
-        </div>
+
+        {result && result.total_pages > 1 && (
+          <div className="pagination">
+            <button className="page-btn" disabled={page === 1} onClick={() => goToPage(page - 1)}>‹</button>
+            {Array.from({ length: result.total_pages }, (_, i) => i + 1).map((p) => (
+              <button
+                key={p}
+                className={`page-btn ${p === page ? 'active' : ''}`}
+                onClick={() => goToPage(p)}
+              >
+                {p}
+              </button>
+            ))}
+            <button className="page-btn" disabled={page === result.total_pages} onClick={() => goToPage(page + 1)}>›</button>
+          </div>
+        )}
       </aside>
 
       <main className="species-detail">
         {selected ? (
           <>
             <div className="species-detail-header">
-              <img className="species-image" src="/placeholder-animal-large.png" alt={selected.nome_popular || ''} />
+              <img className="species-image" src={PLACEHOLDER} alt={selected.nome_popular || ''} />
               <div>
                 <h2>{selected.nome_popular || selected.nome_cientifico}</h2>
                 <p className="species-detail-scientific">{selected.nome_cientifico}</p>
@@ -83,7 +113,7 @@ export default function SpeciesPage() {
               <button className="tab">Unidades de Conservação</button>
             </div>
             <div className="species-tab-content">
-              <p>Informações sobre a espécie em análise.</p>
+              <p>{selected.descricao || 'Sem descrição cadastrada.'}</p>
             </div>
           </>
         ) : (
