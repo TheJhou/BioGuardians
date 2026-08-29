@@ -19,12 +19,11 @@ permissions:
   packages: write
 
 env:
-  REGISTRY: ghcr.io
+  REGISTRY: ghcr
 
 jobs:
   # ============================================================
   # Job 1: Validate schema in ephemeral PostGIS container
-  # Runs on every push/PR to main
   # ============================================================
   validate:
     name: Validate schema (ephemeral)
@@ -45,7 +44,7 @@ jobs:
           --health-cmd "pg_isready"
           --health-interval 10s
           --health-timeout 5s
-          --health-retries 10
+          --health-retries  10
 
     env:
       DB_HOST: localhost
@@ -55,8 +54,7 @@ jobs:
       DB_NAME: ${{ secrets.DB_NAME }}
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Install PostgreSQL client
         run: |
@@ -75,7 +73,7 @@ jobs:
         run: bash db/migrate.sh
 
   # ============================================================
-  # Job 2: Typecheck backend (every push/PR)
+  # Job 2: Typecheck backend
   # ============================================================
   backend-typecheck:
     name: Typecheck backend
@@ -83,11 +81,9 @@ jobs:
     needs: validate
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
@@ -106,7 +102,7 @@ jobs:
         run: npm run build
 
   # ============================================================
-  # Job 3: Typecheck frontend (every push/PR)
+  # Job 3: Typecheck frontend
   # ============================================================
   frontend-typecheck:
     name: Typecheck frontend
@@ -114,11 +110,9 @@ jobs:
     needs: validate
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
@@ -134,11 +128,12 @@ jobs:
 
       - name: Build
         working-directory: frontend
+        env:
+          VITE_MAPTILER_API_KEY: ${{ secrets.VITE_MAPTILER_API_KEY }}
         run: npm run build
 
   # ============================================================
-  # Job 4: Prepare — compute shared vars and detect changes
-  # Main only
+  # Job 4: Prepare deploy
   # ============================================================
   prepare:
     name: Prepare deploy
@@ -146,89 +141,132 @@ jobs:
     needs: [validate, backend-typecheck, frontend-typecheck]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     outputs:
-      image:          ${{ steps.vars.outputs.image }}
-      tag:            ${{ steps.vars.outputs.tag }}
-      backend_build:  ${{ steps.changes.outputs.backend }}
-      frontend_build: ${{ steps.changes.outputs.frontend }}
+      image:         ${{ steps.vars.outputs.image }}
+      tag:           ${{ steps.vars.outputs.tag }}
+      project_name:  ${{ steps.vars.outputs.project_name }}
+      matrix:        ${{ steps.matrix.outputs.matrix }}
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
-      - name: Compute image base, tag SHA
+      - name: Gera imagem base, tag SHA e project_name
         id: vars
         run: |
           OWNER_LOWER=$(printf '%s' "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          IMAGE="$REGISTRY/$OWNER_LOWER/bioguardians"
+          REPO_LOWER=$(printf '%s' "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE="$REGISTRY/$OWNER_LOWER/$REPO_LOWER"
           echo "image=$IMAGE"              >> "$GITHUB_OUTPUT"
           echo "tag=sha-${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+          echo "project_name=$REPO_LOWER"  >> "$GITHUB_OUTPUT"
 
-      - name: Detect changes by path (HEAD~1 -> HEAD)
-        id: changes
-        run: |
-          CHANGED=$(git diff --name-only HEAD~1 HEAD || echo "")
-          echo "$CHANGED" | grep -qE '^(backend/|db/)' && BE_CHANGED="true" || BE_CHANGED="false"
-          echo "$CHANGED" | grep -qE '^(frontend/)' && FE_CHANGED="true" || FE_CHANGED="false"
-          # On first commit or empty diff, build everything
-          if [ -z "$CHANGED" ]; then
-            BE_CHANGED="true"
-            FE_CHANGED="true"
-          fi
-          echo "backend=$BE_CHANGED"  >> "$GITHUB_OUTPUT"
-          echo "frontend=$FE_CHANGED" >> "$GITHUB_OUTPUT"
-
-  # ============================================================
-  # Job 5: Build and push Docker images to GHCR (matrix)
-  # Main only — only builds services that changed
-  # ============================================================
-  build-and-push:
-    name: Build & push ${{ matrix.service }}
-    runs-on: ubuntu-latest
-    needs: prepare
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - service: backend
-            context: ./backend
-            should_build: ${{ needs.prepare.outputs.backend_build }}
-          - service: frontend
-            context: ./frontend
-            should_build: ${{ needs.prepare.outputs.frontend_build }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
+      - name: Login no GHCR
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push ${{ matrix.service }}
-        if: ${{ matrix.should_build == 'true' }}
+      - name: Detecta mudancas por caminho (HEAD~1 -> HEAD)
+        id: changes
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1 HEAD || echo "")
+          echo "$CHANGED" | grep -qE '^(backend/|db/)' && BE_CHANGED="true" || BE_CHANGED="false"
+          echo "$CHANGED" | grep -qE '^(frontend/)'   && FE_CHANGED="true" || FE_CHANGED="false"
+          if [ -z "$CHANGED" ]; then
+            BE_CHANGED="true"
+            FE_CHANGED="true"
+          fi
+          echo "frontend=$FE_CHANGED" >> "$GITHUB_OUTPUT"
+          echo "backend=$BE_CHANGED"  >> "$GITHUB_OUTPUT"
+
+      - name: Valida integridade das migrations
+        run: |
+          cd db/migrations
+          files=$(ls -1 [0-9][0-9][0-9]_*.sql 2>/dev/null | sort)
+          if [ -z "$files" ]; then
+            echo "ERROR: no migration files found"
+            exit 1
+          fi
+          prev=0
+          for f in $files; do
+            num=$(echo "$f" | sed -E 's/^0*([0-9]+)_.*/\1/')
+            if ! [ "$num" -gt 0 ] 2>/dev/null; then
+              echo "ERROR: invalid migration filename: $f"
+              exit 1
+            fi
+            if [ "$num" -ne "$((prev + 1))" ]; then
+              echo "ERROR: migration numbers are not sequential. File $f, previous was $prev"
+              exit 1
+            fi
+            prev=$num
+          done
+          echo "OK: $(echo "$files" | wc -l) migration files are sequential".
+
+      - name: Monta matrix com flag should_build por servico
+        id: matrix
+        run: |
+          MATRIX=$(jq -cn \
+            --argjson f "${{ steps.changes.outputs.frontend }}" \
+            --argjson b "${{ steps.changes.outputs.backend }}" '[
+              {"service":"frontend","dockerfile":"frontend/Dockerfile","should_build":$f},
+              {"service":"backend","dockerfile":"backend/Dockerfile","should_build":$b}
+            ]')
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+
+  # ============================================================
+  # Job 5: Build and push images
+  # ============================================================
+  build:
+    name: Build ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs: prepare
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.prepare.outputs.matrix) }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepara build-args (VITE_* apenas para frontend)
+        id: args
+        run: |
+          if [ "${{ matrix.service }}" = "frontend" ]; then
+            echo "value=VITE_MAPTILER_API_KEY=${{ secrets.VITE_MAPTILER_API_KEY }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build e Push ${{ matrix.service }}
+        if: ${{ matrix.should_build }}
         uses: docker/build-push-action@v6
         with:
-          context: ${{ matrix.context }}
-          push: true
+          context: .
+          file:    ${{ matrix.dockerfile }}
+          push:    true
           tags: |
-            ${{ needs.prepare.outputs.image }}-${{ matrix.service }}:latest
             ${{ needs.prepare.outputs.image }}-${{ matrix.service }}:${{ needs.prepare.outputs.tag }}
+            ${{ needs.prepare.outputs.image }}-${{ matrix.service }}:latest
+          build-args: ${{ steps.args.outputs.value }}
           cache-from: type=gha,scope=${{ matrix.service }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
-          build-args: |
-            VITE_MAPTILER_API_KEY=${{ secrets.VITE_MAPTILER_API_KEY }}
+          cache-to:   type=gha,mode=max,scope=${{ matrix.service }}
 
-      - name: Re-tag unchanged image with new SHA
-        if: ${{ matrix.should_build != 'true' }}
+      - name: Re-tag imagem inalterada com nova SHA
+        if: ${{ !matrix.should_build }}
         env:
           IMAGE: ${{ needs.prepare.outputs.image }}
           TAG:   ${{ needs.prepare.outputs.tag }}
@@ -238,13 +276,12 @@ jobs:
           docker push "${IMAGE}-${{ matrix.service }}:${TAG}"
 
   # ============================================================
-  # Job 6: Deploy migrations to production database
-  # Main only — runs after images are built
+  # Job 6: Deploy migrations to production
   # ============================================================
   deploy-migrations:
-    name: Deploy migrations (production DB)
+    name: Deploy migrations (production)
     runs-on: ubuntu-latest
-    needs: [prepare, build-and-push]
+    needs: [prepare, build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     env:
@@ -255,8 +292,7 @@ jobs:
       DB_NAME: ${{ secrets.DB_NAME }}
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Install PostgreSQL client
         run: |
@@ -271,22 +307,17 @@ jobs:
           PGPASSWORD: ${{ secrets.DB_PASSWORD }}
         run: psql -v ON_ERROR_STOP=1 -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f db/tests/smoke_test.sql
 
-      - name: Verify migration idempotency (production)
-        run: bash db/migrate.sh
-
   # ============================================================
-  # Job 7: Deploy application on Oracle VM via SSH
-  # Main only — runs after migrations are applied
+  # Job 7: Deploy application on Oracle VM
   # ============================================================
-  deploy-app:
-    name: Deploy app (Oracle VM via SSH)
+  deploy:
+    name: Deploy app (Oracle VM)
     runs-on: ubuntu-latest
     needs: [prepare, deploy-migrations]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup SSH key
         run: |
@@ -343,7 +374,7 @@ jobs:
             observability/grafana/dashboards/bioguardians-overview.json \
             ${{ secrets.ORACLE_SSH_USER }}@${{ secrets.ORACLE_SSH_HOST }}:~/bioguardians/observability/grafana/dashboards/
 
-      - name: SSH and deploy containers (app + observability)
+      - name: Deploy containers
         run: |
           ssh -i ~/.ssh/id_rsa -p ${{ secrets.ORACLE_SSH_PORT || 22 }} \
             ${{ secrets.ORACLE_SSH_USER }}@${{ secrets.ORACLE_SSH_HOST }} \

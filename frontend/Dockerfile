@@ -1,35 +1,32 @@
 # --- Build stage ---
 FROM node:22-alpine AS build
+
 WORKDIR /app
-COPY package.json ./
+
+# Copy the whole build context (respects .dockerignore).
+COPY . .
+
+# Bake Vite env vars into the bundle at build time.
+ARG VITE_API_URL=/api
 ARG VITE_MAPTILER_API_KEY
+ENV VITE_API_URL=${VITE_API_URL}
 ENV VITE_MAPTILER_API_KEY=${VITE_MAPTILER_API_KEY}
-ENV VITE_API_URL=/api
-RUN npm install
-COPY tsconfig.json vite.config.ts index.html ./
-COPY src ./src
-RUN npm run build
+
+# Install dependencies without running lifecycle scripts.
+RUN npm install --ignore-scripts
+
+# Build the production bundle.
+RUN npx vite build
 
 # --- Runtime stage ---
-FROM nginx:alpine AS runtime
+FROM nginx:alpine
+
+# Copy built static assets.
 COPY --from=build /app/dist /usr/share/nginx/html
-# nginx config that proxies /api to the backend container
-RUN printf 'server {\n\
-  listen 80;\n\
-  root /usr/share/nginx/html;\n\
-  index index.html;\n\
-\n\
-  location / {\n\
-    try_files $uri $uri/ /index.html;\n\
-  }\n\
-\n\
-  location /api {\n\
-    proxy_pass http://backend:3001/api;\n\
-    proxy_set_header Host $host;\n\
-    proxy_set_header X-Real-IP $remote_addr;\n\
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n\
-    proxy_set_header X-Forwarded-Proto $scheme;\n\
-  }\n\
-}\n' > /etc/nginx/conf.d/default.conf
+
+# nginx config that proxies /api to the backend container.
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
 EXPOSE 80
+
 CMD ["nginx", "-g", "daemon off;"]
