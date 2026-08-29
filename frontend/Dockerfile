@@ -2,12 +2,12 @@
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY package.json ./
+ARG VITE_MAPTILER_API_KEY
+ENV VITE_MAPTILER_API_KEY=${VITE_MAPTILER_API_KEY}
+ENV VITE_API_URL=/api
 RUN npm install
 COPY tsconfig.json vite.config.ts index.html ./
 COPY src ./src
-# Use relative API URL so nginx proxy handles routing.
-# No need to know the VM IP at build time.
-ENV VITE_API_URL=/api
 RUN npm run build
 
 # --- Runtime stage ---

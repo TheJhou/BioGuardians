@@ -224,6 +224,8 @@ jobs:
             ${{ needs.prepare.outputs.image }}-${{ matrix.service }}:${{ needs.prepare.outputs.tag }}
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+          build-args: |
+            VITE_MAPTILER_API_KEY=${{ secrets.VITE_MAPTILER_API_KEY }}
 
       - name: Re-tag unchanged image with new SHA
         if: ${{ matrix.should_build != 'true' }}
