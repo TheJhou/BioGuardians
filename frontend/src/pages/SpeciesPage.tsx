@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { api } from '../api/client.js';
+import ImageWithSkeleton from '../components/ImageWithSkeleton.js';
 import StatCard from '../components/ui/StatCard.js';
 import type { Especie, PaginatedResponse } from '../types/index.js';
 
@@ -141,7 +142,12 @@ export default function SpeciesPage() {
             >
               <div className="species-avatar">
                 {s.imagem_url ? (
-                  <img src={s.imagem_url} alt={s.nome_cientifico} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  <ImageWithSkeleton
+                    src={s.imagem_url}
+                    alt={s.nome_cientifico}
+                    skeletonClassName="species-avatar-skeleton"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
                 ) : (
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M13 7a3 3 0 1 0-6 0 3 3 0 0 0 6 0z" />
@@ -170,9 +176,11 @@ export default function SpeciesPage() {
             <div className="species-detail-header">
               <div className="species-image">
                 {selected.imagem_url ? (
-                  <img
+                  <ImageWithSkeleton
                     src={selected.imagem_url}
                     alt={selected.nome_cientifico}
+                    className="species-detail-img"
+                    skeletonClassName="species-detail-img-skeleton"
                     onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                   />
                 ) : (

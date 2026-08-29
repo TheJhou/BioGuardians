@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Map, Source, Layer, Popup, NavigationControl } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { api } from '../api/client.js';
+import ImageWithSkeleton from './ImageWithSkeleton.js';
 import { MAP_DEFAULTS, getCategoryColor, getUcCategoryColor } from '../constants/index.js';
 import type {
   GeoJSONFeatureCollection, OcorrenciaProperties,
@@ -299,9 +300,11 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
             <div className="occurrence-popup">
               <div className="occurrence-image">
                 {selectedOcorrencia.properties.imagem_url ? (
-                  <img
+                  <ImageWithSkeleton
                     src={selectedOcorrencia.properties.imagem_url}
                     alt={selectedOcorrencia.properties.nome_cientifico}
+                    className="occurrence-detail-img"
+                    skeletonClassName="occurrence-image-skeleton"
                     onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                   />
                 ) : (

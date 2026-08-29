@@ -63,6 +63,14 @@ a, button { transition: all 0.2s ease; }
   border-radius: var(--radius-sm);
 }
 
+.image-skeleton-wrapper { width: 100%; height: 100%; }
+
+.species-avatar-skeleton { width: 100%; height: 100%; border-radius: 50%; }
+
+.species-detail-img-skeleton { width: 100%; height: 100%; border-radius: var(--radius-md); }
+
+.occurrence-image-skeleton { width: 100%; height: 100%; border-radius: var(--radius-md); }
+
 @keyframes skeleton {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
