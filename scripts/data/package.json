@@ -9,6 +9,7 @@
     "load:gbif": "node load_gbif_ocorrencias.mjs",
     "load:splink": "node load_specieslink_ocorrencias.mjs",
     "enrich:descriptions": "node enrich_species_descriptions.mjs",
+    "enrich:images": "node enrich_species_images.mjs",
     "load:all": "node load_mma_especies.mjs && node load_gbif_ocorrencias.mjs && node load_specieslink_ocorrencias.mjs"
   },
   "dependencies": {

@@ -165,12 +165,20 @@ export default function SpeciesPage() {
           <>
             <div className="species-detail-header">
               <div className="species-image">
-                <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M13 7a3 3 0 1 0-6 0 3 3 0 0 0 6 0z" />
-                  <path d="M17.8 9.6c1.4 2.2 2.2 4.8 2.2 7.4 0 1.3-.4 2.5-1 3.5" />
-                  <path d="M4 17c0-2.6.8-5.2 2.2-7.4" />
-                  <path d="M12 19l4 2-3-6" />
-                </svg>
+                {selected.imagem_url ? (
+                  <img
+                    src={selected.imagem_url}
+                    alt={selected.nome_cientifico}
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                ) : (
+                  <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M13 7a3 3 0 1 0-6 0 3 3 0 0 0 6 0z" />
+                    <path d="M17.8 9.6c1.4 2.2 2.2 4.8 2.2 7.4 0 1.3-.4 2.5-1 3.5" />
+                    <path d="M4 17c0-2.6.8-5.2 2.2-7.4" />
+                    <path d="M12 19l4 2-3-6" />
+                  </svg>
+                )}
               </div>
               <div className="species-detail-meta">
                 <h2>{selected.nome_popular || selected.nome_cientifico}</h2>

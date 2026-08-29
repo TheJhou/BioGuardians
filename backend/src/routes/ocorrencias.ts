@@ -65,6 +65,7 @@ router.get('/', async (req, res, next) => {
                  'base_registro', o.base_registro,
                  'nome_cientifico', e.nome_cientifico,
                  'nome_popular', e.nome_popular,
+                 'imagem_url', e.imagem_url,
                  'categoria_ameaca', e.categoria_ameaca
                )
              ) AS feature

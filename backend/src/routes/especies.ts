@@ -109,7 +109,7 @@ router.get('/:id', validateId, async (req, res, next) => {
 
     const { rows: espRows } = await query(
       `SELECT e.id, e.nome_cientifico, e.nome_popular, e.categoria_ameaca,
-              e.descricao, e.status, e.criado_em, e.atualizado_em,
+              e.descricao, e.imagem_url, e.status, e.criado_em, e.atualizado_em,
               g.id AS genero_id, g.nome AS genero_nome
        FROM especie e
        JOIN taxon g ON g.id = e.genero_id

@@ -43,6 +43,7 @@ export interface Especie {
   criado_em?: string;
   atualizado_em?: string;
   descricao?: string | null;
+  imagem_url?: string | null;
   genero_id?: number;
   genero_nome?: string;
   biomas?: Bioma[];
@@ -91,6 +92,7 @@ export interface OcorrenciaProperties {
   base_registro: string | null;
   nome_cientifico: string;
   nome_popular: string | null;
+  imagem_url: string | null;
   categoria_ameaca: string;
 }
 

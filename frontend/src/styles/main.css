@@ -545,6 +545,12 @@ a, button { transition: all 0.2s ease; }
   height: 56px;
 }
 
+.occurrence-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .occurrence-body {
   display: flex;
   flex-direction: column;
@@ -691,6 +697,13 @@ a, button { transition: all 0.2s ease; }
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.species-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .species-detail-meta { min-width: 0; }
