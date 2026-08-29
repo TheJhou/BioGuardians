@@ -1,0 +1,243 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**/*.md"
+      - ".gitignore"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr
+  REPOSITORY_OWNER: ${{ github.repository_owner }}
+  REPOSITORY_NAME: ${{ github.event.repository.name }}
+
+jobs:
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    outputs:
+      image:         ${{ steps.vars.outputs.image }}
+      tag:           ${{ steps.vars.outputs.tag }}
+      project_name:  ${{ steps.vars.outputs.project_name }}
+      matrix:        ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Gera imagem base, tag SHA e project_name
+        id: vars
+        run: |
+          OWNER_LOWER=$(printf '%s' "$REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
+          REPO_LOWER=$(printf '%s' "$REPOSITORY_NAME" | tr '[:upper:]' '[:lower:]')
+          IMAGE="$REGISTRY/$OWNER_LOWER/$REPO_LOWER"
+          echo "image=$IMAGE"              >> "$GITHUB_OUTPUT"
+          echo "tag=sha-${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+          echo "project_name=$REPO_LOWER"  >> "$GITHUB_OUTPUT"
+
+      - name: Login no GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Detecta mudancas por caminho (HEAD~1 -> HEAD)
+        id: changes
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1 HEAD || echo "")
+          echo "$CHANGED" | grep -qE '^(backend/|db/)' && BE_CHANGED="true" || BE_CHANGED="false"
+          echo "$CHANGED" | grep -qE '^(frontend/|observability/|stack\.yml)' && FE_CHANGED="true" || FE_CHANGED="false"
+          if [ -z "$CHANGED" ]; then
+            BE_CHANGED="true"
+            FE_CHANGED="true"
+          fi
+          echo "frontend=$FE_CHANGED" >> "$GITHUB_OUTPUT"
+          echo "backend=$BE_CHANGED"  >> "$GITHUB_OUTPUT"
+
+      - name: Valida integridade das migrations
+        run: |
+          cd db/migrations
+          files=$(ls -1 [0-9][0-9][0-9]_*.sql 2>/dev/null | sort)
+          if [ -z "$files" ]; then
+            echo "ERROR: no migration files found"
+            exit 1
+          fi
+          prev=0
+          for f in $files; do
+            num=$(echo "$f" | sed -E 's/^0*([0-9]+)_.*/\1/')
+            if ! [ "$num" -gt 0 ] 2>/dev/null; then
+              echo "ERROR: invalid migration filename: $f"
+              exit 1
+            fi
+            if [ "$num" -ne "$((prev + 1))" ]; then
+              echo "ERROR: migration numbers are not sequential. File $f, previous was $prev"
+              exit 1
+            fi
+            prev=$num
+          done
+          echo "OK: $(echo "$files" | wc -l) migration files are sequential".
+
+      - name: Monta matrix com flag should_build por servico
+        id: matrix
+        run: |
+          MATRIX=$(jq -cn \
+            --argjson f "${{ steps.changes.outputs.frontend }}" \
+            --argjson b "${{ steps.changes.outputs.backend }}" '[
+              {"service":"frontend","dockerfile":"frontend/Dockerfile","should_build":$f},
+              {"service":"backend","dockerfile":"backend/Dockerfile","should_build":$b}
+            ]')
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs: prepare
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.prepare.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepara build-args (VITE_* apenas para frontend)
+        id: args
+        run: |
+          if [ "${{ matrix.service }}" = "frontend" ]; then
+            echo "value=VITE_MAPTILER_API_KEY=${{ secrets.VITE_MAPTILER_API_KEY }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build e Push ${{ matrix.service }}
+        if: ${{ matrix.should_build }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file:    ${{ matrix.dockerfile }}
+          push:    true
+          build-args: ${{ steps.args.outputs.value }}
+          tags: |
+            ${{ needs.prepare.outputs.image }}-${{ matrix.service }}:${{ needs.prepare.outputs.tag }}
+            ${{ needs.prepare.outputs.image }}-${{ matrix.service }}:latest
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to:   type=gha,mode=max,scope=${{ matrix.service }}
+
+      - name: Re-tag imagem inalterada com nova SHA
+        if: ${{ !matrix.should_build }}
+        env:
+          IMAGE: ${{ needs.prepare.outputs.image }}
+          TAG:   ${{ needs.prepare.outputs.tag }}
+        run: |
+          docker pull "${IMAGE}-${{ matrix.service }}:latest"
+          docker tag  "${IMAGE}-${{ matrix.service }}:latest" "${IMAGE}-${{ matrix.service }}:${TAG}"
+          docker push "${IMAGE}-${{ matrix.service }}:${TAG}"
+
+  migrate:
+    name: Deploy migrations
+    runs-on: ubuntu-latest
+    needs: [prepare, build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+
+      - name: Aplica migrations
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+        run: bash db/migrate.sh
+
+      - name: Smoke tests
+        env:
+          PGPASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: psql -v ON_ERROR_STOP=1 -h "${{ secrets.DB_HOST }}" -p "${{ secrets.DB_PORT }}" -U "${{ secrets.DB_USER }}" -d "${{ secrets.DB_NAME }}" -f db/tests/smoke_test.sql
+
+  generate-stack:
+    name: Generate stack
+    runs-on: ubuntu-latest
+    needs: [prepare, migrate]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Renderiza stack com secrets
+        env:
+          IMAGE:                  ${{ needs.prepare.outputs.image }}
+          PROJECT_NAME:           ${{ needs.prepare.outputs.project_name }}
+          DATABASE_URL:           ${{ secrets.DATABASE_URL }}
+          GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+        run: envsubst < stack.yml > stack.rendered.yml
+
+      - name: Upload stack renderizada
+        uses: actions/upload-artifact@v4
+        with:
+          name: rendered-stack-${{ needs.prepare.outputs.tag }}
+          path: stack.rendered.yml
+          retention-days: 30
+
+  deploy:
+    name: Deploy on VM
+    runs-on: ubuntu-latest
+    needs: [prepare, generate-stack]
+    steps:
+      - name: Download stack renderizada
+        uses: actions/download-artifact@v4
+        with:
+          name: rendered-stack-${{ needs.prepare.outputs.tag }}
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.ORACLE_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.ORACLE_SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Ensure deploy directory and copy stack
+        run: |
+          ssh -i ~/.ssh/id_rsa -p ${{ secrets.ORACLE_SSH_PORT || 22 }} \
+            ${{ secrets.ORACLE_SSH_USER }}@${{ secrets.ORACLE_SSH_HOST }} \
+            'mkdir -p ~/bioguardians/observability/grafana/provisioning/datasources \
+                      ~/bioguardians/observability/grafana/provisioning/dashboards \
+                      ~/bioguardians/observability/grafana/dashboards'
+
+          scp -i ~/.ssh/id_rsa -P ${{ secrets.ORACLE_SSH_PORT || 22 }} \
+            stack.rendered.yml \
+            ${{ secrets.ORACLE_SSH_USER }}@${{ secrets.ORACLE_SSH_HOST }}:~/bioguardians/stack.yml
+
+          scp -i ~/.ssh/id_rsa -P ${{ secrets.ORACLE_SSH_PORT || 22 }} -r \
+            observability otel-collector-config.yaml \
+            ${{ secrets.ORACLE_SSH_USER }}@${{ secrets.ORACLE_SSH_HOST }}:~/bioguardians/
+
+      - name: Aplica stack na VM
+        run: |
+          ssh -i ~/.ssh/id_rsa -p ${{ secrets.ORACLE_SSH_PORT || 22 }} \
+            ${{ secrets.ORACLE_SSH_USER }}@${{ secrets.ORACLE_SSH_HOST }} \
+            'cd ~/bioguardians && \
+             sudo docker compose -f stack.yml pull && \
+             sudo docker compose -f stack.yml up -d && \
+             sudo docker image prune -f'

@@ -1,0 +1,155 @@
+services:
+  backend:
+    image: ${IMAGE}-backend:latest
+    container_name: bioguardians-backend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DATABASE_URL=${DATABASE_URL}
+      - CORS_ORIGIN=*
+      - GBIF_API_BASE=https://api.gbif.org/v1
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://otel-collector:4318
+      - OTEL_SERVICE_NAME=bioguardians-backend
+      - OTEL_RESOURCE_ATTRIBUTES=deployment.environment=production
+    ports:
+      - "3001:3001"
+    networks:
+      - bioguardians-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1"
+    depends_on:
+      - otel-collector
+
+  frontend:
+    image: ${IMAGE}-frontend:latest
+    container_name: bioguardians-frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    networks:
+      - bioguardians-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1"
+    depends_on:
+      - backend
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.110.0
+    container_name: bioguardians-otel-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "8889:8889"
+    networks:
+      - bioguardians-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    container_name: bioguardians-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - bioguardians_prometheus:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=168h"
+      - "--storage.tsdb.path=/prometheus"
+    networks:
+      - bioguardians-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  tempo:
+    image: grafana/tempo:2.6.0
+    container_name: bioguardians-tempo
+    restart: unless-stopped
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./observability/tempo.yml:/etc/tempo.yaml:ro
+      - bioguardians_tempo:/var/tempo
+    ports:
+      - "3200:3200"
+    networks:
+      - bioguardians-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1"
+
+  loki:
+    image: grafana/loki:3.3.0
+    container_name: bioguardians-loki
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    volumes:
+      - ./observability/loki.yml:/etc/loki/local-config.yaml:ro
+      - bioguardians_loki:/loki
+    ports:
+      - "3100:3100"
+    networks:
+      - bioguardians-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1"
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: bioguardians-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/var/lib/grafana/dashboards/bioguardians-overview.json
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - bioguardians_grafana:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - bioguardians-network
+    depends_on:
+      - prometheus
+      - tempo
+      - loki
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+networks:
+  bioguardians-network:
+    driver: bridge
+
+volumes:
+  bioguardians_prometheus:
+  bioguardians_tempo:
+  bioguardians_loki:
+  bioguardians_grafana:
