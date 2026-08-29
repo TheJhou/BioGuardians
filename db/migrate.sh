@@ -59,9 +59,6 @@ wait_for_db() {
         log "Attempt $i/30..."
         sleep 1
     done
-    # On the last attempt, show the actual psql error for debugging.
-    log "Final connection attempt (showing error):"
-    $PSQL_BASE -t -A -c "SELECT 1" || true
     die "Could not connect to database at $CONN_LABEL after 30 attempts."
 }
 
