@@ -45,8 +45,12 @@ export default function SpeciesPage() {
       const found = idNum ? res.data.find((s) => s.id === idNum) : null;
       const first = found || res.data[0];
       if (!append && first) {
-        const detail = await api.getEspecie(first.id);
-        setSelected(detail);
+        try {
+          const detail = await api.getEspecie(first.id);
+          setSelected(detail);
+        } catch {
+          setSelected(first);
+        }
       }
     } catch {
       setHasMore(false);
@@ -59,8 +63,13 @@ export default function SpeciesPage() {
 
   useEffect(() => {
     pageRef.current = 1;
+    setItems([]);
+    setHasMore(true);
     load(1, false);
   }, [busca, load]);
+
+  const loadRef = useRef(load);
+  loadRef.current = load;
 
   useEffect(() => {
     const list = listRef.current;
@@ -72,7 +81,7 @@ export default function SpeciesPage() {
         const [entry] = entries;
         if (entry.isIntersecting && !isFetchingRef.current) {
           const nextPage = pageRef.current + 1;
-          load(nextPage, true);
+          loadRef.current(nextPage, true);
         }
       },
       { root: list, rootMargin: '80px', threshold: 0.1 }
@@ -80,7 +89,17 @@ export default function SpeciesPage() {
 
     observer.observe(sentinel);
     return () => { observer.disconnect(); };
-  }, [load]);
+  }, []);
+
+  const handleScroll = () => {
+    const list = listRef.current;
+    if (!list || isFetchingRef.current || !hasMore) return;
+    const nearBottom = list.scrollTop + list.clientHeight >= list.scrollHeight - 120;
+    if (nearBottom) {
+      const nextPage = pageRef.current + 1;
+      loadRef.current(nextPage, true);
+    }
+  };
 
   const handleSearch = () => {
     if (search) setSearchParams({ busca: search });
@@ -113,7 +132,7 @@ export default function SpeciesPage() {
           <button onClick={handleSearch} className="filter-apply">Buscar</button>
         </div>
 
-        <div className="species-list" ref={listRef}>
+        <div className="species-list" ref={listRef} onScroll={handleScroll}>
           {items.map((s) => (
             <div
               key={s.id}
