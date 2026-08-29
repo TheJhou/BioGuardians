@@ -75,6 +75,10 @@ jobs:
           fi
           prev=0
           for f in $files; do
+            # Skip the journal bootstrap file (000_...)
+            case "$f" in
+              000_*) continue ;;
+            esac
             num=$(echo "$f" | sed -E 's/^0*([0-9]+)_.*/\1/')
             if ! [ "$num" -gt 0 ] 2>/dev/null; then
               echo "ERROR: invalid migration filename: $f"
