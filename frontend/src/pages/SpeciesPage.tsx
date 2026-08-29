@@ -4,7 +4,7 @@ import { api } from '../api/client.js';
 import ImageWithSkeleton from '../components/ImageWithSkeleton.js';
 import { CATEGORY_LABELS } from '../constants/index.js';
 import StatCard from '../components/ui/StatCard.js';
-import type { Especie, PaginatedResponse } from '../types/index.js';
+import type { Especie, OcorrenciaProperties, PaginatedResponse } from '../types/index.js';
 
 const TABS = ['Sobre', 'Ocorrências', 'Unidades de Conservação'] as const;
 const PER_PAGE = 15;
@@ -21,6 +21,8 @@ export default function SpeciesPage() {
   const [hasMore, setHasMore] = useState(true);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState(searchParams.get('busca') || '');
+  const [ocorrencias, setOcorrencias] = useState<OcorrenciaProperties[]>([]);
+  const [loadingOcorrencias, setLoadingOcorrencias] = useState(false);
 
   const busca = searchParams.get('busca') || undefined;
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -116,6 +118,18 @@ export default function SpeciesPage() {
       setSelected(s);
     }
   };
+
+  useEffect(() => {
+    if (!selected) return;
+    setLoadingOcorrencias(true);
+    api.getOcorrencias({ especie_id: selected.id, limit: 200 })
+      .then((geojson) => {
+        const features = (geojson.features || []) as unknown as { properties: OcorrenciaProperties }[];
+        setOcorrencias(features.map((f) => f.properties));
+      })
+      .catch(() => setOcorrencias([]))
+      .finally(() => setLoadingOcorrencias(false));
+  }, [selected?.id]);
 
   if (loading && items.length === 0) return <div className="loading">Carregando espécies...</div>;
 
@@ -219,13 +233,46 @@ export default function SpeciesPage() {
                     <p>{selected.descricao || 'Sem descrição cadastrada.'}</p>
                   </div>
                   <div className="detail-card stats">
-                    <StatCard value={0} label="Ocorrências" />
+                    <StatCard value={ocorrencias.length} label="Ocorrências" />
                     <StatCard value={selected.biomas?.length ?? 0} label="Biomas" />
                     <StatCard value={0} label="UCs com registros" />
                   </div>
                 </div>
               )}
-              {tab === 'Ocorrências' && <p className="empty-state">Ocorrências da espécie serão carregadas aqui.</p>}
+              {tab === 'Ocorrências' && (
+                <div className="detail-card occurrence-list">
+                  <h4>Ocorrências registradas</h4>
+                  {loadingOcorrencias ? (
+                    <p className="loading">Carregando ocorrências...</p>
+                  ) : ocorrencias.length === 0 ? (
+                    <p className="empty-state">Nenhuma ocorrência registrada para esta espécie.</p>
+                  ) : (
+                    <ul className="occurrence-list-items">
+                      {ocorrencias.map((o, i) => (
+                        <li key={i} className="occurrence-list-item">
+                          <div className="occurrence-list-image">
+                            {o.imagem_url ? (
+                              <img src={o.imagem_url} alt={o.nome_cientifico} />
+                            ) : (
+                              <div className="occurrence-list-placeholder" />
+                            )}
+                          </div>
+                          <div className="occurrence-list-info">
+                            <strong>{o.nome_popular || o.nome_cientifico}</strong>
+                            <span className="occurrence-list-scientific">{o.nome_cientifico}</span>
+                            <span className="occurrence-list-coords">
+                              {o.lat.toFixed(4)}, {o.lon.toFixed(4)}
+                            </span>
+                            <span className="occurrence-list-meta">
+                              {o.data_evento ? new Date(o.data_evento).toLocaleDateString('pt-BR') : 'Data não informada'} · {o.fonte}
+                            </span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
               {tab === 'Unidades de Conservação' && <p className="empty-state">Unidades de conservação com registros serão listadas aqui.</p>}
             </div>
           </>

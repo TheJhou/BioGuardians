@@ -835,6 +835,62 @@ a, button { transition: all 0.2s ease; }
 .detail-card.stats .stat-value { font-size: 1.6rem; }
 .detail-card.stats .stat-label { font-size: 0.95rem; }
 
+.occurrence-list-items { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+
+.occurrence-list-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+
+.occurrence-list-image {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--green-light);
+  flex-shrink: 0;
+}
+
+.occurrence-list-image img { width: 100%; height: 100%; object-fit: cover; }
+
+.occurrence-list-placeholder {
+  width: 100%;
+  height: 100%;
+  background: var(--green-light) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2316A36A' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13 7a3 3 0 1 0-6 0 3 3 0 0 0 6 0z'/%3E%3Cpath d='M17.8 9.6c1.4 2.2 2.2 4.8 2.2 7.4 0 1.3-.4 2.5-1 3.5'/%3E%3Cpath d='M4 17c0-2.6.8-5.2 2.2-7.4'/%3E%3Cpath d='M12 19l4 2-3-6'/%3E%3C/svg%3E") no-repeat center;
+  background-size: 28px;
+}
+
+.occurrence-list-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.occurrence-list-info strong { font-size: 1rem; color: var(--green-darker); }
+
+.occurrence-list-scientific {
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+.occurrence-list-coords {
+  font-family: 'SF Mono', monospace;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.occurrence-list-meta {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
 /* ============================================================
    Badges de categoria
    ============================================================ */
