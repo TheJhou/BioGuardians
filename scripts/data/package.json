@@ -8,6 +8,7 @@
     "load:cnuc": "node load_cnuc_ucs.mjs",
     "load:gbif": "node load_gbif_ocorrencias.mjs",
     "load:splink": "node load_specieslink_ocorrencias.mjs",
+    "enrich:descriptions": "node enrich_species_descriptions.mjs",
     "load:all": "node load_mma_especies.mjs && node load_gbif_ocorrencias.mjs && node load_specieslink_ocorrencias.mjs"
   },
   "dependencies": {
