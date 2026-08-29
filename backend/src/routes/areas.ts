@@ -10,7 +10,7 @@ const router = Router();
 // Supports bbox (minLng,minLat,maxLng,maxLat) and zoom for geometry simplification.
 router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next) => {
   try {
-    const { bioma, esfera, categoria, bbox, zoom } = req.query;
+    const { bioma, esfera, categoria, busca, bbox, zoom } = req.query;
 
     const conditions: string[] = [];
     const params: unknown[] = [];
@@ -19,6 +19,12 @@ router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next)
     if (bioma) { conditions.push(`a.bioma_id = $${idx++}`); params.push(parseParam(bioma)); }
     if (esfera) { conditions.push(`a.esfera = $${idx++}`); params.push(esfera); }
     if (categoria) { conditions.push(`a.categoria_uc = $${idx++}`); params.push(categoria); }
+    if (busca && typeof busca === 'string') {
+      conditions.push(`(a.nome ILIKE $${idx++} OR a.esfera ILIKE $${idx++} OR b.nome ILIKE $${idx++})`);
+      const like = `%${busca}%`;
+      params.push(like, like, like);
+      idx += 3;
+    }
 
     // Bounding box filter: only return areas intersecting the visible map region
     if (bbox) {
@@ -37,6 +43,7 @@ router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next)
     const { rows: metaRows } = await query(
       `SELECT a.id, a.nome, a.categoria_uc, a.esfera, a.bioma_id, a.area_ha
        FROM area_protegida a
+       LEFT JOIN bioma b ON b.id = a.bioma_id
        ${where}
        ORDER BY a.id
        ${limitClause}`,

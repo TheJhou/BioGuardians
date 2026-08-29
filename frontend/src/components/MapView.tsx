@@ -10,13 +10,22 @@ import type {
 
 const MAPTILER_API_KEY = import.meta.env.VITE_MAPTILER_API_KEY || '';
 
+interface MapFilters {
+  categoria?: string;
+  bioma?: number;
+  esfera?: string;
+  busca?: string;
+}
+
+interface MapLayers {
+  unidades: boolean;
+  ocorrencias: boolean;
+  especies: boolean;
+}
+
 interface MapViewProps {
-  filters: {
-    categoria?: string;
-    bioma?: number;
-    estado?: string;
-    busca?: string;
-  };
+  filters: MapFilters;
+  layers: MapLayers;
   selectedEspecieId?: number | null;
 }
 
@@ -37,7 +46,7 @@ const INITIAL_VIEW = {
   zoom: MAP_DEFAULTS.zoom,
 };
 
-export default function MapView({ filters, selectedEspecieId }: MapViewProps) {
+export default function MapView({ filters, layers, selectedEspecieId }: MapViewProps) {
   const [areas, setAreas] = useState<GeoJSONFeatureCollection | null>(null);
   const [ocorrencias, setOcorrencias] = useState<GeoJSONFeatureCollection<OcorrenciaProperties> | null>(null);
   const [selectedAreaId, setSelectedAreaId] = useState<number | null>(null);
@@ -72,12 +81,15 @@ export default function MapView({ filters, selectedEspecieId }: MapViewProps) {
     });
   }, []);
 
-  // Load areas (filtered by bioma + viewport).
+  // Load areas (filtered by viewport + filters).
   const loadAreas = useCallback(async () => {
     if (!debouncedViewport.bbox) return;
     try {
       const data = await api.getAreas({
         bioma: filters.bioma,
+        esfera: filters.esfera,
+        categoria: filters.categoria,
+        busca: filters.busca,
         bbox: debouncedViewport.bbox,
         zoom: debouncedViewport.zoom,
       });
@@ -99,14 +111,16 @@ export default function MapView({ filters, selectedEspecieId }: MapViewProps) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load areas');
     }
-  }, [filters.bioma, debouncedViewport]);
+  }, [filters, debouncedViewport]);
 
-  // Load occurrences (filtered by especie_id + viewport).
+  // Load occurrences (filtered by viewport + filters).
   const loadOcorrencias = useCallback(async () => {
     if (!debouncedViewport.bbox) return;
     try {
       const data = await api.getOcorrencias({
         especie_id: selectedEspecieId || undefined,
+        categoria: filters.categoria, // threat category of the species
+        bioma: filters.bioma,
         bbox: debouncedViewport.bbox,
         limit: 1000,
       });
@@ -127,15 +141,17 @@ export default function MapView({ filters, selectedEspecieId }: MapViewProps) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load occurrences');
     }
-  }, [selectedEspecieId, debouncedViewport]);
+  }, [selectedEspecieId, filters, debouncedViewport]);
 
   useEffect(() => {
     if (!debouncedViewport.bbox) return;
     setLoading(true);
     setError(null);
-    Promise.all([loadAreas(), loadOcorrencias()])
-      .finally(() => setLoading(false));
-  }, [loadAreas, loadOcorrencias, debouncedViewport]);
+    const promises: Promise<void>[] = [];
+    if (layers.unidades) promises.push(loadAreas());
+    if (layers.ocorrencias || layers.especies) promises.push(loadOcorrencias());
+    Promise.all(promises).finally(() => setLoading(false));
+  }, [loadAreas, loadOcorrencias, debouncedViewport, layers]);
 
   // Handle click on a protected area polygon or occurrence point.
   const handleClick = async (evt: any) => {
@@ -190,12 +206,15 @@ export default function MapView({ filters, selectedEspecieId }: MapViewProps) {
         mapStyle={`https://api.maptiler.com/maps/streets/style.json?key=${MAPTILER_API_KEY}`}
         onMoveEnd={handleMoveEnd}
         onClick={handleClick}
-        interactiveLayerIds={['areas-fill', 'ocorrencias-circle']}
+        interactiveLayerIds={[
+          ...(layers.unidades ? ['areas-fill'] : []),
+          ...(layers.ocorrencias ? ['ocorrencias-circle'] : []),
+        ]}
       >
         <NavigationControl position="top-right" />
 
         {/* Protected area polygons */}
-        {areas && (
+        {layers.unidades && areas && (
           <Source id="areas" type="geojson" data={areas}>
             <Layer
               id="areas-fill"
@@ -217,7 +236,7 @@ export default function MapView({ filters, selectedEspecieId }: MapViewProps) {
         )}
 
         {/* Occurrence markers */}
-        {ocorrencias && (
+        {(layers.ocorrencias || layers.especies) && ocorrencias && (
           <Source id="ocorrencias" type="geojson" data={ocorrencias}>
             <Layer
               id="ocorrencias-circle"

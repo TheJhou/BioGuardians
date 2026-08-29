@@ -1,36 +1,58 @@
 import { useState } from 'react';
 import MapView from '../components/MapView.js';
-import { BIOME_OPTIONS, CATEGORY_OPTIONS } from '../constants/index.js';
+import { BIOME_OPTIONS, UC_CATEGORY_OPTIONS, SPHERE_OPTIONS } from '../constants/index.js';
+
+interface MapFilters {
+  busca?: string;
+  bioma?: number;
+  categoria?: string;
+  esfera?: string;
+}
+
+interface MapLayers {
+  unidades: boolean;
+  ocorrencias: boolean;
+  especies: boolean;
+}
+
+const defaultFilters: MapFilters = {};
+const defaultLayers: MapLayers = { unidades: true, ocorrencias: true, especies: false };
 
 export default function MapPage() {
-  const [filters, setFilters] = useState<{
-    busca?: string;
-    bioma?: number;
-    categoria?: string;
-    camadas: { unidades: boolean; ocorrencias: boolean; especies: boolean };
-  }>({
-    camadas: { unidades: true, ocorrencias: true, especies: false },
-  });
+  const [draft, setDraft] = useState<MapFilters>(defaultFilters);
+  const [applied, setApplied] = useState<MapFilters>(defaultFilters);
+  const [layers, setLayers] = useState<MapLayers>(defaultLayers);
+
+  const handleApply = () => {
+    setApplied(draft);
+  };
+
+  const handleClear = () => {
+    setDraft(defaultFilters);
+    setApplied(defaultFilters);
+    setLayers(defaultLayers);
+  };
+
+  const updateDraft = (patch: Partial<MapFilters>) => {
+    setDraft((prev) => ({ ...prev, ...patch }));
+  };
 
   return (
     <div className="map-page">
       <aside className="map-sidebar">
         <h3 className="sidebar-title">Filtros</h3>
-        <button
-          className="map-clear-btn"
-          onClick={() => setFilters({ camadas: { unidades: true, ocorrencias: true, especies: false } })}
-        >
+        <button className="map-clear-btn" onClick={handleClear}>
           Limpar
         </button>
 
         <div className="filter-group">
-          <label className="filter-label">Buscar localização</label>
+          <label className="filter-label">Buscar UC</label>
           <input
             type="text"
             className="filter-input"
-            placeholder="Ex: Pantanal, Amazônia..."
-            value={filters.busca || ''}
-            onChange={(e) => setFilters({ ...filters, busca: e.target.value || undefined })}
+            placeholder="Ex: Pantanal..."
+            value={draft.busca || ''}
+            onChange={(e) => updateDraft({ busca: e.target.value || undefined })}
           />
         </div>
 
@@ -38,8 +60,8 @@ export default function MapPage() {
           <label className="filter-label">Bioma</label>
           <select
             className="filter-select"
-            value={filters.bioma ? String(filters.bioma) : ''}
-            onChange={(e) => setFilters({ ...filters, bioma: e.target.value ? Number(e.target.value) : undefined })}
+            value={draft.bioma ? String(draft.bioma) : ''}
+            onChange={(e) => updateDraft({ bioma: e.target.value ? Number(e.target.value) : undefined })}
           >
             <option value="">Todos</option>
             {BIOME_OPTIONS.map((b) => (
@@ -52,11 +74,11 @@ export default function MapPage() {
           <label className="filter-label">Categoria da UC</label>
           <select
             className="filter-select"
-            value={filters.categoria || ''}
-            onChange={(e) => setFilters({ ...filters, categoria: e.target.value || undefined })}
+            value={draft.categoria || ''}
+            onChange={(e) => updateDraft({ categoria: e.target.value || undefined })}
           >
             <option value="">Todas</option>
-            {CATEGORY_OPTIONS.map((c) => (
+            {UC_CATEGORY_OPTIONS.map((c) => (
               <option key={c.codigo} value={c.codigo}>{c.nome}</option>
             ))}
           </select>
@@ -64,11 +86,15 @@ export default function MapPage() {
 
         <div className="filter-group">
           <label className="filter-label">Esfera</label>
-          <select className="filter-select">
+          <select
+            className="filter-select"
+            value={draft.esfera || ''}
+            onChange={(e) => updateDraft({ esfera: e.target.value || undefined })}
+          >
             <option value="">Todas</option>
-            <option value="Federal">Federal</option>
-            <option value="Estadual">Estadual</option>
-            <option value="Municipal">Municipal</option>
+            {SPHERE_OPTIONS.map((s) => (
+              <option key={s.value} value={s.value}>{s.nome}</option>
+            ))}
           </select>
         </div>
 
@@ -77,30 +103,32 @@ export default function MapPage() {
           <label className="checkbox-label">
             <input
               type="checkbox"
-              checked={filters.camadas.unidades}
-              onChange={(e) => setFilters({ ...filters, camadas: { ...filters.camadas, unidades: e.target.checked } })}
+              checked={layers.unidades}
+              onChange={(e) => setLayers({ ...layers, unidades: e.target.checked })}
             />
             Unidades de Conservação
           </label>
           <label className="checkbox-label">
             <input
               type="checkbox"
-              checked={filters.camadas.ocorrencias}
-              onChange={(e) => setFilters({ ...filters, camadas: { ...filters.camadas, ocorrencias: e.target.checked } })}
+              checked={layers.ocorrencias}
+              onChange={(e) => setLayers({ ...layers, ocorrencias: e.target.checked })}
             />
             Ocorrências
           </label>
           <label className="checkbox-label">
             <input
               type="checkbox"
-              checked={filters.camadas.especies}
-              onChange={(e) => setFilters({ ...filters, camadas: { ...filters.camadas, especies: e.target.checked } })}
+              checked={layers.especies}
+              onChange={(e) => setLayers({ ...layers, especies: e.target.checked })}
             />
             Espécies
           </label>
         </div>
 
-        <button className="filter-apply">Aplicar Filtros</button>
+        <button className="filter-apply" onClick={handleApply}>
+          Aplicar Filtros
+        </button>
 
         <div className="map-legend">
           <h4>Legenda</h4>
@@ -113,7 +141,8 @@ export default function MapPage() {
 
       <div className="map-wrapper">
         <MapView
-          filters={{ bioma: filters.bioma, categoria: filters.categoria, busca: filters.busca }}
+          filters={applied}
+          layers={layers}
           selectedEspecieId={null}
         />
       </div>

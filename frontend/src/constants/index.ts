@@ -60,6 +60,20 @@ export const BIOME_OPTIONS = [
   { id: 7, nome: 'Marinho' },
 ];
 
+// --- UC category options for map filter dropdowns ---
+export const UC_CATEGORY_OPTIONS = [
+  { codigo: 'protecao_integral', nome: 'Proteção Integral' },
+  { codigo: 'uso_sustentavel', nome: 'Uso Sustentável' },
+];
+
+// --- Sphere options for map filter dropdowns ---
+export const SPHERE_OPTIONS = [
+  { value: 'federal', nome: 'Federal' },
+  { value: 'estadual', nome: 'Estadual' },
+  { value: 'municipal', nome: 'Municipal' },
+  { value: 'particular', nome: 'Particular' },
+];
+
 // --- Category options for filter dropdowns ---
 export const CATEGORY_OPTIONS = [
   { codigo: 'CR', nome: 'CR - Critically Endangered' },

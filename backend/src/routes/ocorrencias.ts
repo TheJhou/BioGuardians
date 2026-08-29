@@ -11,7 +11,7 @@ const router = Router();
 // Supports bbox (minLng,minLat,maxLng,maxLat) to filter by visible map region.
 router.get('/', async (req, res, next) => {
   try {
-    const { especie_id, fonte, limit, bbox } = req.query;
+    const { especie_id, categoria, bioma, fonte, limit, bbox } = req.query;
 
     const conditions: string[] = [];
     const params: unknown[] = [];
@@ -20,6 +20,14 @@ router.get('/', async (req, res, next) => {
     if (especie_id) {
       conditions.push(`o.especie_id = $${idx++}`);
       params.push(parseParam(especie_id));
+    }
+    if (categoria) {
+      conditions.push(`e.categoria_ameaca = $${idx++}`);
+      params.push(categoria);
+    }
+    if (bioma) {
+      conditions.push(`EXISTS (SELECT 1 FROM especie_bioma eb WHERE eb.especie_id = o.especie_id AND eb.bioma_id = $${idx++})`);
+      params.push(parseParam(bioma));
     }
     if (fonte) {
       conditions.push(`o.fonte = $${idx++}`);
