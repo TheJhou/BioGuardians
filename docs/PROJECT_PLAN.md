@@ -106,8 +106,13 @@ geográficos com dados de espécies.
   geometria válida)
 - Triggers para auditoria (log de alterações) e validações automáticas
 - Índices espaciais (GIST) e convencionais para performance
-- Interface web de demonstração: mapa MapTiler Cloud com polígonos das UCs +
-  marcadores de ocorrências, CRUD, filtros, dashboard
+- Interface web de demonstração: 4 páginas principais
+  - **Home**: apresentação do projeto, destaques e fontes
+  - **Dashboard**: estatísticas das views materializadas com gráficos
+  - **Mapa**: MapLibre + MapTiler Cloud com polígonos das UCs, filtros e legenda
+  - **Espécies**: lista com scroll infinito (15 em 15) e detalhe com resumo da espécie
+- Responsivo: menu hamburger mobile, layouts adaptáveis
+- Enriquecimento de resumos: Wikipedia, Wikidata, iNaturalist
 
 ### Fora do escopo
 

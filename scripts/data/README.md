@@ -300,6 +300,26 @@ Or run all at once:
 npm run load:all
 ```
 
+### 5. Enriquecer resumos de espécies
+
+**Script**: `enrich_species_descriptions.mjs`
+
+```bash
+# Busca resumos em Wikipedia (PT/EN), Wikidata e iNaturalist
+npm run enrich:descriptions
+
+# Testar sem salvar e limitar a 10 espécies
+node enrich_species_descriptions.mjs --dry-run --limit=10
+```
+
+**What it does**:
+1. Queries species without `descricao`
+2. Tries multiple sources (Wikipedia PT/EN, Wikidata, iNaturalist)
+3. Prefers popular name, then scientific name
+4. Validates that the extract mentions the species name
+5. Updates `especie.descricao` in the database
+6. Rate-limits at 300ms between API calls
+
 ## Notes
 
 - Scripts are **idempotent** — running twice won't duplicate data
