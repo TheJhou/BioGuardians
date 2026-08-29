@@ -98,8 +98,8 @@ jobs:
           MATRIX=$(jq -cn \
             --argjson f "${{ steps.changes.outputs.frontend }}" \
             --argjson b "${{ steps.changes.outputs.backend }}" '[
-              {"service":"frontend","dockerfile":"frontend/Dockerfile","should_build":$f},
-              {"service":"backend","dockerfile":"backend/Dockerfile","should_build":$b}
+              {"service":"frontend","context":"./frontend","dockerfile":"frontend/Dockerfile","should_build":$f},
+              {"service":"backend","context":"./backend","dockerfile":"backend/Dockerfile","should_build":$b}
             ]')
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
 
@@ -136,7 +136,7 @@ jobs:
         if: ${{ matrix.should_build }}
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ${{ matrix.context }}
           file:    ${{ matrix.dockerfile }}
           push:    true
           build-args: ${{ steps.args.outputs.value }}
