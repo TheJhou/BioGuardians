@@ -64,6 +64,7 @@ router.get('/', async (req, res, next) => {
                  'fonte', o.fonte,
                  'base_registro', o.base_registro,
                  'nome_cientifico', e.nome_cientifico,
+                 'nome_popular', e.nome_popular,
                  'categoria_ameaca', e.categoria_ameaca
                )
              ) AS feature

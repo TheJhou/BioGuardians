@@ -90,6 +90,7 @@ export interface OcorrenciaProperties {
   fonte: string;
   base_registro: string | null;
   nome_cientifico: string;
+  nome_popular: string | null;
   categoria_ameaca: string;
 }
 

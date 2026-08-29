@@ -519,6 +519,62 @@ a, button { transition: all 0.2s ease; }
 .dot-uc-mun { background: #f57c00; }
 .dot-occ { background: #d32f2f; }
 
+.occurrence-popup {
+  display: flex;
+  gap: 14px;
+  min-width: 240px;
+  max-width: 280px;
+  padding: 8px;
+}
+
+.occurrence-image {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-sm);
+  background: var(--green-light);
+  color: var(--green-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.occurrence-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.occurrence-body h4 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--green-darker);
+  line-height: 1.3;
+}
+
+.occurrence-scientific {
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+.occurrence-meta {
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.occurrence-meta p { margin: 2px 0; }
+
+.occurrence-coords {
+  font-family: 'SF Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 6px;
+}
+
 .map-wrapper {
   flex: 1;
   border-radius: var(--radius-md);
