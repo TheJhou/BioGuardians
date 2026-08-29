@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 
 const navItems = [
@@ -10,6 +11,8 @@ const navItems = [
 ];
 
 export default function Header() {
+  const [open, setOpen] = useState(false);
+
   return (
     <header className="app-header">
       <div className="header-brand">
@@ -28,9 +31,31 @@ export default function Header() {
         ))}
       </nav>
 
-      <div className="header-right">
-        {/* Público: sem autenticação */}
-      </div>
+      <button
+        className="header-menu-toggle"
+        aria-label={open ? 'Fechar menu' : 'Abrir menu'}
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
+        <span className={`menu-bar ${open ? 'open' : ''}`} />
+        <span className={`menu-bar ${open ? 'open' : ''}`} />
+        <span className={`menu-bar ${open ? 'open' : ''}`} />
+      </button>
+
+      {open && (
+        <nav className="header-nav-mobile" aria-label="Navegação mobile">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className="header-nav-link"
+              onClick={() => setOpen(false)}
+            >
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
+      )}
     </header>
   );
 }
