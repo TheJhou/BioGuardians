@@ -37,7 +37,7 @@ router.get('/', async (req, res, next) => {
       }
 
       const { rows } = await query(
-        `SELECT e.id, e.nome_cientifico, e.nome_popular, e.categoria_ameaca,
+        `SELECT e.id, e.nome_cientifico, e.nome_popular, e.categoria_ameaca, e.imagem_url,
                 COUNT(*) OVER() AS full_count
          FROM especie e
          WHERE ${searchConditions.join(' AND ')}
@@ -83,7 +83,7 @@ router.get('/', async (req, res, next) => {
       : '';
 
     const { rows } = await query(
-      `SELECT e.id, e.nome_cientifico, e.nome_popular, e.categoria_ameaca,
+      `SELECT e.id, e.nome_cientifico, e.nome_popular, e.categoria_ameaca, e.imagem_url,
               COUNT(*) OVER() AS full_count
        FROM especie e
        ${where}

@@ -657,15 +657,11 @@ a, button { transition: all 0.2s ease; }
 .species-item:hover { background: var(--green-light); transform: translateX(4px); }
 .species-item.active { background: var(--green-light); border-color: var(--green-primary); }
 
-.species-avatar {
-  width: 48px;
-  height: 48px;
+.species-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
   border-radius: 50%;
-  background: var(--green-light);
-  color: var(--green-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .species-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }

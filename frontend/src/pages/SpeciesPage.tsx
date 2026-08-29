@@ -140,12 +140,16 @@ export default function SpeciesPage() {
               onClick={() => selectSpecies(s)}
             >
               <div className="species-avatar">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M13 7a3 3 0 1 0-6 0 3 3 0 0 0 6 0z" />
-                  <path d="M17.8 9.6c1.4 2.2 2.2 4.8 2.2 7.4 0 1.3-.4 2.5-1 3.5" />
-                  <path d="M4 17c0-2.6.8-5.2 2.2-7.4" />
-                  <path d="M12 19l4 2-3-6" />
-                </svg>
+                {s.imagem_url ? (
+                  <img src={s.imagem_url} alt={s.nome_cientifico} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                ) : (
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M13 7a3 3 0 1 0-6 0 3 3 0 0 0 6 0z" />
+                    <path d="M17.8 9.6c1.4 2.2 2.2 4.8 2.2 7.4 0 1.3-.4 2.5-1 3.5" />
+                    <path d="M4 17c0-2.6.8-5.2 2.2-7.4" />
+                    <path d="M12 19l4 2-3-6" />
+                  </svg>
+                )}
               </div>
               <div className="species-info">
                 <span className="species-name">{s.nome_popular || s.nome_cientifico}</span>
