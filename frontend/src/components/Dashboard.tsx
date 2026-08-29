@@ -95,7 +95,7 @@ export default function Dashboard() {
         <StatCard value={stats.total_especies} label="Espécies registradas" />
         <StatCard value={stats.total_ocorrencias} label="Ocorrências registradas" />
         <StatCard value={stats.total_areas} label="Unidades de Conservação" />
-        <StatCard value={Object.keys(SPHERE_LABELS).length} label="Biomas mapeados" />
+        <StatCard value={7} label="Biomas mapeados" />
       </div>
 
       {/* Charts */}
