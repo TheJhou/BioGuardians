@@ -204,7 +204,9 @@ export default function SpeciesPage() {
               </div>
               <div className="species-info">
                 <span className="species-name">{s.nome_popular || s.nome_cientifico}</span>
-                <span className="species-scientific">{s.nome_cientifico}</span>
+                {(!s.nome_popular || s.nome_cientifico.toLowerCase() !== s.nome_popular.toLowerCase()) && (
+                  <span className="species-scientific">{s.nome_cientifico}</span>
+                )}
                 <span className={`cat-badge cat-${s.categoria_ameaca.toLowerCase()}`}>{CATEGORY_LABELS[s.categoria_ameaca] || s.categoria_ameaca}</span>
               </div>
             </div>

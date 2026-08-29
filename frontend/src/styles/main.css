@@ -742,8 +742,8 @@ a, button { transition: all 0.2s ease; }
 .species-avatar-skeleton { width: 100%; height: 100%; border-radius: var(--radius-sm); }
 
 .species-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.species-name { font-weight: 700; font-size: 1.05rem; color: var(--text); word-break: break-word; }
-.species-scientific { font-size: 0.9rem; color: var(--text-secondary); font-style: italic; word-break: break-word; }
+.species-name { font-weight: 700; font-size: 1rem; color: var(--text); word-break: break-word; line-height: 1.3; }
+.species-scientific { font-size: 0.8rem; color: var(--text-secondary); font-style: italic; }
 
 .species-detail {
   flex: 1;
