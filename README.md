@@ -16,39 +16,32 @@ BioGuardians/
 ├── .github/workflows/ci.yml      # CI: validate + build + deploy
 ├── db/
 │   ├── migrate.sh                # migration runner (journal + SHA-256 hash)
-│   ├── migrations/               # SQL migrations (applied in order)
-│   │   ├── 001_extensions.sql
-│   │   ├── 002_enums_domains.sql
-│   │   ├── 003_tables.sql
-│   │   ├── 004_indexes.sql
-│   │   ├── 005_functions.sql
-│   │   ├── 006_triggers.sql
-│   │   ├── 007_materialized_views.sql
-│   │   ├── 008_seed_data.sql
-│   │   ├── 009_performance.sql   # parallel query, FTS, indices compostos, memoria
-│   │   └── 010_cache_support.sql # tabela cache_metadata + trigger invalidacao
+│   ├── migrations/               # SQL migrations 000-012 (applied in order)
 │   └── tests/
 │       └── smoke_test.sql        # CI validation
-├── backend/                      # API Node.js + Express + TypeScript
+├── backend/                      # API Node.js 22 + Express + TypeScript
 │   ├── src/
 │   │   ├── index.ts              # app principal
 │   │   ├── config/env.ts         # config tipado
 │   │   ├── db/pool.ts            # pool PostgreSQL
 │   │   ├── cache/cache.ts        # cache LRU em memoria
-│   │   ├── middleware/           # errorHandler, validateId
-│   │   └── routes/               # referencias, especies, areas, ocorrencias, dashboard
+│   │   ├── middleware/           # errorHandler, validateId, requestLogger
+│   │   ├── routes/               # especies, areas, ocorrencias, dashboard, referencias
+│   │   └── telemetry/            # OpenTelemetry SDK
 │   ├── Dockerfile
 │   └── package.json
-├── frontend/                     # React + Vite + TypeScript + MapTiler Cloud
+├── frontend/                     # React 19 + Vite + TypeScript + MapLibre
 │   ├── src/
 │   │   ├── main.tsx              # entry point
-│   │   ├── App.tsx               # layout com tabs
-│   │   ├── api/client.ts         # API client com cache
-│   │   ├── types/index.ts        # interfaces TypeScript
-│   │   ├── components/           # MapView, SpeciesList, SpeciesForm, AreaForm, Dashboard
-│   │   └── styles/main.css       # estilos
+│   │   ├── App.tsx               # layout com router
+│   │   ├── api/client.ts         # API client
+│   │   ├── pages/                # Home, Dashboard, Mapa, Species
+│   │   ├── components/           # MapView, Dashboard, StatCard, Header
+│   │   └── styles/main.css       # design system
 │   ├── Dockerfile
 │   └── package.json
+├── scripts/data/                 # importadores de dados reais (MMA, GBIF, etc)
+├── observability/                # Grafana, Tempo, Prometheus, Loki, OTel Collector
 └── docs/
     ├── PROJECT_PLAN.md
     ├── DATA_DICTIONARY.md
@@ -91,6 +84,30 @@ sudo -u postgres psql -c "ALTER USER bioguard WITH PASSWORD 'bioguard';"
 sudo -u postgres createdb bioguardians -O bioguard
 sh db/migrate.sh
 ```
+
+## Carga de dados reais
+
+Os scripts em `scripts/data/` importam dados oficiais no banco:
+
+```bash
+cd scripts/data
+npm install
+
+# Lista de espécies ameaçadas (MMA)
+npm run load:mma
+
+# Ocorrências via GBIF e speciesLink
+npm run load:gbif
+npm run load:splink
+
+# Unidades de Conservação (ICMBio/CNUC)
+npm run load:cnuc
+
+# Buscar resumos de espécies na Wikipedia/Wikidata/iNaturalist
+npm run enrich:descriptions
+```
+
+> **Atenção**: os scripts requerem Node.js 22+ e acesso ao banco via `.env`.
 
 ## Sistema de Migrations
 

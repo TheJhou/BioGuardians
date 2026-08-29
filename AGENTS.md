@@ -2,10 +2,11 @@
 
 ## Stack
 - **Database**: PostgreSQL 16 + PostGIS 3.4
-- **Backend**: Node.js + Express (próxima etapa)
-- **Frontend**: React + Vite + MapTiler Cloud (próxima etapa)
-- **Infra**: Docker Compose ou instalação nativa (Oracle Cloud VM)
-- **CI/CD**: GitHub Actions (migrations + smoke tests)
+- **Backend**: Node.js 22 + Express + TypeScript (porta 3001)
+- **Frontend**: React 19 + Vite + TypeScript + MapLibre GL + MapTiler Cloud
+- **Infra**: Docker Compose, Nginx, Oracle Cloud VM
+- **CI/CD**: GitHub Actions (build, migrations, deploy)
+- **Observabilidade**: OpenTelemetry, Grafana, Tempo, Prometheus, Loki
 
 ## Migrations
 - Sistema customizado em `db/migrate.sh` (sem ferramentas de terceiros)
@@ -34,7 +35,11 @@
 5. `005_functions.sql` — funções PL/pgSQL e SQL (consultas espaciais, refresh)
 6. `006_triggers.sql` — auditoria, validação de geometria, timestamps
 7. `007_materialized_views.sql` — dashboard_stats, especies_por_uc, rankings
-8. `008_seed_data.sql` — dados sintéticos (13 espécies, 9 UCs, 21 ocorrências)
+8. `008_seed_data.sql` — dados de referência (categorias, biomas, estados)
+9. `009_server_config.sql` — configurações do PostgreSQL (parallel workers, work_mem)
+10. `010_performance.sql` — full-text search, índices GIN e compósitos
+11. `011_cache_support.sql` — tabela cache_metadata + triggers de invalidação
+12. `012_spatial_optimization.sql` — otimizações espaciais (simplificação de geometrias)
 
 ## Decisões de modelagem
 - SRID 4326 (WGS84) para todas as geometrias
@@ -43,6 +48,25 @@
 - Taxonomia hierárquica com auto-referência (reino → gênero)
 - Auditoria via trigger genérico (to_jsonb do registro inteiro)
 - Views materializadas com refresh simples (não CONCURRENTLY dentro de função)
+
+## Frontend
+- Rotas: `/` (Home), `/dashboard`, `/mapa`, `/especies`, `/especies/:id`
+- Páginas principais: Home, Dashboard, Mapa, Espécies
+- Design system: paleta verde institucional, componentes `Layout`, `Header`, `StatCard`
+- Responsivo: menu hamburger mobile, grids adaptáveis
+
+## Backend
+- Rotas principais: `/api/health`, `/api/especies`, `/api/areas`, `/api/ocorrencias`, `/api/dashboard`, `/api/referencias`
+- Cache LRU em memória com invalidação por rota
+- OpenTelemetry condicional (só ativa com `OTEL_EXPORTER_OTLP_ENDPOINT`)
+
+## Carga de dados
+- Scripts em `scripts/data/` carregam dados reais de MMA, GBIF, speciesLink e CNUC
+- `load_mma_especies.mjs` — importa lista de espécies ameaçadas do MMA
+- `load_gbif_ocorrencias.mjs` — importa ocorrências da API GBIF
+- `load_specieslink_ocorrencias.mjs` — importa ocorrências do speciesLink
+- `load_cnuc_ucs.mjs` — importa Unidades de Conservação do ICMBio/CNUC
+- `enrich_species_descriptions.mjs` — busca resumos na Wikipedia/Wikidata/iNaturalist
 
 ## Observabilidade (OpenTelemetry + Grafana stack)
 
