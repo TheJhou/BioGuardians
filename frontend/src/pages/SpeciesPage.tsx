@@ -1,54 +1,89 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { api } from '../api/client.js';
 import StatCard from '../components/ui/StatCard.js';
-import type { Especie } from '../types/index.js';
+import type { Especie, PaginatedResponse } from '../types/index.js';
 
 const TABS = ['Sobre', 'Ocorrências', 'Unidades de Conservação'] as const;
+const PER_PAGE = 15;
 
 export default function SpeciesPage() {
   const { id } = useParams<{ id?: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [result, setResult] = useState<{ data: Especie[]; total: number; total_pages: number } | null>(null);
+  const [items, setItems] = useState<Especie[]>([]);
   const [selected, setSelected] = useState<Especie | null>(null);
   const [tab, setTab] = useState<typeof TABS[number]>('Sobre');
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [search, setSearch] = useState(searchParams.get('busca') || '');
 
-  const page = Math.max(1, Number(searchParams.get('page') || 1));
-  const perPage = 8;
+  const busca = searchParams.get('busca') || undefined;
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  const load = useCallback(async (pageToLoad: number, append: boolean) => {
+    if (pageToLoad === 1) setLoading(true);
+    else setLoadingMore(true);
+
+    try {
+      const res = await api.getEspecies({ busca, page: pageToLoad, per_page: PER_PAGE }) as PaginatedResponse<Especie>;
+      setTotal(res.total);
+      setItems((prev) => append ? [...prev, ...res.data] : res.data);
+      setHasMore(res.data.length > 0 && (append ? prev.length + res.data.length : res.data.length) < res.total);
+      setPage(pageToLoad);
+
+      const idNum = id ? Number(id) : null;
+      const found = idNum ? res.data.find((s) => s.id === idNum) : null;
+      if (!append && (found || res.data[0])) {
+        setSelected(found || res.data[0] || null);
+      }
+    } catch {
+      setHasMore(false);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, [busca, id]);
 
   useEffect(() => {
-    setLoading(true);
-    const busca = searchParams.get('busca') || undefined;
-    api.getEspecies({ busca, page, per_page: perPage })
-      .then((res) => {
-        setResult(res as { data: Especie[]; total: number; total_pages: number });
-        const idNum = id ? Number(id) : null;
-        const found = idNum ? res.data.find((s: Especie) => s.id === idNum) : null;
-        setSelected(found || (res.data[0] as Especie) || null);
-      })
-      .catch(() => setResult({ data: [], total: 0, total_pages: 0 }))
-      .finally(() => setLoading(false));
-  }, [searchParams, id]);
+    setPage(1);
+    load(1, false);
+  }, [busca, load]);
+
+  useEffect(() => {
+    if (page <= 1) return;
+    load(page, true);
+  }, [page]);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting && hasMore && !loadingMore && !loading) {
+          setPage((p) => p + 1);
+        }
+      },
+      { root: null, rootMargin: '100px', threshold: 0.1 }
+    );
+
+    const current = sentinelRef.current;
+    if (current) observer.observe(current);
+    return () => { if (current) observer.unobserve(current); };
+  }, [hasMore, loadingMore, loading]);
 
   const handleSearch = () => {
-    setSearchParams({ page: '1', ...(search ? { busca: search } : {}) });
-  };
-
-  const goToPage = (p: number) => {
-    const params = new URLSearchParams(searchParams);
-    params.set('page', String(p));
-    setSearchParams(params);
+    if (search) setSearchParams({ busca: search });
+    else setSearchParams({});
   };
 
   const selectSpecies = (s: Especie) => {
     setSelected(s);
-    setSearchParams({ ...Object.fromEntries(searchParams), page: String(page) });
   };
 
-  if (loading) return <div className="loading">Carregando espécies...</div>;
+  if (loading && items.length === 0) return <div className="loading">Carregando espécies...</div>;
 
   return (
     <div className="species-page">
@@ -66,9 +101,10 @@ export default function SpeciesPage() {
         </div>
 
         <div className="species-list">
-          {result?.data.map((s: Especie) => (
+          {items.map((s, index) => (
             <div
               key={s.id}
+              ref={index === items.length - 1 ? sentinelRef : undefined}
               className={`species-item ${selected?.id === s.id ? 'active' : ''}`}
               onClick={() => selectSpecies(s)}
             >
@@ -87,23 +123,9 @@ export default function SpeciesPage() {
               </div>
             </div>
           ))}
+          {loadingMore && <div className="loading">Carregando mais...</div>}
+          {!hasMore && items.length > 0 && <div className="empty-state">Fim da lista</div>}
         </div>
-
-        {result && result.total_pages > 1 && (
-          <div className="pagination">
-            <button className="page-btn" disabled={page === 1} onClick={() => goToPage(page - 1)}>‹</button>
-            {Array.from({ length: result.total_pages }, (_, i) => i + 1).map((p) => (
-              <button
-                key={p}
-                className={`page-btn ${p === page ? 'active' : ''}`}
-                onClick={() => goToPage(p)}
-              >
-                {p}
-              </button>
-            ))}
-            <button className="page-btn" disabled={page === result.total_pages} onClick={() => goToPage(page + 1)}>›</button>
-          </div>
-        )}
       </aside>
 
       <main className="species-detail">
