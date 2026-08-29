@@ -520,11 +520,14 @@ a, button { transition: all 0.2s ease; }
 
 .map-legend { margin-top: auto; padding-top: 20px; border-top: 1px solid var(--border); }
 .map-legend h4 { font-size: 0.9rem; color: var(--green-darker); margin-bottom: 10px; }
+.legend-section { margin-bottom: 12px; }
+.legend-section-title { display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 6px; }
 .legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; margin-bottom: 6px; }
 .legend-dot { width: 12px; height: 12px; border-radius: 50%; }
 .dot-uc-fed { background: #1565c0; }
 .dot-uc-est { background: #2e7d32; }
 .dot-uc-mun { background: #f57c00; }
+.dot-uc-part { background: #757575; }
 .dot-occ { background: #d32f2f; }
 
 .occurrence-popup {

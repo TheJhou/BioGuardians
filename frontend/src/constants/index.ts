@@ -11,14 +11,14 @@ export const CATEGORY_COLORS: Record<string, string> = {
   DD: '#757575', // gray — Data Deficient
 };
 
-// --- Threat category labels ---
+// --- Threat category labels (Portuguese) ---
 export const CATEGORY_LABELS: Record<string, string> = {
-  CR: 'Critically Endangered',
-  EN: 'Endangered',
-  VU: 'Vulnerable',
-  NT: 'Near Threatened',
-  LC: 'Least Concern',
-  DD: 'Data Deficient',
+  CR: 'CR — Criticamente em Perigo',
+  EN: 'EN — Em Perigo',
+  VU: 'VU — Vulnerável',
+  NT: 'NT — Quase Ameaçada',
+  LC: 'LC — Menos Preocupante',
+  DD: 'DD — Dados Insuficientes',
 };
 
 // --- UC category colors ---

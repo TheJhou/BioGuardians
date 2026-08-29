@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { api } from '../api/client.js';
 import ImageWithSkeleton from '../components/ImageWithSkeleton.js';
+import { CATEGORY_LABELS } from '../constants/index.js';
 import StatCard from '../components/ui/StatCard.js';
 import type { Especie, PaginatedResponse } from '../types/index.js';
 
@@ -160,7 +161,7 @@ export default function SpeciesPage() {
               <div className="species-info">
                 <span className="species-name">{s.nome_popular || s.nome_cientifico}</span>
                 <span className="species-scientific">{s.nome_cientifico}</span>
-                <span className={`cat-badge cat-${s.categoria_ameaca.toLowerCase()}`}>{s.categoria_ameaca}</span>
+                <span className={`cat-badge cat-${s.categoria_ameaca.toLowerCase()}`}>{CATEGORY_LABELS[s.categoria_ameaca] || s.categoria_ameaca}</span>
               </div>
             </div>
           ))}
@@ -196,8 +197,8 @@ export default function SpeciesPage() {
                 <h2>{selected.nome_popular || selected.nome_cientifico}</h2>
                 <p className="species-detail-scientific">{selected.nome_cientifico}</p>
                 <div className="species-badges">
-                  <span className={`cat-badge cat-${selected.categoria_ameaca.toLowerCase()}`}>{selected.categoria_ameaca}</span>
-                  <span className="species-source">MMA</span>
+                  <span className={`cat-badge cat-${selected.categoria_ameaca.toLowerCase()}`}>{CATEGORY_LABELS[selected.categoria_ameaca] || selected.categoria_ameaca}</span>
+                  <span className="species-source" title="MMA — Ministério do Meio Ambiente">MMA — Ministério do Meio Ambiente</span>
                 </div>
               </div>
             </div>

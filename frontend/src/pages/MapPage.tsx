@@ -132,10 +132,17 @@ export default function MapPage() {
 
         <div className="map-legend">
           <h4>Legenda</h4>
-          <div className="legend-item"><span className="legend-dot dot-uc-fed"></span> UCs Federais</div>
-          <div className="legend-item"><span className="legend-dot dot-uc-est"></span> UCs Estaduais</div>
-          <div className="legend-item"><span className="legend-dot dot-uc-mun"></span> UCs Municipais</div>
-          <div className="legend-item"><span className="legend-dot dot-occ"></span> Ocorrências</div>
+          <div className="legend-section">
+            <span className="legend-section-title">Unidades de Conservação</span>
+            <div className="legend-item"><span className="legend-dot dot-uc-fed"></span> Federal</div>
+            <div className="legend-item"><span className="legend-dot dot-uc-est"></span> Estadual</div>
+            <div className="legend-item"><span className="legend-dot dot-uc-mun"></span> Municipal</div>
+            <div className="legend-item"><span className="legend-dot dot-uc-part"></span> Particular</div>
+          </div>
+          <div className="legend-section">
+            <span className="legend-section-title">Registros</span>
+            <div className="legend-item"><span className="legend-dot dot-occ"></span> Ocorrências</div>
+          </div>
         </div>
       </aside>
 

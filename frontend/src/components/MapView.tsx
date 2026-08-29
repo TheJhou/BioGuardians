@@ -4,6 +4,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { api } from '../api/client.js';
 import ImageWithSkeleton from './ImageWithSkeleton.js';
 import { MAP_DEFAULTS, getCategoryColor, getUcCategoryColor } from '../constants/index.js';
+import { CATEGORY_LABELS } from '../constants/index.js';
 import type {
   GeoJSONFeatureCollection, OcorrenciaProperties,
   EspecieEmArea, GeoJSONFeature, GeoJSONPoint, GeoJSONPolygon,
@@ -275,7 +276,7 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
                       <strong>{sp.nome_cientifico}</strong>
                       {sp.nome_popular && ` (${sp.nome_popular})`}
                       <span className={`cat-badge cat-${sp.categoria.toLowerCase()}`}>
-                        {sp.categoria}
+                        {CATEGORY_LABELS[sp.categoria] || sp.categoria}
                       </span>
                     </li>
                   ))}
@@ -320,7 +321,7 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
                 <h4>{selectedOcorrencia.properties.nome_popular || selectedOcorrencia.properties.nome_cientifico}</h4>
                 <p className="occurrence-scientific">{selectedOcorrencia.properties.nome_cientifico}</p>
                 <span className={`cat-badge cat-${selectedOcorrencia.properties.categoria_ameaca.toLowerCase()}`}>
-                  {selectedOcorrencia.properties.categoria_ameaca}
+                  {CATEGORY_LABELS[selectedOcorrencia.properties.categoria_ameaca] || selectedOcorrencia.properties.categoria_ameaca}
                 </span>
                 <div className="occurrence-meta">
                   <p><strong>Data:</strong> {selectedOcorrencia.properties.data_evento || 'N/A'}</p>
