@@ -22,6 +22,7 @@ export default function SpeciesPage() {
   const [search, setSearch] = useState(searchParams.get('busca') || '');
 
   const busca = searchParams.get('busca') || undefined;
+  const listRef = useRef<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   const load = useCallback(async (pageToLoad: number, append: boolean) => {
@@ -32,7 +33,8 @@ export default function SpeciesPage() {
       const res = await api.getEspecies({ busca, page: pageToLoad, per_page: PER_PAGE }) as PaginatedResponse<Especie>;
       setTotal(res.total);
       setItems((prev) => append ? [...prev, ...res.data] : res.data);
-      setHasMore(res.data.length > 0 && (append ? prev.length + res.data.length : res.data.length) < res.total);
+      const loadedCount = (pageToLoad - 1) * PER_PAGE + res.data.length;
+      setHasMore(res.data.length > 0 && loadedCount < res.total);
       setPage(pageToLoad);
 
       const idNum = id ? Number(id) : null;
@@ -56,9 +58,13 @@ export default function SpeciesPage() {
   useEffect(() => {
     if (page <= 1) return;
     load(page, true);
-  }, [page]);
+  }, [page, load]);
 
   useEffect(() => {
+    const list = listRef.current;
+    const sentinel = sentinelRef.current;
+    if (!list || !sentinel) return;
+
     const observer = new IntersectionObserver(
       (entries) => {
         const [entry] = entries;
@@ -66,12 +72,11 @@ export default function SpeciesPage() {
           setPage((p) => p + 1);
         }
       },
-      { root: null, rootMargin: '100px', threshold: 0.1 }
+      { root: list, rootMargin: '80px', threshold: 0.1 }
     );
 
-    const current = sentinelRef.current;
-    if (current) observer.observe(current);
-    return () => { if (current) observer.unobserve(current); };
+    observer.observe(sentinel);
+    return () => { observer.disconnect(); };
   }, [hasMore, loadingMore, loading]);
 
   const handleSearch = () => {
@@ -100,11 +105,10 @@ export default function SpeciesPage() {
           <button onClick={handleSearch} className="filter-apply">Buscar</button>
         </div>
 
-        <div className="species-list">
-          {items.map((s, index) => (
+        <div className="species-list" ref={listRef}>
+          {items.map((s) => (
             <div
               key={s.id}
-              ref={index === items.length - 1 ? sentinelRef : undefined}
               className={`species-item ${selected?.id === s.id ? 'active' : ''}`}
               onClick={() => selectSpecies(s)}
             >
@@ -125,6 +129,7 @@ export default function SpeciesPage() {
           ))}
           {loadingMore && <div className="loading">Carregando mais...</div>}
           {!hasMore && items.length > 0 && <div className="empty-state">Fim da lista</div>}
+          <div ref={sentinelRef} className="sentinel" />
         </div>
       </aside>
 
@@ -161,7 +166,7 @@ export default function SpeciesPage() {
             <div className="species-tab-content">
               {tab === 'Sobre' && (
                 <div className="species-detail-grid">
-                  <div className="detail-card">
+                  <div className="detail-card summary">
                     <h4>Resumo da Espécie</h4>
                     <p>{selected.descricao || 'Sem descrição cadastrada.'}</p>
                   </div>
