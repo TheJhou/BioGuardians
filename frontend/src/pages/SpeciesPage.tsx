@@ -23,6 +23,10 @@ export default function SpeciesPage() {
   const [search, setSearch] = useState(searchParams.get('busca') || '');
   const [ocorrencias, setOcorrencias] = useState<OcorrenciaProperties[]>([]);
   const [loadingOcorrencias, setLoadingOcorrencias] = useState(false);
+  const [hasMoreOcorrencias, setHasMoreOcorrencias] = useState(true);
+  const [totalOcorrencias, setTotalOcorrencias] = useState(0);
+  const ocorrenciaPageRef = useRef(1);
+  const isFetchingOcorrenciasRef = useRef(false);
 
   const busca = searchParams.get('busca') || undefined;
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -119,17 +123,43 @@ export default function SpeciesPage() {
     }
   };
 
+  const loadOcorrencias = useCallback(async (pageToLoad: number, append: boolean) => {
+    if (!selected || isFetchingOcorrenciasRef.current) return;
+    isFetchingOcorrenciasRef.current = true;
+    if (pageToLoad === 1) setLoadingOcorrencias(true);
+
+    try {
+      const res = await api.getEspecieOcorrencias(selected.id, { page: pageToLoad, per_page: 20 });
+      setTotalOcorrencias(res.total);
+      setOcorrencias((prev) => append ? [...prev, ...res.data] : res.data);
+      const loadedCount = (pageToLoad - 1) * 20 + res.data.length;
+      setHasMoreOcorrencias(res.data.length > 0 && loadedCount < res.total);
+      ocorrenciaPageRef.current = pageToLoad;
+    } catch {
+      setHasMoreOcorrencias(false);
+    } finally {
+      setLoadingOcorrencias(false);
+      isFetchingOcorrenciasRef.current = false;
+    }
+  }, [selected?.id]);
+
   useEffect(() => {
     if (!selected) return;
-    setLoadingOcorrencias(true);
-    api.getOcorrencias({ especie_id: selected.id, limit: 200 })
-      .then((geojson) => {
-        const features = (geojson.features || []) as unknown as { properties: OcorrenciaProperties }[];
-        setOcorrencias(features.map((f) => f.properties));
-      })
-      .catch(() => setOcorrencias([]))
-      .finally(() => setLoadingOcorrencias(false));
-  }, [selected?.id]);
+    ocorrenciaPageRef.current = 1;
+    setOcorrencias([]);
+    setHasMoreOcorrencias(true);
+    loadOcorrencias(1, false);
+  }, [selected?.id, loadOcorrencias]);
+
+  const handleOcorrenciasScroll = (e: React.UIEvent<HTMLUListElement>) => {
+    const list = e.currentTarget;
+    if (isFetchingOcorrenciasRef.current || !hasMoreOcorrencias) return;
+    const nearBottom = list.scrollTop + list.clientHeight >= list.scrollHeight - 80;
+    if (nearBottom) {
+      const nextPage = ocorrenciaPageRef.current + 1;
+      loadOcorrencias(nextPage, true);
+    }
+  };
 
   if (loading && items.length === 0) return <div className="loading">Carregando espécies...</div>;
 
@@ -233,7 +263,7 @@ export default function SpeciesPage() {
                     <p>{selected.descricao || 'Sem descrição cadastrada.'}</p>
                   </div>
                   <div className="detail-card stats">
-                    <StatCard value={ocorrencias.length} label="Ocorrências" />
+                    <StatCard value={totalOcorrencias} label="Ocorrências" />
                     <StatCard value={selected.biomas?.length ?? 0} label="Biomas" />
                     <StatCard value={0} label="UCs com registros" />
                   </div>
@@ -241,13 +271,13 @@ export default function SpeciesPage() {
               )}
               {tab === 'Ocorrências' && (
                 <div className="detail-card occurrence-list">
-                  <h4>Ocorrências registradas</h4>
-                  {loadingOcorrencias ? (
+                  <h4>Ocorrências registradas ({totalOcorrencias})</h4>
+                  {loadingOcorrencias && ocorrencias.length === 0 ? (
                     <p className="loading">Carregando ocorrências...</p>
                   ) : ocorrencias.length === 0 ? (
                     <p className="empty-state">Nenhuma ocorrência registrada para esta espécie.</p>
                   ) : (
-                    <ul className="occurrence-list-items">
+                    <ul className="occurrence-list-items" onScroll={handleOcorrenciasScroll}>
                       {ocorrencias.map((o, i) => (
                         <li key={i} className="occurrence-list-item">
                           <div className="occurrence-list-image">
@@ -269,6 +299,8 @@ export default function SpeciesPage() {
                           </div>
                         </li>
                       ))}
+                      {loadingOcorrencias && <li className="loading-inline">Carregando mais...</li>}
+                      {!hasMoreOcorrencias && <li className="empty-state-inline">Fim da lista</li>}
                     </ul>
                   )}
                 </div>

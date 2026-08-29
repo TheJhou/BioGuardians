@@ -92,6 +92,14 @@ export const api = {
     return fetchApi<Especie>(`/especies/${id}`);
   },
 
+  async getEspecieOcorrencias(id: number, params?: { page?: number; per_page?: number }): Promise<PaginatedResponse<OcorrenciaProperties>> {
+    const qs = new URLSearchParams();
+    if (params?.page) qs.set('page', String(params.page));
+    if (params?.per_page) qs.set('per_page', String(params.per_page));
+    const query = qs.toString();
+    return fetchApi<PaginatedResponse<OcorrenciaProperties>>(`/especies/${id}/ocorrencias${query ? `?${query}` : ''}`);
+  },
+
   async createEspecie(data: {
     nome_cientifico: string; nome_popular?: string; categoria_ameaca: string;
     genero_id: number; descricao?: string; biomas?: number[]; estados?: string[];

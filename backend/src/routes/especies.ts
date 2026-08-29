@@ -4,6 +4,7 @@ import { validateId } from '../middleware/validateId.js';
 import { cacheInvalidateAll } from '../cache/cache.js';
 import { parseParam, getParam } from '../utils/params.js';
 import { paginate, getPaginationParams } from '../utils/paginate.js';
+import { paginate, getPaginationParams } from '../utils/paginate.js';
 
 const router = Router();
 
@@ -223,6 +224,32 @@ router.delete('/:id', validateId, async (req, res, next) => {
 
     cacheInvalidateAll(['route:/api/especies', 'route:/api/dashboard']);
     res.json({ message: 'Species deleted' });
+  } catch (err) { next(err); }
+});
+
+router.get('/:id/ocorrencias', validateId, async (req, res, next) => {
+  try {
+    const id = parseParam(req.params.id)!;
+    const { page, perPage, offset } = getPaginationParams(req.query);
+
+    const countRes = await query(
+      'SELECT COUNT(*) AS total FROM ocorrencia WHERE especie_id = $1',
+      [id]
+    );
+    const total = Number(countRes.rows[0].total);
+
+    const { rows } = await query(
+      `SELECT o.id, o.especie_id, o.lat, o.lon, o.data_evento, o.fonte, o.base_registro,
+              e.nome_cientifico, e.nome_popular, e.imagem_url, e.categoria_ameaca
+       FROM ocorrencia o
+       JOIN especie e ON e.id = o.especie_id
+       WHERE o.especie_id = $1
+       ORDER BY o.data_evento DESC NULLS LAST
+       LIMIT $2 OFFSET $3`,
+      [id, perPage, offset]
+    );
+
+    res.json(paginate(rows, page, perPage, total));
   } catch (err) { next(err); }
 });
 
