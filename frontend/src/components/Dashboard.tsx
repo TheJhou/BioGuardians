@@ -105,8 +105,9 @@ export default function Dashboard() {
           <div className="chart-doughnut">
             <Doughnut data={biomasData} options={{
               responsive: true,
+              maintainAspectRatio: false,
               cutout: '70%',
-              plugins: { legend: { position: 'right', labels: { boxWidth: 14 } } },
+              plugins: { legend: { position: 'bottom', labels: { boxWidth: 14, usePointStyle: true, padding: 20 } } },
             }} />
             <div className="doughnut-center">
               <span className="big">{MOCK_BIOMAS.reduce((a, b) => a + b.total, 0).toLocaleString()}</span>
