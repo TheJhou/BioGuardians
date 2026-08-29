@@ -43,8 +43,10 @@ export default function SpeciesPage() {
 
       const idNum = id ? Number(id) : null;
       const found = idNum ? res.data.find((s) => s.id === idNum) : null;
-      if (!append && (found || res.data[0])) {
-        setSelected(found || res.data[0] || null);
+      const first = found || res.data[0];
+      if (!append && first) {
+        const detail = await api.getEspecie(first.id);
+        setSelected(detail);
       }
     } catch {
       setHasMore(false);
@@ -85,8 +87,13 @@ export default function SpeciesPage() {
     else setSearchParams({});
   };
 
-  const selectSpecies = (s: Especie) => {
-    setSelected(s);
+  const selectSpecies = async (s: Especie) => {
+    try {
+      const detail = await api.getEspecie(s.id);
+      setSelected(detail);
+    } catch {
+      setSelected(s);
+    }
   };
 
   if (loading && items.length === 0) return <div className="loading">Carregando espécies...</div>;

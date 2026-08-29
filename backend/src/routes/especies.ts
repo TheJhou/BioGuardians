@@ -15,11 +15,44 @@ router.get('/', async (req, res, next) => {
 
     // Full-text search takes priority when 'busca' is provided.
     if (busca && typeof busca === 'string') {
+      const searchConditions: string[] = ["e.tsv_busca @@ plainto_tsquery('portuguese', $1)"];
+      const searchParams: unknown[] = [busca];
+      let searchIdx = 2;
+
+      if (categoria) {
+        searchConditions.push(`e.categoria_ameaca = $${searchIdx++}`);
+        searchParams.push(categoria);
+      }
+      if (status) {
+        searchConditions.push(`e.status = $${searchIdx++}`);
+        searchParams.push(status);
+      }
+      if (bioma) {
+        searchConditions.push(`EXISTS (SELECT 1 FROM especie_bioma eb WHERE eb.especie_id = e.id AND eb.bioma_id = $${searchIdx++})`);
+        searchParams.push(parseParam(bioma));
+      }
+      if (estado) {
+        searchConditions.push(`EXISTS (SELECT 1 FROM especie_estado ee WHERE ee.especie_id = e.id AND ee.estado_uf = $${searchIdx++})`);
+        searchParams.push(estado);
+      }
+
       const { rows } = await query(
-        'SELECT * FROM buscar_especies($1)',
-        [busca]
+        `SELECT e.id, e.nome_cientifico, e.nome_popular, e.categoria_ameaca,
+                COUNT(*) OVER() AS full_count
+         FROM especie e
+         WHERE ${searchConditions.join(' AND ')}
+         ORDER BY ts_rank(e.tsv_busca, plainto_tsquery('portuguese', $1)) DESC
+         LIMIT $${searchIdx++} OFFSET $${searchIdx++}`,
+        [...searchParams, perPage, offset]
       );
-      res.json(paginate(rows, page, perPage, rows.length));
+
+      const total = rows.length > 0 ? Number(rows[0].full_count) : 0;
+      const data = rows.map((r: any) => {
+        const { full_count, ...rest } = r;
+        return rest;
+      });
+
+      res.json(paginate(data, page, perPage, total));
       return;
     }
 
@@ -51,7 +84,6 @@ router.get('/', async (req, res, next) => {
 
     const { rows } = await query(
       `SELECT e.id, e.nome_cientifico, e.nome_popular, e.categoria_ameaca,
-              e.status, e.criado_em, e.atualizado_em,
               COUNT(*) OVER() AS full_count
        FROM especie e
        ${where}
