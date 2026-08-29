@@ -48,6 +48,8 @@ const INITIAL_VIEW = {
   zoom: MAP_DEFAULTS.zoom,
 };
 
+const DEFAULT_BBOX = `${MAP_DEFAULTS.center.lng - 20},${MAP_DEFAULTS.center.lat - 20},${MAP_DEFAULTS.center.lng + 20},${MAP_DEFAULTS.center.lat + 20}`;
+
 export default function MapView({ filters, layers, selectedEspecieId }: MapViewProps) {
   const [areas, setAreas] = useState<GeoJSONFeatureCollection | null>(null);
   const [ocorrencias, setOcorrencias] = useState<GeoJSONFeatureCollection<OcorrenciaProperties> | null>(null);
@@ -59,7 +61,7 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
 
   // Viewport state (bbox + zoom) updated when map stops moving.
   const [viewport, setViewport] = useState({
-    bbox: '',
+    bbox: DEFAULT_BBOX,
     zoom: MAP_DEFAULTS.zoom,
     longitude: INITIAL_VIEW.longitude,
     latitude: INITIAL_VIEW.latitude,
@@ -68,6 +70,23 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
   const mapRef = useRef<any>(null);
 
   const handleMoveEnd = useCallback((evt: any) => {
+    const map = evt.target;
+    const bounds = map.getBounds();
+    const sw = bounds.getSouthWest();
+    const ne = bounds.getNorthEast();
+    const bbox = `${sw.lng},${sw.lat},${ne.lng},${ne.lat}`;
+    const zoom = map.getZoom();
+    const center = map.getCenter();
+    setViewport({
+      bbox,
+      zoom,
+      longitude: center.lng,
+      latitude: center.lat,
+    });
+  }, []);
+
+  const handleLoad = useCallback((evt: any) => {
+    setLoading(false);
     const map = evt.target;
     const bounds = map.getBounds();
     const sw = bounds.getSouthWest();
@@ -146,7 +165,10 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
   }, [selectedEspecieId, filters, debouncedViewport]);
 
   useEffect(() => {
-    if (!debouncedViewport.bbox) return;
+    if (!debouncedViewport.bbox) {
+      const t = setTimeout(() => setLoading(false), 8000);
+      return () => clearTimeout(t);
+    }
     setLoading(true);
     setError(null);
     const promises: Promise<void>[] = [];
@@ -206,6 +228,7 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
         initialViewState={INITIAL_VIEW}
         style={{ width: '100%', height: '100%' }}
         mapStyle={`https://api.maptiler.com/maps/streets/style.json?key=${MAPTILER_API_KEY}`}
+        onLoad={handleLoad}
         onMoveEnd={handleMoveEnd}
         onClick={handleClick}
         onError={(evt) => setError(String(evt.error) || 'Falha ao carregar o mapa. Verifique a chave do MapTiler.')}
