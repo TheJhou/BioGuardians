@@ -17,15 +17,19 @@ export default function SpeciesPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState(searchParams.get('busca') || '');
 
   const busca = searchParams.get('busca') || undefined;
   const listRef = useRef<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const pageRef = useRef(1);
+  const isFetchingRef = useRef(false);
 
   const load = useCallback(async (pageToLoad: number, append: boolean) => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+
     if (pageToLoad === 1) setLoading(true);
     else setLoadingMore(true);
 
@@ -35,7 +39,7 @@ export default function SpeciesPage() {
       setItems((prev) => append ? [...prev, ...res.data] : res.data);
       const loadedCount = (pageToLoad - 1) * PER_PAGE + res.data.length;
       setHasMore(res.data.length > 0 && loadedCount < res.total);
-      setPage(pageToLoad);
+      pageRef.current = pageToLoad;
 
       const idNum = id ? Number(id) : null;
       const found = idNum ? res.data.find((s) => s.id === idNum) : null;
@@ -47,18 +51,14 @@ export default function SpeciesPage() {
     } finally {
       setLoading(false);
       setLoadingMore(false);
+      isFetchingRef.current = false;
     }
   }, [busca, id]);
 
   useEffect(() => {
-    setPage(1);
+    pageRef.current = 1;
     load(1, false);
   }, [busca, load]);
-
-  useEffect(() => {
-    if (page <= 1) return;
-    load(page, true);
-  }, [page, load]);
 
   useEffect(() => {
     const list = listRef.current;
@@ -68,8 +68,9 @@ export default function SpeciesPage() {
     const observer = new IntersectionObserver(
       (entries) => {
         const [entry] = entries;
-        if (entry.isIntersecting && hasMore && !loadingMore && !loading) {
-          setPage((p) => p + 1);
+        if (entry.isIntersecting && !isFetchingRef.current) {
+          const nextPage = pageRef.current + 1;
+          load(nextPage, true);
         }
       },
       { root: list, rootMargin: '80px', threshold: 0.1 }
@@ -77,7 +78,7 @@ export default function SpeciesPage() {
 
     observer.observe(sentinel);
     return () => { observer.disconnect(); };
-  }, [hasMore, loadingMore, loading]);
+  }, [load]);
 
   const handleSearch = () => {
     if (search) setSearchParams({ busca: search });
@@ -128,7 +129,7 @@ export default function SpeciesPage() {
             </div>
           ))}
           {loadingMore && <div className="loading">Carregando mais...</div>}
-          {!hasMore && items.length > 0 && <div className="empty-state">Fim da lista</div>}
+          {!hasMore && items.length > 0 && <div className="empty-state">Fim da lista ({items.length} / {total})</div>}
           <div ref={sentinelRef} className="sentinel" />
         </div>
       </aside>
