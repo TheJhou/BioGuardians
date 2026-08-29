@@ -128,7 +128,7 @@ jobs:
         run: |
           if [ "${{ matrix.service }}" = "frontend" ]; then
             VITE_API_URL="${{ secrets.VITE_API_URL }}"
-            [ -z "$VITE_API_URL" ] && VITE_API_URL="https://api.financemobile.com.br"
+            [ -z "$VITE_API_URL" ] && VITE_API_URL="https://api.financemobile.com.br/api"
             MAPTILER_KEY="${{ secrets.VITE_MAPTILER_API_KEY }}"
             {
               echo "VITE_API_URL=${VITE_API_URL}"
