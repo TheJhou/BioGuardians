@@ -127,7 +127,18 @@ jobs:
         id: args
         run: |
           if [ "${{ matrix.service }}" = "frontend" ]; then
-            echo "value=VITE_MAPTILER_API_KEY=${{ secrets.VITE_MAPTILER_API_KEY }}" >> "$GITHUB_OUTPUT"
+            VITE_API_URL="${{ secrets.VITE_API_URL }}"
+            [ -z "$VITE_API_URL" ] && VITE_API_URL="https://api.financemobile.com.br"
+            MAPTILER_KEY="${{ secrets.VITE_MAPTILER_API_KEY }}"
+            {
+              echo "VITE_API_URL=${VITE_API_URL}"
+              echo "VITE_MAPTILER_API_KEY=${MAPTILER_KEY}"
+            } > build-args.txt
+            {
+              echo "value<<EOF"
+              cat build-args.txt
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
           else
             echo "value=" >> "$GITHUB_OUTPUT"
           fi
@@ -204,8 +215,10 @@ jobs:
           DB_USER='${{ secrets.DB_USER }}'
           DB_PASSWORD='${{ secrets.DB_PASSWORD }}'
           DB_NAME='${{ secrets.DB_NAME }}'
+          FRONTEND_URL='${{ secrets.FRONTEND_URL || 'https://financemobile.com.br' }}'
           DB_PASSWORD_ENC=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$DB_PASSWORD'))")
           export DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD_ENC}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+          export FRONTEND_URL
           envsubst < stack.yml > stack.rendered.yml
 
       - name: Upload stack renderizada

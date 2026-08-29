@@ -119,3 +119,100 @@ docker compose -f docker-compose.prod.yml -f docker-compose.observability.yml up
 - `db_client_connections_usage` (gauge) — pool active/idle
 - `bioguardians_cache_hits_total` / `bioguardians_cache_misses_total` (counter) — cache hit rate
 - `bioguardians_errors_total` (counter) — erros por tipo/status
+
+## Produção com domínio próprio
+
+### Arquitetura alvo
+```
+Internet → Cloudflare (DNS + HTTPS) → Nginx na VM → Docker
+  your-domain.com     → 127.0.0.1:8080 (frontend)
+  api.your-domain.com → 127.0.0.1:3001 (backend)
+```
+
+### Variáveis de ambiente
+- `VITE_API_URL=https://api.your-domain.com` (frontend)
+- `FRONTEND_URL=https://your-domain.com` (backend)
+- `CORS_ORIGIN=https://your-domain.com` (backend)
+
+### Portas
+- Abertas para Internet: 80, 443, 22
+- Acesso administrativo/local: 8080, 9443
+- Fechadas para externo: 3000, 3001, 5432
+- Frontend expõe `127.0.0.1:8080` (só Nginx da VM acessa)
+- Backend expõe `127.0.0.1:3001` (só Nginx da VM acessa)
+
+### Nginx
+- Configurar na VM em: `/etc/nginx/sites-available/your-domain`
+- Certificado Cloudflare Origin CA: `/etc/cloudflare/origin-ca.crt`
+- Chave privada: `/etc/cloudflare/origin-ca.key`
+- NÃO commitar certificado/chave no Git.
+
+Exemplo de config (substitua `your-domain.com`):
+```nginx
+upstream frontend { server 127.0.0.1:8080; }
+upstream backend  { server 127.0.0.1:3001; }
+
+server {
+  listen 80;
+  server_name your-domain.com api.your-domain.com;
+  return 301 https://$host$request_uri;
+}
+
+server {
+  listen 443 ssl http2;
+  server_name your-domain.com;
+  ssl_certificate     /etc/cloudflare/origin-ca.crt;
+  ssl_certificate_key /etc/cloudflare/origin-ca.key;
+  location / {
+    proxy_pass http://frontend;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+}
+
+server {
+  listen 443 ssl http2;
+  server_name api.your-domain.com;
+  ssl_certificate     /etc/cloudflare/origin-ca.crt;
+  ssl_certificate_key /etc/cloudflare/origin-ca.key;
+  client_max_body_size 10M;
+  location / {
+    proxy_pass http://backend;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+}
+```
+
+### Cloudflare
+- `A @`   → IP público VM (Proxied)
+- `A api` → IP público VM (Proxied)
+- SSL/TLS → Full (strict)
+
+### Comandos na VM
+```bash
+# Instalar Nginx
+sudo apt update && sudo apt install -y nginx
+
+# Copiar config
+sudo cp infra/nginx/financemobile.conf /etc/nginx/sites-available/financemobile
+sudo ln -sf /etc/nginx/sites-available/financemobile /etc/nginx/sites-enabled/
+
+# Criar diretório e colocar certificado Origin CA
+sudo mkdir -p /etc/cloudflare
+sudo chown root:root /etc/cloudflare/origin-ca.crt /etc/cloudflare/origin-ca.key
+sudo chmod 600 /etc/cloudflare/origin-ca.key
+
+# Testar e reiniciar
+sudo nginx -t
+sudo systemctl reload nginx
+
+# Reiniciar aplicação
+sudo docker compose -f stack.yml pull
+sudo docker compose -f stack.yml up -d
+```
+

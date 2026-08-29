@@ -10,7 +10,8 @@ function required(key: string): string {
 export const env = {
   databaseUrl: required('DATABASE_URL'),
   port: parseInt(process.env.PORT || '3001', 10),
-  corsOrigin: process.env.CORS_ORIGIN || '*',
+  corsOrigin: process.env.CORS_ORIGIN || process.env.FRONTEND_URL || '*',
+  frontendUrl: process.env.FRONTEND_URL || process.env.CORS_ORIGIN || '*',
   cache: {
     ttlMs: parseInt(process.env.CACHE_TTL_MS || '30000', 10),
     max: parseInt(process.env.CACHE_MAX || '100', 10),

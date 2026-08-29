@@ -55,12 +55,13 @@ services:
     environment:
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
       PORT: 3001
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
       CACHE_TTL_MS: ${CACHE_TTL_MS:-30000}
       CACHE_MAX: ${CACHE_MAX:-100}
       GBIF_API_BASE: https://api.gbif.org/v1
     ports:
-      - "3001:3001"
+      - "127.0.0.1:3001:3001"
     volumes:
       - ./backend/src:/app/src:ro
     command: ["npx", "tsx", "watch", "src/index.ts"]

@@ -17,10 +17,11 @@ services:
     environment:
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@host.docker.internal:${DB_PORT}/${DB_NAME}
       PORT: 3001
-      CORS_ORIGIN: "*"
+      FRONTEND_URL: ${FRONTEND_URL:-https://financemobile.com.br}
+      CORS_ORIGIN: ${FRONTEND_URL:-https://financemobile.com.br}
       GBIF_API_BASE: https://api.gbif.org/v1
     ports:
-      - "3001:3001"
+      - "127.0.0.1:3001:3001"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
@@ -44,7 +45,7 @@ services:
       backend:
         condition: service_healthy
     ports:
-      - "8080:80"
+      - "127.0.0.1:8080:80"
     deploy:
       resources:
         limits:
