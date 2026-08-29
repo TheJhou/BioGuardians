@@ -1,39 +1,61 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import StatCard from '../components/ui/StatCard.js';
 import { api } from '../api/client.js';
-import type { DashboardData } from '../types/index.js';
+import StatCard from '../components/ui/StatCard.js';
+import type { DashboardStats } from '../types/index.js';
 
 const dataSources = [
-  { name: 'MMA', full: 'Ministério do Meio Ambiente', icon: '🏛️' },
-  { name: 'GBIF', full: 'Global Biodiversity Information Facility', icon: '🌍' },
-  { name: 'speciesLink', full: 'Repositório de dados da Rede SpeciesLink', icon: '🔗' },
-  { name: 'CNUC', full: 'Cadastro Nacional de Unidades de Conservação', icon: '📋' },
+  { name: 'MMA', full: 'Ministério do Meio Ambiente' },
+  { name: 'GBIF', full: 'Global Biodiversity Information Facility' },
+  { name: 'speciesLink', full: 'Repositório de dados da Rede SpeciesLink' },
+  { name: 'CNUC', full: 'Cadastro Nacional de Unidades de Conservação' },
 ];
 
 export default function HomePage() {
-  const [stats, setStats] = useState<DashboardData['stats'] | null>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.getDashboard().then((d) => setStats(d.stats)).catch(() => null);
+    api.getDashboard()
+      .then((d) => setStats(d.stats))
+      .catch((err) => setError(err instanceof Error ? err.message : 'Falha ao carregar'))
+      .finally(() => setLoading(false));
   }, []);
-
-  const totalArea = stats?.area_total_ha ? Math.round(stats.area_total_ha).toLocaleString() : '—';
 
   return (
     <div className="home-page">
-      <section className="hero">
+      <section className="hero" style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1600)' }}>
+        <div className="hero-overlay" aria-hidden="true" />
         <div className="hero-content">
-          <h1 className="hero-title">Monitoramento da Biodiversidade Brasileira</h1>
+          <h1 className="hero-title">
+            Monitoramento da <br />
+            <span className="hero-accent">Biodiversidade</span> Brasileira
+          </h1>
           <p className="hero-text">
-            Acesse dados de espécies, unidades de conservação e ocorrências em todo o território nacional.
+            Explore dados de espécies, unidades de conservação e ocorrências em todo o território nacional.
           </p>
-          <Link to="/mapa" className="hero-cta">Explorar Mapa</Link>
-        </div>
-        <div className="hero-stats">
-          <StatCard value={stats?.total_especies ?? '—'} label="Espécies registradas" icon="🐾" variant="info" />
-          <StatCard value={stats?.total_ocorrencias ?? '—'} label="Ocorrências registradas" icon="📍" variant="info" />
-          <StatCard value={stats?.total_areas ?? '—'} label="Unidades de Conservação cadastradas" icon="🌳" variant="info" />
+          <Link to="/mapa" className="hero-cta">
+            Explorar Mapa
+          </Link>
+
+          <div className="hero-stats">
+            {loading ? (
+              <>
+                <div className="stat-skeleton" />
+                <div className="stat-skeleton" />
+                <div className="stat-skeleton" />
+              </>
+            ) : error ? (
+              <p className="hero-error">{error}</p>
+            ) : (
+              <>
+                <StatCard value={stats?.total_especies ?? 0} label="Espécies registradas" icon variant="info" />
+                <StatCard value={stats?.total_ocorrencias ?? 0} label="Ocorrências registradas" icon variant="info" />
+                <StatCard value={stats?.total_areas ?? 0} label="Unidades de Conservação cadastradas" icon variant="info" />
+              </>
+            )}
+          </div>
         </div>
       </section>
 
@@ -42,7 +64,6 @@ export default function HomePage() {
         <div className="sources-grid">
           {dataSources.map((s) => (
             <div key={s.name} className="source-card">
-              <span className="source-icon">{s.icon}</span>
               <span className="source-name">{s.name}</span>
               <span className="source-full">{s.full}</span>
             </div>
