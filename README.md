@@ -45,7 +45,8 @@ BioGuardians/
 └── docs/
     ├── PROJECT_PLAN.md
     ├── DATA_DICTIONARY.md
-    └── ERD.md
+    ├── ERD.md
+    └── OBSERVABILITY.md
 ```
 
 ## Como subir tudo (Docker Compose)
@@ -64,6 +65,9 @@ Acesse:
 - Frontend: http://localhost:5173
 - API: http://localhost:3001/api/health
 - Banco: localhost:5432
+- Grafana (com observabilidade): http://localhost:3000
+
+Para subir a stack de observabilidade completa (OpenTelemetry, Grafana, Tempo, Prometheus, Loki), veja `docs/OBSERVABILITY.md`.
 
 ## Como subir o banco
 
