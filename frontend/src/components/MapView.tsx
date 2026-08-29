@@ -200,7 +200,7 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
 
   return (
     <div className="map-container" style={{ width: '100%', height: '100%' }}>
-      {loading && <div className="map-overlay">Loading...</div>}
+      {loading && <div className="map-overlay">Carregando mapa...</div>}
       <Map
         ref={mapRef}
         initialViewState={INITIAL_VIEW}
@@ -208,6 +208,7 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
         mapStyle={`https://api.maptiler.com/maps/streets/style.json?key=${MAPTILER_API_KEY}`}
         onMoveEnd={handleMoveEnd}
         onClick={handleClick}
+        onError={(evt) => setError(String(evt.error) || 'Falha ao carregar o mapa. Verifique a chave do MapTiler.')}
         interactiveLayerIds={[
           ...(layers.unidades ? ['areas-fill'] : []),
           ...(layers.ocorrencias ? ['ocorrencias-circle'] : []),

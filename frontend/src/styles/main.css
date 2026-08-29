@@ -658,6 +658,34 @@ a, button { transition: all 0.2s ease; }
   min-height: 0;
 }
 
+.map-container { width: 100%; height: 100%; }
+
+.map-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255, 255, 255, 0.9);
+  padding: 12px 20px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  z-index: 10;
+  font-weight: 600;
+  color: var(--green-darker);
+}
+
+.map-error {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  color: var(--danger);
+  text-align: center;
+  font-weight: 600;
+}
+
 /* ============================================================
    Espécies
    ============================================================ */
@@ -941,8 +969,8 @@ a, button { transition: all 0.2s ease; }
   .sources-grid { grid-template-columns: 1fr; }
   .map-page { height: auto; min-height: calc(100vh - 112px); }
   .map-sidebar { height: 320px; width: 100%; }
-  .map-wrapper { min-height: 50vh; }
-  .map-container { min-height: 50vh; }
+  .map-wrapper { min-height: 60vh; height: 60vh; }
+  .map-container { min-height: 60vh; }
   .species-detail-grid { grid-template-columns: 1fr; }
 
   .species-page {
