@@ -4,7 +4,6 @@ import { validateId } from '../middleware/validateId.js';
 import { cacheInvalidateAll } from '../cache/cache.js';
 import { parseParam, getParam } from '../utils/params.js';
 import { paginate, getPaginationParams } from '../utils/paginate.js';
-import { paginate, getPaginationParams } from '../utils/paginate.js';
 
 const router = Router();
 
