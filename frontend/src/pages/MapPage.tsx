@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import MapView from '../components/MapView.js';
+import { api } from '../api/client.js';
 import { BIOME_OPTIONS, UC_CATEGORY_OPTIONS, SPHERE_OPTIONS } from '../constants/index.js';
+import type { Especie } from '../types/index.js';
 
 interface MapFilters {
-  busca?: string;
   bioma?: number;
   categoria?: string;
   esfera?: string;
@@ -23,6 +24,13 @@ export default function MapPage() {
   const [applied, setApplied] = useState<MapFilters>(defaultFilters);
   const [layers, setLayers] = useState<MapLayers>(defaultLayers);
 
+  const [speciesSearch, setSpeciesSearch] = useState('');
+  const [speciesResults, setSpeciesResults] = useState<Especie[]>([]);
+  const [selectedEspecieId, setSelectedEspecieId] = useState<number | null>(null);
+  const [selectedEspecieName, setSelectedEspecieName] = useState<string | null>(null);
+  const [searching, setSearching] = useState(false);
+  const searchTimeout = useRef<NodeJS.Timeout | null>(null);
+
   const handleApply = () => {
     setApplied(draft);
   };
@@ -31,11 +39,50 @@ export default function MapPage() {
     setDraft(defaultFilters);
     setApplied(defaultFilters);
     setLayers(defaultLayers);
+    setSpeciesSearch('');
+    setSpeciesResults([]);
+    setSelectedEspecieId(null);
+    setSelectedEspecieName(null);
   };
 
   const updateDraft = (patch: Partial<MapFilters>) => {
     setDraft((prev) => ({ ...prev, ...patch }));
   };
+
+  const handleSpeciesInputChange = (value: string) => {
+    setSpeciesSearch(value);
+    setSelectedEspecieId(null);
+    setSelectedEspecieName(null);
+    setSpeciesResults([]);
+
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    if (!value.trim()) return;
+
+    searchTimeout.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res = await api.getEspecies({ busca: value, per_page: 10 });
+        setSpeciesResults(res.data as Especie[]);
+      } catch {
+        setSpeciesResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 400);
+  };
+
+  const selectEspecie = (especie: Especie) => {
+    setSelectedEspecieId(especie.id);
+    setSelectedEspecieName(especie.nome_popular || especie.nome_cientifico);
+    setSpeciesSearch(especie.nome_popular || especie.nome_cientifico);
+    setSpeciesResults([]);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    };
+  }, []);
 
   return (
     <div className="map-page">
@@ -45,15 +92,35 @@ export default function MapPage() {
           Limpar
         </button>
 
-        <div className="filter-group">
-          <label className="filter-label">Buscar UC</label>
+        <div className="filter-group" style={{ position: 'relative' }}>
+          <label className="filter-label">Buscar espécie</label>
           <input
             type="text"
             className="filter-input"
-            placeholder="Ex: Pantanal..."
-            value={draft.busca || ''}
-            onChange={(e) => updateDraft({ busca: e.target.value || undefined })}
+            placeholder="Ex: onça, arara, jacaré..."
+            value={speciesSearch}
+            onChange={(e) => handleSpeciesInputChange(e.target.value)}
           />
+          {searching && <span className="species-search-hint">Buscando...</span>}
+          {speciesResults.length > 0 && (
+            <ul className="species-search-results">
+              {speciesResults.map((s) => (
+                <li
+                  key={s.id}
+                  className="species-search-item"
+                  onClick={() => selectEspecie(s)}
+                >
+                  <strong>{s.nome_popular || s.nome_cientifico}</strong>
+                  <span className="species-search-scientific">{s.nome_cientifico}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {selectedEspecieId && (
+            <div className="species-selected">
+              Filtrando por: <strong>{selectedEspecieName}</strong>
+            </div>
+          )}
         </div>
 
         <div className="filter-group">
@@ -150,7 +217,7 @@ export default function MapPage() {
         <MapView
           filters={applied}
           layers={layers}
-          selectedEspecieId={null}
+          selectedEspecieId={selectedEspecieId}
         />
       </div>
     </div>
