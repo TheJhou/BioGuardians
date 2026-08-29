@@ -521,22 +521,28 @@ a, button { transition: all 0.2s ease; }
 
 .occurrence-popup {
   display: flex;
-  gap: 14px;
-  min-width: 240px;
-  max-width: 280px;
+  align-items: flex-start;
+  gap: 16px;
+  min-width: 280px;
+  max-width: 360px;
   padding: 8px;
 }
 
 .occurrence-image {
-  width: 64px;
-  height: 64px;
-  border-radius: var(--radius-sm);
+  width: 96px;
+  height: 96px;
+  border-radius: var(--radius-md);
   background: var(--green-light);
   color: var(--green-primary);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+}
+
+.occurrence-image svg {
+  width: 56px;
+  height: 56px;
 }
 
 .occurrence-body {
