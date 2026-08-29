@@ -21,12 +21,9 @@ router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next)
     if (categoria) { conditions.push(`a.categoria_uc = $${idx++}`); params.push(categoria); }
 
     // Bounding box filter: only return areas intersecting the visible map region
-    let bboxCondition = '';
     if (bbox) {
       const parts = String(bbox).split(',').map(Number);
       if (parts.length === 4 && parts.every(n => !isNaN(n))) {
-        // Use && (bounding-box overlap) instead of ST_Intersects for the
-        // viewport filter — it is index-backed and much cheaper.
         conditions.push(`a.geom && ST_MakeEnvelope($${idx}, $${idx + 1}, $${idx + 2}, $${idx + 3}, 4326)`);
         params.push(parts[0], parts[1], parts[2], parts[3]);
         idx += 4;
@@ -34,47 +31,67 @@ router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next)
     }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-
-    // Simplify geometry based on zoom level to reduce payload size.
-    // Use a few discrete tolerance buckets so the same simplification is
-    // reused for similar zoom levels (better for cache + CPU).
-    const zoomLevel = zoom ? parseInt(String(zoom), 10) : 10;
-    const tolerance = zoomLevel > 12 ? 0.001 : zoomLevel > 8 ? 0.01 : 0.1;
-    const geomExpr = `ST_SimplifyPreserveTopology(a.geom, $${idx++})`;
-    params.push(tolerance);
-
-    // Limit results to prevent massive responses
     const limitClause = `LIMIT 500`;
 
-    const { rows } = await query(
-      `SELECT json_build_object(
-         'type', 'FeatureCollection',
-         'features', COALESCE((
-           SELECT json_agg(feature)
-           FROM (
-             SELECT json_build_object(
-               'type', 'Feature',
-               'id', a.id,
-               'geometry', ST_AsGeoJSON(${geomExpr}, 5)::json,
-               'properties', json_build_object(
-                 'id', a.id,
-                 'nome', a.nome,
-                 'categoria_uc', a.categoria_uc,
-                 'esfera', a.esfera,
-                 'bioma_id', a.bioma_id,
-                 'area_ha', a.area_ha
-               )
-             ) AS feature
-             FROM area_protegida a
-             ${where}
-             ${limitClause}
-           ) sub
-         ), '[]'::json)
-       ) AS geojson`,
+    // 1) Fetch area metadata (no geometry).
+    const { rows: metaRows } = await query(
+      `SELECT a.id, a.nome, a.categoria_uc, a.esfera, a.bioma_id, a.area_ha
+       FROM area_protegida a
+       ${where}
+       ORDER BY a.id
+       ${limitClause}`,
       params
     );
 
-    res.json(rows[0].geojson);
+    if (metaRows.length === 0) {
+      res.json({ type: 'FeatureCollection', features: [] });
+      return;
+    }
+
+    // 2) Select tolerance and fetch geometries in parallel chunks.
+    const zoomLevel = zoom ? parseInt(String(zoom), 10) : 10;
+    const tolerance = zoomLevel > 12 ? 0.001 : zoomLevel > 8 ? 0.01 : 0.1;
+    const chunkSize = 50;
+    const chunks: number[][] = [];
+    for (let i = 0; i < metaRows.length; i += chunkSize) {
+      chunks.push(metaRows.slice(i, i + chunkSize).map(r => r.id as number));
+    }
+
+    const geometryChunks = await Promise.all(chunks.map(async (ids) => {
+      const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
+      const { rows } = await query(
+        `SELECT a.id,
+                ST_AsGeoJSON(ST_SimplifyPreserveTopology(a.geom, $${ids.length + 1}), 5)::json AS geometry
+         FROM area_protegida a
+         WHERE a.id IN (${placeholders})
+         ORDER BY a.id`,
+        [...ids, tolerance]
+      );
+      return rows;
+    }));
+
+    const geomById = new Map<number, any>();
+    for (const chunk of geometryChunks) {
+      for (const row of chunk) {
+        geomById.set(row.id as number, row.geometry);
+      }
+    }
+
+    const features = metaRows.map(r => ({
+      type: 'Feature' as const,
+      id: r.id,
+      geometry: geomById.get(r.id as number) || null,
+      properties: {
+        id: r.id,
+        nome: r.nome,
+        categoria_uc: r.categoria_uc,
+        esfera: r.esfera,
+        bioma_id: r.bioma_id,
+        area_ha: r.area_ha,
+      },
+    }));
+
+    res.json({ type: 'FeatureCollection', features });
   } catch (err) { next(err); }
 });
 
