@@ -15,7 +15,8 @@
     "react": "^19.0.0",
     "react-chartjs-2": "^5.2.0",
     "react-dom": "^19.0.0",
-    "react-map-gl": "^8.0.0"
+    "react-map-gl": "^8.0.0",
+    "react-router-dom": "^7.0.0"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
