@@ -257,6 +257,9 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
             longitude={areaPopupPosition.longitude}
             latitude={areaPopupPosition.latitude}
             anchor="top"
+            offset={16}
+            dynamicPosition
+            maxWidth="320px"
             onClose={() => setSelectedAreaId(null)}
             closeButton
           >
@@ -286,7 +289,10 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
           <Popup
             longitude={occurrencePopupPosition.longitude}
             latitude={occurrencePopupPosition.latitude}
-            anchor="top"
+            anchor="bottom"
+            offset={16}
+            dynamicPosition
+            maxWidth="360px"
             onClose={() => setSelectedOcorrencia(null)}
             closeButton
           >
