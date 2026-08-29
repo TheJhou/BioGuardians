@@ -25,7 +25,9 @@ router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next)
     if (bbox) {
       const parts = String(bbox).split(',').map(Number);
       if (parts.length === 4 && parts.every(n => !isNaN(n))) {
-        conditions.push(`ST_Intersects(a.geom, ST_MakeEnvelope($${idx}, $${idx + 1}, $${idx + 2}, $${idx + 3}, 4326))`);
+        // Use && (bounding-box overlap) instead of ST_Intersects for the
+        // viewport filter — it is index-backed and much cheaper.
+        conditions.push(`a.geom && ST_MakeEnvelope($${idx}, $${idx + 1}, $${idx + 2}, $${idx + 3}, 4326)`);
         params.push(parts[0], parts[1], parts[2], parts[3]);
         idx += 4;
       }
@@ -34,10 +36,10 @@ router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next)
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
     // Simplify geometry based on zoom level to reduce payload size.
-    // Higher zoom = more detail, lower zoom = simpler polygons.
+    // Use a few discrete tolerance buckets so the same simplification is
+    // reused for similar zoom levels (better for cache + CPU).
     const zoomLevel = zoom ? parseInt(String(zoom), 10) : 10;
-    // tolerance in degrees: ~0.01 at zoom 15+, ~0.1 at zoom 5
-    const tolerance = Math.max(0.001, 0.1 / Math.pow(2, (zoomLevel - 5) / 2));
+    const tolerance = zoomLevel > 12 ? 0.001 : zoomLevel > 8 ? 0.01 : 0.1;
     const geomExpr = `ST_SimplifyPreserveTopology(a.geom, $${idx++})`;
     params.push(tolerance);
 
@@ -53,7 +55,7 @@ router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next)
              SELECT json_build_object(
                'type', 'Feature',
                'id', a.id,
-               'geometry', ST_AsGeoJSON(${geomExpr})::json,
+               'geometry', ST_AsGeoJSON(${geomExpr}, 5)::json,
                'properties', json_build_object(
                  'nome', a.nome,
                  'categoria_uc', a.categoria_uc,
