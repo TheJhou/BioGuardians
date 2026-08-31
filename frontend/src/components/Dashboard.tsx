@@ -118,14 +118,11 @@ export default function Dashboard() {
 
         <div className="dashboard-card large">
           <h3 className="card-title">Ocorrências ao longo do tempo</h3>
-          <div className="chart-line">
-            <Line data={temporalData} options={{
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: { legend: { display: false } },
-              scales: { y: { beginAtZero: true, grid: { color: '#E3E9E5' } }, x: { grid: { display: false } } },
-            }} />
-          </div>
+          <Line data={temporalData} options={{
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, grid: { color: '#E3E9E5' } }, x: { grid: { display: false } } },
+          }} />
         </div>
       </div>
 
