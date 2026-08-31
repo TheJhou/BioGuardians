@@ -9,7 +9,7 @@ const router = Router();
 
 // GET /api/ocorrencias?especie_id=42 — returns GeoJSON FeatureCollection
 // Supports bbox (minLng,minLat,maxLng,maxLat) to filter by visible map region.
-router.get('/', async (req, res, next) => {
+router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next) => {
   try {
     const { especie_id, categoria, bioma, fonte, limit, bbox } = req.query;
 

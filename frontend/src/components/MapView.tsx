@@ -48,7 +48,19 @@ const INITIAL_VIEW = {
   zoom: MAP_DEFAULTS.zoom,
 };
 
-const DEFAULT_BBOX = `${MAP_DEFAULTS.center.lng - 20},${MAP_DEFAULTS.center.lat - 20},${MAP_DEFAULTS.center.lng + 20},${MAP_DEFAULTS.center.lat + 20}`;
+function getViewport(map: any) {
+  const bounds = map.getBounds();
+  const sw = bounds.getSouthWest();
+  const ne = bounds.getNorthEast();
+  const center = map.getCenter();
+  const coordinate = (value: number) => value.toFixed(5);
+  return {
+    bbox: `${coordinate(sw.lng)},${coordinate(sw.lat)},${coordinate(ne.lng)},${coordinate(ne.lat)}`,
+    zoom: Number(map.getZoom().toFixed(2)),
+    longitude: center.lng,
+    latitude: center.lat,
+  };
+}
 
 export default function MapView({ filters, layers, selectedEspecieId }: MapViewProps) {
   const [areas, setAreas] = useState<GeoJSONFeatureCollection | null>(null);
@@ -61,28 +73,20 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
 
   // Viewport state (bbox + zoom) updated when map stops moving.
   const [viewport, setViewport] = useState({
-    bbox: DEFAULT_BBOX,
+    bbox: '',
     zoom: MAP_DEFAULTS.zoom,
     longitude: INITIAL_VIEW.longitude,
     latitude: INITIAL_VIEW.latitude,
   });
   const debouncedViewport = useDebounce(viewport, 500);
   const mapRef = useRef<any>(null);
+  const areaRequestId = useRef(0);
+  const occurrenceRequestId = useRef(0);
+  const loadingRequests = useRef(0);
+  const showOccurrenceData = layers.ocorrencias || layers.especies;
 
   const handleMoveEnd = useCallback((evt: any) => {
-    const map = evt.target;
-    const bounds = map.getBounds();
-    const sw = bounds.getSouthWest();
-    const ne = bounds.getNorthEast();
-    const bbox = `${sw.lng},${sw.lat},${ne.lng},${ne.lat}`;
-    const zoom = map.getZoom();
-    const center = map.getCenter();
-    setViewport({
-      bbox,
-      zoom,
-      longitude: center.lng,
-      latitude: center.lat,
-    });
+    setViewport(getViewport(evt.target));
   }, []);
 
   const handleLoad = useCallback((evt: any) => {
@@ -91,23 +95,15 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
     setTimeout(() => {
       if (map.resize) map.resize();
     }, 150);
-    const bounds = map.getBounds();
-    const sw = bounds.getSouthWest();
-    const ne = bounds.getNorthEast();
-    const bbox = `${sw.lng},${sw.lat},${ne.lng},${ne.lat}`;
-    const zoom = map.getZoom();
-    const center = map.getCenter();
-    setViewport({
-      bbox,
-      zoom,
-      longitude: center.lng,
-      latitude: center.lat,
-    });
+    setViewport(getViewport(map));
   }, []);
 
   // Load areas (filtered by viewport + filters).
   const loadAreas = useCallback(async () => {
-    if (!debouncedViewport.bbox) return;
+    const requestId = ++areaRequestId.current;
+    loadingRequests.current += 1;
+    setLoading(true);
+    setError(null);
     try {
       const data = await api.getAreas({
         bioma: filters.bioma,
@@ -131,15 +127,21 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
           };
         }),
       };
-      setAreas(colored as GeoJSONFeatureCollection);
+      if (requestId === areaRequestId.current) setAreas(colored as GeoJSONFeatureCollection);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load areas');
+      if (requestId === areaRequestId.current) setError(err instanceof Error ? err.message : 'Failed to load areas');
+    } finally {
+      loadingRequests.current -= 1;
+      if (loadingRequests.current === 0) setLoading(false);
     }
-  }, [filters, debouncedViewport]);
+  }, [filters.bioma, filters.esfera, filters.categoria, filters.busca, debouncedViewport.bbox, debouncedViewport.zoom]);
 
   // Load occurrences (filtered by viewport + filters).
   const loadOcorrencias = useCallback(async () => {
-    if (!debouncedViewport.bbox) return;
+    const requestId = ++occurrenceRequestId.current;
+    loadingRequests.current += 1;
+    setLoading(true);
+    setError(null);
     try {
       const data = await api.getOcorrencias({
         especie_id: selectedEspecieId || undefined,
@@ -161,24 +163,30 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
           };
         }),
       };
-      setOcorrencias(colored as GeoJSONFeatureCollection<OcorrenciaProperties>);
+      if (requestId === occurrenceRequestId.current) setOcorrencias(colored as GeoJSONFeatureCollection<OcorrenciaProperties>);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load occurrences');
+      if (requestId === occurrenceRequestId.current) setError(err instanceof Error ? err.message : 'Failed to load occurrences');
+    } finally {
+      loadingRequests.current -= 1;
+      if (loadingRequests.current === 0) setLoading(false);
     }
-  }, [selectedEspecieId, filters, debouncedViewport]);
+  }, [selectedEspecieId, filters.categoria, filters.bioma, debouncedViewport.bbox]);
 
   useEffect(() => {
-    if (!debouncedViewport.bbox) {
-      const t = setTimeout(() => setLoading(false), 8000);
-      return () => clearTimeout(t);
+    if (!debouncedViewport.bbox || !layers.unidades) {
+      areaRequestId.current += 1;
+      return;
     }
-    setLoading(true);
-    setError(null);
-    const promises: Promise<void>[] = [];
-    if (layers.unidades) promises.push(loadAreas());
-    if (layers.ocorrencias || layers.especies) promises.push(loadOcorrencias());
-    Promise.all(promises).finally(() => setLoading(false));
-  }, [loadAreas, loadOcorrencias, debouncedViewport, layers]);
+    void loadAreas();
+  }, [loadAreas, layers.unidades, debouncedViewport.bbox]);
+
+  useEffect(() => {
+    if (!debouncedViewport.bbox || !showOccurrenceData) {
+      occurrenceRequestId.current += 1;
+      return;
+    }
+    void loadOcorrencias();
+  }, [loadOcorrencias, showOccurrenceData, debouncedViewport.bbox]);
 
   // Handle click on a protected area polygon or occurrence point.
   const handleClick = async (evt: any) => {

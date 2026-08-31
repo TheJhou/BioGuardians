@@ -8,18 +8,44 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 // Simple in-memory cache to avoid refetching the same data.
 const responseCache = new Map<string, { data: unknown; ts: number }>();
+const pendingRequests = new Map<string, Promise<unknown>>();
 const CACHE_TTL = 30_000; // 30s
+const CACHE_MAX_ENTRIES = 100;
 
 function getCached<T>(key: string): T | null {
   const entry = responseCache.get(key);
-  if (entry && Date.now() - entry.ts < CACHE_TTL) {
-    return entry.data as T;
+  if (!entry) return null;
+  if (Date.now() - entry.ts >= CACHE_TTL) {
+    responseCache.delete(key);
+    return null;
   }
-  return null;
+  responseCache.delete(key);
+  responseCache.set(key, entry);
+  return entry.data as T;
 }
 
 function setCached(key: string, data: unknown): void {
+  if (responseCache.size >= CACHE_MAX_ENTRIES) {
+    const oldestKey = responseCache.keys().next().value;
+    if (oldestKey) responseCache.delete(oldestKey);
+  }
+  responseCache.delete(key);
   responseCache.set(key, { data, ts: Date.now() });
+}
+
+function fetchCached<T>(key: string, path: string): Promise<T> {
+  const cached = getCached<T>(key);
+  if (cached) return Promise.resolve(cached);
+  const pending = pendingRequests.get(key) as Promise<T> | undefined;
+  if (pending) return pending;
+  const request = fetchApi<T>(path)
+    .then((data) => {
+      setCached(key, data);
+      return data;
+    })
+    .finally(() => pendingRequests.delete(key));
+  pendingRequests.set(key, request);
+  return request;
 }
 
 async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
@@ -139,7 +165,8 @@ export const api = {
     if (params?.bbox) qs.set('bbox', params.bbox);
     if (params?.zoom) qs.set('zoom', String(params.zoom));
     const query = qs.toString();
-    return fetchApi<GeoJSONFeatureCollection>(`/areas${query ? `?${query}` : ''}`);
+    const path = `/areas${query ? `?${query}` : ''}`;
+    return fetchCached<GeoJSONFeatureCollection>(path, path);
   },
 
   async getArea(id: number): Promise<GeoJSONFeatureCollection> {
@@ -181,9 +208,8 @@ export const api = {
     if (params?.limit) qs.set('limit', String(params.limit));
     if (params?.bbox) qs.set('bbox', params.bbox);
     const query = qs.toString();
-    return fetchApi<GeoJSONFeatureCollection<OcorrenciaProperties>>(
-      `/ocorrencias${query ? `?${query}` : ''}`
-    );
+    const path = `/ocorrencias${query ? `?${query}` : ''}`;
+    return fetchCached<GeoJSONFeatureCollection<OcorrenciaProperties>>(path, path);
   },
 
   async createOcorrencia(data: {
@@ -207,11 +233,7 @@ export const api = {
 
   // Dashboard
   async getDashboard(): Promise<DashboardData> {
-    const cached = getCached<DashboardData>('dashboard');
-    if (cached) return cached;
-    const data = await fetchApi<DashboardData>('/dashboard');
-    setCached('dashboard', data);
-    return data;
+    return fetchCached<DashboardData>('dashboard', '/dashboard');
   },
 
   async refreshDashboard(): Promise<{ message: string }> {

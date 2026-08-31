@@ -3,12 +3,35 @@ import { Doughnut, Line, Bar } from 'react-chartjs-2';
 import {
   Chart as ChartJS, CategoryScale, LinearScale, BarElement,
   ArcElement, PointElement, LineElement, Title, Tooltip, Legend,
-  Filler,
+  Filler, Plugin,
 } from 'chart.js';
 import { api } from '../api/client.js';
 import { CATEGORY_LABELS, CATEGORY_COLORS, SPHERE_COLORS, SPHERE_LABELS } from '../constants/index.js';
 import StatCard from './ui/StatCard.js';
 import type { DashboardData } from '../types/index.js';
+
+const doughnutTotalPlugin: Plugin<'doughnut'> = {
+  id: 'doughnutTotal',
+  afterDraw(chart) {
+    const arc = chart.getDatasetMeta(0).data[0] as ArcElement | undefined;
+    if (!arc) return;
+    const values = chart.data.datasets[0]?.data ?? [];
+    const total = values.reduce((sum, value) => sum + Number(value), 0);
+    const size = arc.outerRadius * 2;
+    const { ctx } = chart;
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#062A20';
+    ctx.font = `800 ${Math.max(12, Math.round(size * 0.1))}px Inter, 'Segoe UI', system-ui, sans-serif`;
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(total.toLocaleString(), arc.x, arc.y - 4);
+    ctx.fillStyle = '#66736D';
+    ctx.font = `400 ${Math.max(10, Math.round(size * 0.06))}px Inter, 'Segoe UI', system-ui, sans-serif`;
+    ctx.textBaseline = 'top';
+    ctx.fillText('Total', arc.x, arc.y + 4);
+    ctx.restore();
+  },
+};
 
 ChartJS.register(
   CategoryScale, LinearScale, BarElement, ArcElement,
@@ -103,16 +126,12 @@ export default function Dashboard() {
         <div className="dashboard-card large">
           <h3 className="card-title">Ocorrências por Bioma</h3>
           <div className="chart-doughnut">
-            <Doughnut data={biomasData} options={{
+            <Doughnut data={biomasData} plugins={[doughnutTotalPlugin]} options={{
               responsive: true,
               maintainAspectRatio: false,
               cutout: '70%',
               plugins: { legend: { position: 'bottom', labels: { boxWidth: 14, usePointStyle: true, padding: 20 } } },
             }} />
-            <div className="doughnut-center">
-              <span className="big">{MOCK_BIOMAS.reduce((a, b) => a + b.total, 0).toLocaleString()}</span>
-              <span>Total</span>
-            </div>
           </div>
         </div>
 
