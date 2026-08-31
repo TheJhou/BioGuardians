@@ -14,7 +14,7 @@ espécies ameaçadas e áreas protegidas no Brasil, com uma aplicação web simp
 - **Tema**: Gestão de biodiversidade e espécies ameaçadas (tema bio sustentável)
 - **Foco**: Banco de dados (modelagem, persistência, consultas, integridade).
   A aplicação web é uma camada fina de demonstração.
-- **Stack**: PostgreSQL + PostGIS, Node.js, React, MapTiler Cloud
+- **Stack**: PostgreSQL + PostGIS, Node.js 22, React 19, Vite, MapLibre, MapTiler Cloud, OpenTelemetry, Grafana
 - **Recorte geográfico**: Brasil
 - **Abordagem de dados**: Híbrida (carga inicial estática + consulta em tempo
   real ao GBIF)
@@ -112,7 +112,9 @@ geográficos com dados de espécies.
   - **Mapa**: MapLibre + MapTiler Cloud com polígonos das UCs, filtros e legenda
   - **Espécies**: lista com scroll infinito (15 em 15) e detalhe com resumo da espécie
 - Responsivo: menu hamburger mobile, layouts adaptáveis
-- Enriquecimento de resumos: Wikipedia, Wikidata, iNaturalist
+- Enriquecimento de resumos: Wikipedia, Wikidata, iNaturalist e OpenRouter (IA)
+- Enriquecimento de imagens: iNaturalist, Wikimedia Commons, GBIF, EOL
+- Observabilidade: traces, métricas e logs com OpenTelemetry + Grafana
 
 ### Fora do escopo
 
@@ -147,7 +149,7 @@ geográficos com dados de espécies.
 ┌─────────────────────────────────────────────────────────────┐
 │              API Node.js (camada fina)                      │
 │  Endpoints REST que executam SQL no banco                   │
-│  - GET /especies (com filtros)                              │
+│  - GET /api/especies (com filtros)                              │
 │  - GET /areas (com geometria GeoJSON)                       │
 │  - GET /ocorrencias?especie_id=                             │
 │  - GET /especies/:id/areas-protegidas  (query espacial)     │

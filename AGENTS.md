@@ -24,8 +24,9 @@
 - Status das migrations: `sh db/migrate.sh --status`
 - Smoke tests: `psql -f db/tests/smoke_test.sql` (credenciais via .env)
 - Resetar banco: `docker compose down -v && docker compose up -d db && docker compose run --rm migrate`
-- Conectar: `psql -d $POSTGRES_DB -U $POSTGRES_USER`
+- Conectar: `psql -d $DB_NAME -U $DB_USER`
 - Refresh views: `SELECT refresh_dashboard();`
+- Subir produção: `cd ~/bioguardians && sudo docker compose -f stack.yml pull && sudo docker compose -f stack.yml up -d`
 
 ## Estrutura do banco (migrations)
 1. `001_extensions.sql` — PostGIS, pgcrypto
@@ -67,6 +68,7 @@
 - `load_specieslink_ocorrencias.mjs` — importa ocorrências do speciesLink
 - `load_cnuc_ucs.mjs` — importa Unidades de Conservação do ICMBio/CNUC
 - `enrich_species_descriptions.mjs` — busca resumos na Wikipedia/Wikidata/iNaturalist
+- `enrich_species_images.mjs` — busca imagens no iNaturalist/Wikimedia/GBIF/EOL
 
 ## Observabilidade (OpenTelemetry + Grafana stack)
 
@@ -130,13 +132,23 @@ Internet → Cloudflare (DNS + HTTPS) → Nginx na VM → Docker
 ```
 
 ### Variáveis de ambiente
-- `VITE_API_URL=https://api.your-domain.com` (frontend)
-- `FRONTEND_URL=https://your-domain.com` (backend)
+- `VITE_API_URL=https://api.your-domain.com/api` (frontend — deve terminar em `/api`)
+- `FRONTEND_URL=https://your-domain.com` (backend — CORS origin exata)
 - `CORS_ORIGIN=https://your-domain.com` (backend)
+- `VITE_MAPTILER_API_KEY` (frontend — obrigatório para o mapa)
 
 ### Portas
 - Abertas para Internet: 80, 443, 22
-- Acesso administrativo/local: 8080, 9443
+- Acesso administrativo/local: 8080 (frontend via Nginx), 9443 (Portainer)
+- Fechadas externamente: 3000, 3001, 5432, 9090, 3100, 3200, 4317
+
+### Deploy
+- O workflow `deploy.yml` builda imagens GHCR, aplica migrations, renderiza `stack.yml` e sobe na VM.
+- A VM usa `stack.yml` (não `docker-compose.prod.yml`) com `docker compose -f stack.yml up -d`.
+- PostgreSQL pode rodar nativamente na VM; o backend conecta via `host.docker.internal` ou IP local.
+- Nginx termina TLS e faz proxy reverso para `127.0.0.1:8080` e `127.0.0.1:3001`.
+- Certificados ficam em `/etc/cloudflare/` (ou similar) com permissão 600 na chave privada.
+
 - Fechadas para externo: 3000, 3001, 5432
 - Frontend expõe `127.0.0.1:8080` (só Nginx da VM acessa)
 - Backend expõe `127.0.0.1:3001` (só Nginx da VM acessa)

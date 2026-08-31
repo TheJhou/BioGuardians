@@ -11,37 +11,22 @@ Sistema de banco de dados espacial (PostgreSQL + PostGIS) para gestão de
 
 ```
 BioGuardians/
-├── docker-compose.yml            # 4 servicos: db, migrate, backend, frontend
-├── .env.example                  # variaveis de ambiente (copiar para .env)
-├── .github/workflows/ci.yml      # CI: validate + build + deploy
+├── docker-compose.yml            # dev: db, migrate, backend, frontend
+├── docker-compose.observability.yml  # overlay: grafana, prometheus, tempo, loki
+├── stack.yml                     # produção: backend, frontend, observabilidade
+├── .env.example                  # variáveis de ambiente (copiar para .env)
+├── .github/workflows/deploy.yml  # CI/CD: build, migrate, deploy na VM
+├── .github/workflows/ci.yml      # CI: validações e builds
 ├── db/
-│   ├── migrate.sh                # migration runner (journal + SHA-256 hash)
-│   ├── migrations/               # SQL migrations 000-012 (applied in order)
+│   ├── migrate.sh                # migration runner
+│   ├── migrations/               # SQL numerados
 │   └── tests/
-│       └── smoke_test.sql        # CI validation
-├── backend/                      # API Node.js 22 + Express + TypeScript
-│   ├── src/
-│   │   ├── index.ts              # app principal
-│   │   ├── config/env.ts         # config tipado
-│   │   ├── db/pool.ts            # pool PostgreSQL
-│   │   ├── cache/cache.ts        # cache LRU em memoria
-│   │   ├── middleware/           # errorHandler, validateId, requestLogger
-│   │   ├── routes/               # especies, areas, ocorrencias, dashboard, referencias
-│   │   └── telemetry/            # OpenTelemetry SDK
-│   ├── Dockerfile
-│   └── package.json
-├── frontend/                     # React 19 + Vite + TypeScript + MapLibre
-│   ├── src/
-│   │   ├── main.tsx              # entry point
-│   │   ├── App.tsx               # layout com router
-│   │   ├── api/client.ts         # API client
-│   │   ├── pages/                # Home, Dashboard, Mapa, Species
-│   │   ├── components/           # MapView, Dashboard, StatCard, Header
-│   │   └── styles/main.css       # design system
-│   ├── Dockerfile
-│   └── package.json
-├── scripts/data/                 # importadores de dados reais (MMA, GBIF, etc)
-├── observability/                # Grafana, Tempo, Prometheus, Loki, OTel Collector
+│       └── smoke_test.sql
+├── backend/                      # Node 22 + Express + TypeScript
+├── frontend/                     # React 19 + Vite + MapLibre
+├── scripts/data/                 # importadores de dados (MMA, GBIF, speciesLink, CNUC)
+├── observability/                # configuração do Grafana, Prometheus, Tempo, Loki
+├── otel-collector-config.yaml    # configuração do OTel Collector
 └── docs/
     ├── PROJECT_PLAN.md
     ├── DATA_DICTIONARY.md
@@ -53,12 +38,12 @@ BioGuardians/
 
 ```bash
 cp .env.example .env
-# edite .env com suas credenciais e MapTiler API key
+# edite .env com suas credenciais, MapTiler API key e OTEL se quiser
 
-docker compose up -d db           # sobe PostgreSQL + PostGIS
-docker compose run --rm migrate   # aplica as migrations
-docker compose up -d backend      # sobe a API (porta 3001)
-docker compose up -d frontend     # sobe o frontend (porta 5173)
+docker compose up -d db            # sobe PostgreSQL + PostGIS (dev)
+docker compose run --rm migrate    # aplica as migrations
+docker compose up -d backend       # sobe a API (porta 3001)
+docker compose up -d frontend      # sobe o frontend (porta 5173)
 ```
 
 Acesse:
@@ -71,7 +56,7 @@ Para subir a stack de observabilidade completa (OpenTelemetry, Grafana, Tempo, P
 
 ## Como subir o banco
 
-### Opcao A — Docker Compose
+### Opção A — Docker Compose (dev)
 
 ```bash
 cp .env.example .env
@@ -79,16 +64,21 @@ docker compose up -d db
 docker compose run --rm migrate
 ```
 
-### Opcao B — Instalacao nativa (Linux / Oracle Cloud VM)
+### Opção B — Instalação nativa (Oracle Cloud VM / Linux)
+
+Em Oracle Linux, use `dnf` (não `apt`):
 
 ```bash
-sudo apt install -y postgresql-16 postgresql-16-postgis-3 postgresql-contrib
+sudo dnf install -y postgresql-server postgresql-contrib postgis
+sudo postgresql-setup initdb
+sudo systemctl enable --now postgresql
 sudo -u postgres createuser bioguard --superuser
-sudo -u postgres psql -c "ALTER USER bioguard WITH PASSWORD 'bioguard';"
+sudo -u postgres psql -c "ALTER USER bioguard WITH PASSWORD 'sua_senha';"
 sudo -u postgres createdb bioguardians -O bioguard
 sh db/migrate.sh
 ```
 
+Configure `pg_hba.conf` e `postgresql.conf` para conexões locais e da rede Docker. Veja a seção de deploy para detalhes.
 ## Carga de dados reais
 
 Os scripts em `scripts/data/` importam dados oficiais no banco:
@@ -109,9 +99,18 @@ npm run load:cnuc
 
 # Buscar resumos de espécies na Wikipedia/Wikidata/iNaturalist
 npm run enrich:descriptions
+
+# Buscar imagens das espécies (iNaturalist, Wikimedia, GBIF, EOL)
+npm run enrich:images
 ```
 
 > **Atenção**: os scripts requerem Node.js 22+ e acesso ao banco via `.env`.
+
+Após a carga, atualize as views materializadas do dashboard:
+
+```bash
+psql -d $DB_NAME -U $DB_USER -c "SELECT refresh_dashboard();"
+```
 
 ## Sistema de Migrations
 
@@ -160,76 +159,114 @@ sh db/migrate.sh --dry-run   # simula
 
 ## CI/CD
 
-O GitHub Actions roda a cada push/PR:
+O GitHub Actions (`.github/workflows/deploy.yml`) roda a cada `push` na `main`:
 
-1. **validate** — container PostGIS efemero + migrations + smoke tests + idempotencia
-2. **backend-build** — typecheck + build do backend TypeScript
-3. **frontend-build** — typecheck + build do frontend TypeScript
-4. **deploy-migrations** (so push na main) — aplica migrations no banco de producao (Oracle VM)
-5. **build-and-push** (so push na main) — builda imagens Docker e publica no GHCR:
-   - `ghcr.io/thejhou/bioguardians-backend:latest`
-   - `ghcr.io/thejhou/bioguardians-frontend:latest`
-6. **deploy-app** (so push na main) — SSH na Oracle VM, SCP do `docker-compose.prod.yml`,
-   `docker compose pull && docker compose up -d`
+1. **prepare** — detecta quais serviços mudaram e valida migrations
+2. **build** — builda imagens Docker e publica no GHCR
+3. **migrate** — aplica migrations no PostgreSQL de produção
+4. **generate-stack** — renderiza `stack.yml` com secrets
+5. **deploy** — envia `stack.yml` e arquivos de observabilidade para a VM e sobe os containers
 
 ### Pipeline visual
 
 ```
 main
-  |
+  │
   v
 GitHub Actions
-  |
-  +-- validate (ephemeral PostGIS)
-  +-- backend-build (typecheck)
-  +-- frontend-build (typecheck)
-  |
-  v (main only)
-deploy-migrations --> psql na Oracle VM
-build-and-push    --> ghcr.io/thejhou/bioguardians-{backend,frontend}:latest
-  |
+  │
+  +-- prepare (migrations, diff de caminhos)
+  +-- build (frontend + backend)
+  +-- migrate (psql na VM de produção)
+  +-- generate-stack (renderiza stack.yml)
+  +-- deploy (SSH/SCP + docker compose na VM)
   v
-deploy-app --> SSH na Oracle VM
-  |           scp docker-compose.prod.yml
-  |           docker compose pull
-  |           docker compose up -d
-  v
-Portainer (gerenciamento manual dos containers)
+VM Oracle Linux
+  +-- Nginx (80/443) → frontend (:8080) / backend (:3001)
+  +-- Containers: backend, frontend, grafana, prometheus, tempo, loki, otel-collector
 ```
 
-### Secrets necessarios no GitHub
+### Secrets necessários no GitHub
 
 | Secret | Uso |
 |--------|-----|
-| `DB_USER` | Usuario do PostgreSQL |
-| `DB_PASSWORD` | Senha do PostgreSQL |
-| `DB_NAME` | Nome do banco |
-| `DB_HOST` | Host do banco de producao (Oracle VM) |
-| `DB_PORT` | Porta do banco de producao |
-| `ORACLE_SSH_HOST` | IP/hostname da Oracle VM |
-| `ORACLE_SSH_USER` | Usuario SSH da VM |
-| `ORACLE_SSH_KEY` | Chave privada SSH (PEM) da VM |
-| `ORACLE_SSH_PORT` | (opcional) Porta SSH, default 22 |
+| `DB_USER` | Usuário do PostgreSQL de produção |
+| `DB_PASSWORD` | Senha do PostgreSQL de produção |
+| `DB_NAME` | Nome do banco de produção |
+| `DB_HOST` | Host do banco (IP interno ou localhost da VM) |
+| `DB_PORT` | Porta do PostgreSQL (default 5432) |
+| `FRONTEND_URL` | Origem permitida no CORS (ex: `https://seu-dominio.com`) |
+| `VITE_API_URL` | URL da API no build do frontend (ex: `https://api.seu-dominio.com/api`) |
+| `VITE_MAPTILER_API_KEY` | Chave da API do MapTiler Cloud |
+| `GRAFANA_ADMIN_PASSWORD` | Senha do admin do Grafana |
+| `ORACLE_SSH_HOST` | IP público da VM |
+| `ORACLE_SSH_USER` | Usuário SSH (ex: `opc`) |
+| `ORACLE_SSH_KEY` | Chave privada SSH (PEM) |
+| `ORACLE_SSH_PORT` | Porta SSH (opcional, default 22) |
 
-> `GITHUB_TOKEN` e automatico — nao precisa configurar. Tem permissao
-> `packages: write` para publicar no GHCR.
+> `GITHUB_TOKEN` é automático e precisa de permissão `packages: write` para publicar no GHCR.
 
-### VM: .env para o compose.prod
+### Configuração na VM
 
-Na VM, em `~/bioguardians/.env`:
+Requisitos na VM (Oracle Linux):
 
 ```bash
-DB_USER=bioguard
-DB_PASSWORD=sua_senha
-DB_NAME=bioguardians
-DB_PORT=5432
-CORS_ORIGIN=http://localhost
-VITE_API_URL=http://localhost:3001/api
+sudo dnf install -y docker-ce nginx git
+sudo systemctl enable --now docker
 ```
 
-> O PostgreSQL roda nativamente na VM. O backend no container
-> conecta via `host.docker.internal` (configurado no compose.prod.yml).
+O PostgreSQL pode rodar **nativamente** na VM para melhor desempenho. Nesse caso, ajuste `pg_hba.conf` e `postgresql.conf` para aceitar conexões de `127.0.0.1` e da rede Docker (`172.17.0.0/16` ou a rede usada pelo Docker).
 
+Crie o diretório de deploy:
+
+```bash
+mkdir -p ~/bioguardians/observability/grafana/provisioning/datasources
+mkdir -p ~/bioguardians/observability/grafana/provisioning/dashboards
+mkdir -p ~/bioguardians/observability/grafana/dashboards
+```
+
+O workflow enviará automaticamente `stack.yml`, `observability/` e `otel-collector-config.yaml` para `~/bioguardians/`.
+
+Subir manualmente:
+
+```bash
+cd ~/bioguardians
+sudo docker compose -f stack.yml pull
+sudo docker compose -f stack.yml up -d
+```
+
+### Domínio e Nginx
+
+A arquitetura de produção esperada usa **Nginx na VM** como proxy reverso, com certificados TLS:
+
+```
+Internet
+  ↓
+Cloudflare
+  ↓
+Nginx (VM)  :80  :443
+  ├── /     → 127.0.0.1:8080 (frontend)
+  └── /api  → 127.0.0.1:3001 (backend)
+```
+
+Configure o Nginx em `/etc/nginx/conf.d/` e obtenha os certificados (ex: Cloudflare Origin CA, Let's Encrypt). Não commite certificados nem chaves no repositório.
+
+### Deploy manual (emergência)
+
+Se precisar subir sem o GitHub Actions:
+
+```bash
+cd ~/bioguardians
+sudo docker compose -f stack.yml pull
+sudo docker compose -f stack.yml up -d
+```
+
+Verifique:
+
+```bash
+sudo docker compose -f stack.yml ps
+sudo docker compose -f stack.yml logs backend --tail 50
+```
 ## API Endpoints
 
 | Metodo | Endpoint | Descricao |
