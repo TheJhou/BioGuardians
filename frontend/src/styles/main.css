@@ -408,7 +408,9 @@ a, button { transition: all 0.2s ease; }
 
 .doughnut-center, .threat-center {
   position: absolute;
-  inset: 0;
+  top: 48%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
   align-items: center;
