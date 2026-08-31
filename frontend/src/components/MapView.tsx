@@ -88,6 +88,9 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
   const handleLoad = useCallback((evt: any) => {
     setLoading(false);
     const map = evt.target;
+    setTimeout(() => {
+      if (map.resize) map.resize();
+    }, 150);
     const bounds = map.getBounds();
     const sw = bounds.getSouthWest();
     const ne = bounds.getNorthEast();
