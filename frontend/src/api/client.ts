@@ -48,6 +48,14 @@ function fetchCached<T>(key: string, path: string): Promise<T> {
   return request;
 }
 
+function fetchDeduplicated<T>(path: string): Promise<T> {
+  const pending = pendingRequests.get(path) as Promise<T> | undefined;
+  if (pending) return pending;
+  const request = fetchApi<T>(path).finally(() => pendingRequests.delete(path));
+  pendingRequests.set(path, request);
+  return request;
+}
+
 async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     headers: { 'Content-Type': 'application/json' },
@@ -166,7 +174,7 @@ export const api = {
     if (params?.zoom) qs.set('zoom', String(params.zoom));
     const query = qs.toString();
     const path = `/areas${query ? `?${query}` : ''}`;
-    return fetchCached<GeoJSONFeatureCollection>(path, path);
+    return fetchDeduplicated<GeoJSONFeatureCollection>(path);
   },
 
   async getArea(id: number): Promise<GeoJSONFeatureCollection> {
@@ -209,7 +217,7 @@ export const api = {
     if (params?.bbox) qs.set('bbox', params.bbox);
     const query = qs.toString();
     const path = `/ocorrencias${query ? `?${query}` : ''}`;
-    return fetchCached<GeoJSONFeatureCollection<OcorrenciaProperties>>(path, path);
+    return fetchDeduplicated<GeoJSONFeatureCollection<OcorrenciaProperties>>(path);
   },
 
   async createOcorrencia(data: {

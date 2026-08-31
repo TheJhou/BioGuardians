@@ -676,6 +676,8 @@ a, button { transition: all 0.2s ease; }
   color: var(--green-darker);
 }
 
+.map-error-inline { color: var(--danger); }
+
 .map-error {
   width: 100%;
   height: 100%;

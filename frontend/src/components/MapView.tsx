@@ -48,6 +48,8 @@ const INITIAL_VIEW = {
   zoom: MAP_DEFAULTS.zoom,
 };
 
+const DEFAULT_BBOX = `${MAP_DEFAULTS.center.lng - 20},${MAP_DEFAULTS.center.lat - 20},${MAP_DEFAULTS.center.lng + 20},${MAP_DEFAULTS.center.lat + 20}`;
+
 function getViewport(map: any) {
   const bounds = map.getBounds();
   const sw = bounds.getSouthWest();
@@ -69,11 +71,13 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
   const [selectedAreaSpecies, setSelectedAreaSpecies] = useState<EspecieEmArea[]>([]);
   const [selectedOcorrencia, setSelectedOcorrencia] = useState<GeoJSONFeature<OcorrenciaProperties> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingAreas, setLoadingAreas] = useState(false);
+  const [loadingOccurrences, setLoadingOccurrences] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Viewport state (bbox + zoom) updated when map stops moving.
   const [viewport, setViewport] = useState({
-    bbox: '',
+    bbox: DEFAULT_BBOX,
     zoom: MAP_DEFAULTS.zoom,
     longitude: INITIAL_VIEW.longitude,
     latitude: INITIAL_VIEW.latitude,
@@ -82,7 +86,6 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
   const mapRef = useRef<any>(null);
   const areaRequestId = useRef(0);
   const occurrenceRequestId = useRef(0);
-  const loadingRequests = useRef(0);
   const showOccurrenceData = layers.ocorrencias || layers.especies;
 
   const handleMoveEnd = useCallback((evt: any) => {
@@ -101,8 +104,7 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
   // Load areas (filtered by viewport + filters).
   const loadAreas = useCallback(async () => {
     const requestId = ++areaRequestId.current;
-    loadingRequests.current += 1;
-    setLoading(true);
+    setLoadingAreas(true);
     setError(null);
     try {
       const data = await api.getAreas({
@@ -131,16 +133,14 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
     } catch (err) {
       if (requestId === areaRequestId.current) setError(err instanceof Error ? err.message : 'Failed to load areas');
     } finally {
-      loadingRequests.current -= 1;
-      if (loadingRequests.current === 0) setLoading(false);
+      if (requestId === areaRequestId.current) setLoadingAreas(false);
     }
   }, [filters.bioma, filters.esfera, filters.categoria, filters.busca, debouncedViewport.bbox, debouncedViewport.zoom]);
 
   // Load occurrences (filtered by viewport + filters).
   const loadOcorrencias = useCallback(async () => {
     const requestId = ++occurrenceRequestId.current;
-    loadingRequests.current += 1;
-    setLoading(true);
+    setLoadingOccurrences(true);
     setError(null);
     try {
       const data = await api.getOcorrencias({
@@ -167,14 +167,14 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
     } catch (err) {
       if (requestId === occurrenceRequestId.current) setError(err instanceof Error ? err.message : 'Failed to load occurrences');
     } finally {
-      loadingRequests.current -= 1;
-      if (loadingRequests.current === 0) setLoading(false);
+      if (requestId === occurrenceRequestId.current) setLoadingOccurrences(false);
     }
   }, [selectedEspecieId, filters.categoria, filters.bioma, debouncedViewport.bbox]);
 
   useEffect(() => {
     if (!debouncedViewport.bbox || !layers.unidades) {
       areaRequestId.current += 1;
+      setLoadingAreas(false);
       return;
     }
     void loadAreas();
@@ -183,6 +183,7 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
   useEffect(() => {
     if (!debouncedViewport.bbox || !showOccurrenceData) {
       occurrenceRequestId.current += 1;
+      setLoadingOccurrences(false);
       return;
     }
     void loadOcorrencias();
@@ -227,13 +228,10 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
     return { longitude: lng, latitude: lat };
   })();
 
-  if (error) {
-    return <div className="map-error">Error: {error}</div>;
-  }
-
   return (
     <div className="map-container" style={{ width: '100%', height: '100%' }}>
-      {loading && <div className="map-overlay">Carregando mapa...</div>}
+      {error && <div className="map-overlay map-error-inline">Erro: {error}</div>}
+      {(loading || loadingAreas || loadingOccurrences) && !error && <div className="map-overlay">Carregando mapa...</div>}
       <Map
         ref={mapRef}
         initialViewState={INITIAL_VIEW}
