@@ -18,4 +18,5 @@ export const env = {
   },
   gbifApiBase: process.env.GBIF_API_BASE || 'https://api.gbif.org/v1',
   dbPoolMax: parseInt(process.env.DB_POOL_MAX || '20', 10),
+  mlServiceUrl: process.env.ML_SERVICE_URL || 'http://localhost:8001',
 } as const;

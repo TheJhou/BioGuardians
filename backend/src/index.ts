@@ -13,6 +13,7 @@ import especiesRoutes from './routes/especies.js';
 import areasRoutes from './routes/areas.js';
 import ocorrenciasRoutes from './routes/ocorrencias.js';
 import dashboardRoutes from './routes/dashboard.js';
+import deteccoesRoutes from './routes/deteccoes.js';
 
 const app = express();
 
@@ -32,6 +33,7 @@ app.use('/api/especies', especiesRoutes);
 app.use('/api/areas', areasRoutes);
 app.use('/api/ocorrencias', ocorrenciasRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/deteccoes', deteccoesRoutes);
 
 // --- Error handling ---
 app.use(errorHandler);

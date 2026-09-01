@@ -20,6 +20,7 @@ services:
       FRONTEND_URL: ${FRONTEND_URL:-https://financemobile.com.br}
       CORS_ORIGIN: ${FRONTEND_URL:-https://financemobile.com.br}
       GBIF_API_BASE: https://api.gbif.org/v1
+      ML_SERVICE_URL: http://ml-service:8001
     ports:
       - "127.0.0.1:3001:3001"
     extra_hosts:
@@ -35,6 +36,24 @@ services:
         limits:
           memory: 512M
           cpus: "1"
+
+  # ---------- ML Service (Python + FastAPI + YOLOv8) ----------
+  ml-service:
+    image: ghcr.io/thejhou/bioguardians-ml:latest
+    container_name: bioguardians-ml
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@host.docker.internal:${DB_PORT}/${DB_NAME}
+      INPE_EMAIL: ${INPE_EMAIL:-}
+    ports:
+      - "127.0.0.1:8001:8001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "2"
 
   # ---------- Frontend (nginx + proxy reverso) ----------
   frontend:

@@ -4,6 +4,7 @@
 - **Database**: PostgreSQL 16 + PostGIS 3.4
 - **Backend**: Node.js 22 + Express + TypeScript (porta 3001)
 - **Frontend**: React 19 + Vite + TypeScript + MapLibre GL + MapTiler Cloud
+- **ML Service**: Python 3.11 + FastAPI + YOLOv8 + PyTorch (porta 8001)
 - **Infra**: Docker Compose, Nginx, Oracle Cloud VM
 - **CI/CD**: GitHub Actions (build, migrations, deploy)
 - **Observabilidade**: OpenTelemetry, Grafana, Tempo, Prometheus, Loki
@@ -41,6 +42,8 @@
 10. `010_performance.sql` — full-text search, índices GIN e compósitos
 11. `011_cache_support.sql` — tabela cache_metadata + triggers de invalidação
 12. `012_spatial_optimization.sql` — otimizações espaciais (simplificação de geometrias)
+13. `013_imagem_url.sql` — coluna imagem_url na tabela especie
+14. `014_deteccao_satelite.sql` — tabelas deteccao_job, deteccao, modelo_ml (ML service)
 
 ## Decisões de modelagem
 - SRID 4326 (WGS84) para todas as geometrias
@@ -58,8 +61,19 @@
 
 ## Backend
 - Rotas principais: `/api/health`, `/api/especies`, `/api/areas`, `/api/ocorrencias`, `/api/dashboard`, `/api/referencias`
+- Rota proxy ML: `/api/deteccoes` (proxy para o microserviço Python na porta 8001)
 - Cache LRU em memória com invalidação por rota
 - OpenTelemetry condicional (só ativa com `OTEL_EXPORTER_OTLP_ENDPOINT`)
+
+## ML Service (detecção por satélite)
+- Microserviço Python isolado em `ml-service/` (FastAPI + YOLOv8 + PyTorch)
+- Porta 8001, container Docker separado (`bioguardians-ml`)
+- Busca imagens CBERS-4A WPM (2m resolução) no INPE via biblioteca `cbers4asat`
+- Pipeline: buscar imagem → detectar animais (YOLOv8) → classificar espécie → salvar como `ocorrencia` com `fonte='deteccao_satelite'`
+- Ocorrências detectadas aparecem automaticamente no mapa existente (sem UI separada)
+- Tabelas: `deteccao_job`, `deteccao`, `modelo_ml` (migration 014)
+- Env vars: `INPE_EMAIL` (cadastro em dgi.inpe.br), `ML_SERVICE_URL`
+- Endpoints: `POST /detect`, `GET /jobs`, `GET /jobs/:id`, `GET /health`
 
 ## Carga de dados
 - Scripts em `scripts/data/` carregam dados reais de MMA, GBIF, speciesLink e CNUC
