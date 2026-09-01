@@ -57,7 +57,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 8G
           cpus: "2"
     depends_on:
       - backend

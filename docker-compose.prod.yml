@@ -52,7 +52,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 8G
           cpus: "2"
 
   # ---------- Frontend (nginx + proxy reverso) ----------
