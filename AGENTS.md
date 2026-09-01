@@ -62,6 +62,7 @@
 ## Backend
 - Rotas principais: `/api/health`, `/api/especies`, `/api/areas`, `/api/ocorrencias`, `/api/dashboard`, `/api/referencias`
 - Rota proxy ML: `/api/deteccoes` (proxy para o microserviço Python na porta 8001)
+- Detecção por área protegida: `POST /api/areas/:id/detect` (calcula bbox da UC e encaminha para `/detect` do ML service)
 - Cache LRU em memória com invalidação por rota
 - OpenTelemetry condicional (só ativa com `OTEL_EXPORTER_OTLP_ENDPOINT`)
 
