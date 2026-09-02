@@ -1,7 +1,7 @@
 """FastAPI application — ML microservice for satellite animal detection.
 
 Endpoints:
-  POST /detect       — start a detection job (bbox + date)
+  POST /batch        — trigger batch processing of all protected areas (internal)
   GET  /jobs         — list recent jobs
   GET  /jobs/{id}    — get job status + detections
   GET  /health       — health check
@@ -82,16 +82,6 @@ app = FastAPI(
 
 # --- Request/Response models ---
 
-class DetectRequest(BaseModel):
-    bbox: str = Field(..., description="minLng,minLat,maxLng,maxLat")
-    date: date = Field(..., description="Target satellite image date (YYYY-MM-DD)")
-
-
-class DetectResponse(BaseModel):
-    job_id: int
-    status: str
-
-
 class JobSummary(BaseModel):
     id: int
     bbox: str
@@ -121,6 +111,20 @@ class JobDetail(JobSummary):
     deteccoes: list[DetectionItem] = []
 
 
+class BatchRequest(BaseModel):
+    date: date = Field(..., description="Target satellite image date (YYYY-MM-DD)")
+    area_ids: Optional[list[int]] = Field(
+        None, description="Specific area IDs to process (optional, defaults to all)"
+    )
+
+
+class BatchResponse(BaseModel):
+    total_areas: int
+    processadas: int
+    erros: int
+    total_deteccoes: int
+
+
 # --- Endpoints ---
 
 @app.get("/health")
@@ -133,38 +137,19 @@ async def health():
     }
 
 
-@app.post("/detect", response_model=DetectResponse)
-async def detect(req: DetectRequest):
-    """Start a satellite detection job.
+@app.post("/batch", response_model=BatchResponse)
+async def batch(req: BatchRequest):
+    """Trigger batch processing of all protected areas.
 
-    Creates a job in the database and runs the pipeline synchronously
-    (the request blocks until completion). For production, this should
-    use a background task queue.
+    Not exposed publicly — only accessible within the Docker network.
+    Reads area_protegida polygons from the database, computes bbox for
+    each, and runs the detection pipeline.
     """
-    # Validate bbox format
-    parts = req.bbox.split(",")
-    if len(parts) != 4:
-        raise HTTPException(400, "bbox must be 'minLng,minLat,maxLng,maxLat'")
     try:
-        coords = [float(p) for p in parts]
-    except ValueError:
-        raise HTTPException(400, "bbox coordinates must be numeric")
-
-    # Create job
-    job_id = await db.create_job(
-        bbox=req.bbox,
-        data_captura=req.date,
-        satelite="CBERS-4A",
-        instrumento="WPM",
-        produto="L4_DN",
-    )
-
-    # Run pipeline (synchronous for MVP)
-    try:
-        total = await pipeline.run(job_id, req.bbox, req.date)
-        return DetectResponse(job_id=job_id, status="concluido")
+        results = await pipeline.run_batch(req.date, req.area_ids)
+        return BatchResponse(**results)
     except Exception as exc:
-        raise HTTPException(500, f"Detection failed: {exc}")
+        raise HTTPException(500, f"Batch failed: {exc}")
 
 
 @app.get("/jobs", response_model=list[JobSummary])

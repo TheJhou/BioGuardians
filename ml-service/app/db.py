@@ -22,15 +22,16 @@ class DetectionRecord:
 
 class Database:
     def __init__(self, settings: Settings):
+        self._settings = settings
         self._database_url = settings.database_url
         self._pool: Optional[asyncpg.Pool] = None
 
     async def connect(self) -> None:
         self._pool = await asyncpg.create_pool(
             dsn=self._database_url,
-            min_size=1,
-            max_size=5,
-            command_timeout=30,
+            min_size=2,
+            max_size=self._settings.db_pool_max,
+            command_timeout=60,
         )
 
     async def close(self) -> None:
@@ -134,6 +135,102 @@ class Database:
             )
             return row["id"] if row else None
 
+    async def find_or_create_species(
+        self,
+        nome_cientifico: str,
+        nome_popular: Optional[str] = None,
+        categoria_ameaca: str = "DD",
+        descricao: Optional[str] = None,
+    ) -> int:
+        """Find a species by scientific name, or create it if it doesn't exist.
+
+        When creating, extracts the genus from the scientific name and creates
+        a minimal taxon entry (genus rank, no parent) if the genus doesn't exist.
+        """
+        nome_cientifico = nome_cientifico.lower().strip()
+        async with self._pool.acquire() as conn:
+            # Try to find existing species
+            row = await conn.fetchrow(
+                "SELECT id FROM especie WHERE nome_cientifico = $1",
+                nome_cientifico,
+            )
+            if row:
+                return row["id"]
+
+            # Extract genus (first word of binomial)
+            genus_name = nome_cientifico.split()[0] if " " in nome_cientifico else nome_cientifico
+
+            # Find or create genus taxon
+            taxon_row = await conn.fetchrow(
+                """SELECT id FROM taxon WHERE nome = $1 AND "rank" = 'genero'""",
+                genus_name,
+            )
+            if taxon_row:
+                genero_id = taxon_row["id"]
+            else:
+                inserted = await conn.fetchrow(
+                    """INSERT INTO taxon (nome, "rank", parent_id)
+                       VALUES ($1, 'genero', NULL) RETURNING id""",
+                    genus_name,
+                )
+                genero_id = inserted["id"]
+
+            # Create the species
+            inserted = await conn.fetchrow(
+                """INSERT INTO especie
+                     (nome_cientifico, nome_popular, categoria_ameaca, genero_id, descricao, status)
+                   VALUES ($1, $2, $3, $4, $5, 'ativo')
+                   RETURNING id""",
+                nome_cientifico,
+                nome_popular,
+                categoria_ameaca,
+                genero_id,
+                descricao,
+            )
+            return inserted["id"]
+
+    async def update_species_info(
+        self,
+        especie_id: int,
+        descricao: Optional[str] = None,
+        categoria_ameaca: Optional[str] = None,
+        nome_popular: Optional[str] = None,
+    ) -> None:
+        """Update species description, risk category and/or popular name.
+
+        Overwrites existing values when the new values are not None.
+        """
+        fields = []
+        params = []
+        idx = 1
+
+        if descricao is not None:
+            fields.append(f"descricao = ${idx}")
+            params.append(descricao)
+            idx += 1
+
+        if categoria_ameaca is not None:
+            fields.append(f"categoria_ameaca = ${idx}")
+            params.append(categoria_ameaca)
+            idx += 1
+
+        if nome_popular is not None:
+            fields.append(f"nome_popular = ${idx}")
+            params.append(nome_popular)
+            idx += 1
+
+        if not fields:
+            return
+
+        fields.append(f"atualizado_em = now()")
+        params.append(especie_id)
+
+        async with self._pool.acquire() as conn:
+            await conn.execute(
+                f"UPDATE especie SET {', '.join(fields)} WHERE id = ${idx}",
+                *params,
+            )
+
     async def get_job(self, job_id: int) -> Optional[dict]:
         async with self._pool.acquire() as conn:
             row = await conn.fetchrow("SELECT * FROM deteccao_job WHERE id = $1", job_id)
@@ -159,5 +256,18 @@ class Database:
                    LIMIT $1 OFFSET $2""",
                 limit,
                 offset,
+            )
+            return [dict(r) for r in rows]
+
+    async def list_protected_areas(self) -> list[dict]:
+        """Return id, name and bbox of all protected areas for batch processing."""
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(
+                """SELECT id,
+                          nome,
+                          ST_XMin(geom) || ',' || ST_YMin(geom) || ',' ||
+                          ST_XMax(geom) || ',' || ST_YMax(geom) AS bbox
+                   FROM area_protegida
+                   ORDER BY id"""
             )
             return [dict(r) for r in rows]

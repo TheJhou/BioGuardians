@@ -1,16 +1,21 @@
-"""Species classification for detected animals.
+"""Species classification via OpenRouter VLM (Claude Sonnet 4).
 
-Phase 1 (MVP): heuristic mapping from COCO animal classes + geographic
-context (biome inferred from coordinates) to likely Brazilian species.
+Sends the detected animal crop to a vision-language model that:
+1. Identifies the species (scientific name)
+2. Generates a description in Portuguese
+3. Classifies the extinction risk (IUCN/MMA category)
 
-Phase 2 (future): fine-tuned ResNet/EfficientNet on a Brazilian fauna
-satellite dataset.
+Falls back to the heuristic classifier if OPENROUTER_API_KEY is not set.
 """
 
+import base64
+import json
 import logging
 from dataclasses import dataclass
 from typing import Optional
 
+import cv2
+import httpx
 import numpy as np
 
 from .config import Settings
@@ -22,108 +27,147 @@ logger = logging.getLogger(__name__)
 class ClassificationResult:
     """Result of species classification for a detection."""
     nome_cientifico: Optional[str]
+    nome_popular: Optional[str]
+    descricao: Optional[str]
+    categoria_ameaca: Optional[str]  # CR, EN, VU, NT, LC, DD
     confidence: float
-    method: str  # 'heuristic' or 'model'
+    method: str  # 'ai' or 'heuristic'
 
 
-# ---- Heuristic mapping tables ----
+VALID_CATEGORIES = {"CR", "EN", "VU", "NT", "LC", "DD"}
 
-# Maps COCO animal class to candidate Brazilian species by biome.
-# Biomes are inferred from coordinates (simplified).
-# This is intentionally conservative — only high-confidence mappings.
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+PROMPT = """You are a wildlife biologist specialized in Brazilian fauna.
+Analyze this satellite image crop showing a detected animal.
+
+Respond ONLY with a JSON object (no markdown, no explanation) with these fields:
+{
+  "nome_cientifico": "scientific name in lowercase, e.g. panthera onca",
+  "nome_popular": "common name in Portuguese, e.g. onça-pintada",
+  "descricao": "a 2-3 sentence description in Portuguese covering appearance, habitat and behavior",
+  "categoria_ameaca": "extinction risk category — one of: CR, EN, VU, NT, LC, DD",
+  "confianca": "your confidence level from 0.0 to 1.0"
+}
+
+Context: the animal was detected in a satellite image (CBERS-4A WPM, 2m resolution)
+in a Brazilian protected area. Biome inferred from coordinates: {biome}.
+
+If you cannot identify the species with reasonable confidence, set nome_cientifico to null
+and confianca to a low value."""
+
+
+# ---- Heuristic fallback (kept for when API key is not configured) ----
+
 SPECIES_BY_BIOME = {
-    # COCO class "cow" — domestic, not wild fauna. Skip in most cases.
-    "cow": {
-        "_default": None,  # domestic cattle, not a wild species
-    },
-    # COCO class "horse" — domestic. Skip.
-    "horse": {
-        "_default": None,
-    },
-    # COCO class "sheep" — domestic. Skip.
-    "sheep": {
-        "_default": None,
-    },
-    # COCO class "bird" — many possibilities, too broad without a model.
-    "bird": {
-        "_default": None,  # cannot classify to species from "bird" alone
-    },
-    # COCO class "dog" — could be bush dog (Speothos venaticus) in Amazon.
-    "dog": {
-        "amazonia": ("speothos venaticus", 0.3),  # low confidence — could be domestic
-        "_default": None,
-    },
-    # COCO class "cat" — could be jaguar, puma, ocelot depending on biome.
     "cat": {
-        "amazonia": ("panthera onca", 0.35),
-        "mata_atlantica": ("panthera onca", 0.30),
-        "pantanal": ("panthera onca", 0.40),
-        "cerrado": ("puma concolor", 0.25),
-        "caatinga": ("leopardus tigrinus", 0.20),
+        "amazonia": ("panthera onca", "onça-pintada", 0.35),
+        "mata_atlantica": ("panthera onca", "onça-pintada", 0.30),
+        "pantanal": ("panthera onca", "onça-pintada", 0.40),
+        "cerrado": ("puma concolor", "onça-parda", 0.25),
+        "caatinga": ("leopardus tigrinus", "gato-do-mato-pintado", 0.20),
         "_default": None,
     },
-    # COCO class "elephant" — no native elephants in Brazil. Skip.
-    "elephant": {
-        "_default": None,
-    },
-    # COCO class "bear" — no native bears in Brazil (except spectacled bear
-    # historically, but extirpated). Skip.
-    "bear": {
-        "_default": None,
-    },
-    # COCO class "zebra" — no native zebras. Skip.
-    "zebra": {
-        "_default": None,
-    },
-    # COCO class "giraffe" — no native giraffes. Skip.
-    "giraffe": {
+    "dog": {
+        "amazonia": ("speothos venaticus", "cachorro-vinagre", 0.30),
         "_default": None,
     },
 }
 
 
-# Simplified biome inference from coordinates (bounding box in Brazil).
-# This is a rough approximation — real biome boundaries are complex.
 def infer_biome(lat: float, lon: float) -> str:
     """Infer a Brazilian biome from coordinates (simplified)."""
-    # Amazon: north, west
     if lat < -5 and lon < -45:
         return "amazonia"
     if lat < -10 and lon < -40:
         return "amazonia"
-    # Pantanal: center-west, around -16 to -22, -54 to -58
     if -22 < lat < -16 and -58 < lon < -54:
         return "pantanal"
-    # Cerrado: central Brazil
     if -20 < lat < -5 and -55 < lon < -40:
         return "cerrado"
-    # Caatinga: northeast
     if -15 < lat < -3 and -42 < lon < -34:
         return "caatinga"
-    # Mata Atlantica: eastern coast
     if lat < -5 and -42 < lon < -35:
         return "mata_atlantica"
     if -33 < lat < -5 and -52 < lon < -35:
         return "mata_atlantica"
-    # Pampa: south
     if lat < -28 and lon > -55:
         return "pampa"
     return "unknown"
 
 
+def _crop_to_base64_jpeg(crop: np.ndarray, quality: int = 85) -> str:
+    """Encode a numpy crop as base64 JPEG string."""
+    # OpenCV expects BGR; our crops are BGR already (read from rasterio as BGR).
+    # If the crop is very small, upscale it so the VLM can see details.
+    h, w = crop.shape[:2]
+    if h < 128 or w < 128:
+        scale = max(128 / h, 128 / w)
+        crop = cv2.resize(crop, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_CUBIC)
+    ok, buf = cv2.imencode(".jpg", crop, [cv2.IMWRITE_JPEG_QUALITY, quality])
+    if not ok:
+        raise RuntimeError("Failed to encode crop as JPEG")
+    return base64.b64encode(buf.tobytes()).decode("ascii")
+
+
+def _parse_ai_response(raw: str) -> Optional[dict]:
+    """Parse the JSON response from the VLM, tolerating markdown fences."""
+    text = raw.strip()
+    if text.startswith("```"):
+        # Strip markdown code fences
+        lines = text.split("\n")
+        lines = [l for l in lines if not l.strip().startswith("```")]
+        text = "\n".join(lines).strip()
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        logger.warning("VLM returned non-JSON response: %s", text[:200])
+        return None
+
+    # Normalize fields
+    nome_cientifico = data.get("nome_cientifico")
+    if nome_cientifico:
+        nome_cientifico = nome_cientifico.strip().lower()
+        if len(nome_cientifico) < 4:
+            nome_cientifico = None
+
+    categoria = data.get("categoria_ameaca")
+    if categoria:
+        categoria = str(categoria).strip().upper()
+        if categoria not in VALID_CATEGORIES:
+            categoria = None
+
+    try:
+        confianca = float(data.get("confianca", 0))
+    except (TypeError, ValueError):
+        confianca = 0.0
+
+    return {
+        "nome_cientifico": nome_cientifico,
+        "nome_popular": data.get("nome_popular"),
+        "descricao": data.get("descricao"),
+        "categoria_ameaca": categoria,
+        "confianca": confianca,
+    }
+
+
 class SpeciesClassifier:
-    """Classifies detected animals to Brazilian species."""
+    """Classifies detected animals using a vision-language model via OpenRouter."""
 
     def __init__(self, settings: Settings):
         self._settings = settings
-        self._model = None
+        self._heuristic = _HeuristicFallback()
 
     def load(self) -> None:
-        """Load the classification model (Phase 2).
-
-        Phase 1 uses heuristics only — no model to load.
-        """
-        logger.info("Species classifier: using heuristic mapping (Phase 1)")
+        if self._settings.openrouter_api_key:
+            logger.info(
+                "Species classifier: using OpenRouter VLM (%s)",
+                self._settings.openrouter_model,
+            )
+        else:
+            logger.warning(
+                "OPENROUTER_API_KEY not set — falling back to heuristic classifier"
+            )
 
     def classify(
         self,
@@ -136,34 +180,123 @@ class SpeciesClassifier:
         """Classify a detected animal crop to a Brazilian species.
 
         Args:
-            crop: cropped image of the detected animal (numpy array)
+            crop: cropped image of the detected animal (numpy array, BGR)
             coco_class_name: COCO class name from the detector
             lat: latitude of detection center
             lon: longitude of detection center
             detection_confidence: YOLOv8 detection confidence
 
         Returns:
-            ClassificationResult with species name or None.
+            ClassificationResult with species, description, risk and confidence.
         """
+        if self._settings.openrouter_api_key:
+            try:
+                return self._classify_with_vlm(crop, lat, lon, detection_confidence)
+            except Exception as exc:
+                logger.error("VLM classification failed, falling back to heuristic: %s", exc)
+
+        return self._heuristic.classify(coco_class_name, lat, lon, detection_confidence)
+
+    def _classify_with_vlm(
+        self,
+        crop: np.ndarray,
+        lat: float,
+        lon: float,
+        detection_confidence: float,
+    ) -> ClassificationResult:
+        """Send crop to OpenRouter VLM and parse the response."""
+        biome = infer_biome(lat, lon)
+        b64 = _crop_to_base64_jpeg(crop)
+
+        prompt = PROMPT.format(biome=biome)
+
+        payload = {
+            "model": self._settings.openrouter_model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
+                        },
+                    ],
+                }
+            ],
+            "max_tokens": 600,
+            "temperature": 0.2,
+        }
+
+        headers = {
+            "Authorization": f"Bearer {self._settings.openrouter_api_key}",
+            "Content-Type": "application/json",
+        }
+
+        with httpx.Client(timeout=self._settings.http_timeout) as client:
+            resp = client.post(OPENROUTER_URL, json=payload, headers=headers)
+
+        if resp.status_code != 200:
+            raise RuntimeError(
+                f"OpenRouter API error {resp.status_code}: {resp.text[:300]}"
+            )
+
+        data = resp.json()
+        content = data["choices"][0]["message"]["content"]
+        parsed = _parse_ai_response(content)
+
+        if parsed is None or not parsed["nome_cientifico"]:
+            return ClassificationResult(
+                nome_cientifico=None,
+                nome_popular=None,
+                descricao=None,
+                categoria_ameaca=None,
+                confidence=0.0,
+                method="ai",
+            )
+
+        return ClassificationResult(
+            nome_cientifico=parsed["nome_cientifico"],
+            nome_popular=parsed.get("nome_popular"),
+            descricao=parsed.get("descricao"),
+            categoria_ameaca=parsed.get("categoria_ameaca"),
+            confidence=parsed["confianca"],
+            method="ai",
+        )
+
+
+class _HeuristicFallback:
+    """Heuristic classifier used when OPENROUTER_API_KEY is not set."""
+
+    def classify(
+        self,
+        coco_class_name: str,
+        lat: float,
+        lon: float,
+        detection_confidence: float,
+    ) -> ClassificationResult:
         biome = infer_biome(lat, lon)
         species_map = SPECIES_BY_BIOME.get(coco_class_name, {})
-
-        # Try biome-specific mapping first, then default.
         result = species_map.get(biome, species_map.get("_default"))
 
         if result is None:
             return ClassificationResult(
                 nome_cientifico=None,
+                nome_popular=None,
+                descricao=None,
+                categoria_ameaca=None,
                 confidence=0.0,
                 method="heuristic",
             )
 
-        nome_cientifico, base_confidence = result
-        # Combine detection confidence with classification confidence.
+        nome_cientifico, nome_popular, base_confidence = result
         combined = min(base_confidence * detection_confidence, 1.0)
 
         return ClassificationResult(
             nome_cientifico=nome_cientifico,
+            nome_popular=nome_popular,
+            descricao=None,
+            categoria_ameaca=None,
             confidence=combined,
             method="heuristic",
         )

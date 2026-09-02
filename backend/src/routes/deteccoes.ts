@@ -54,40 +54,4 @@ router.get('/jobs/:id', cacheMiddleware(
   }
 });
 
-// POST /api/deteccoes — start a new detection job
-router.post('/', async (req, res, next) => {
-  try {
-    const { bbox, date } = req.body;
-
-    if (!bbox || !date) {
-      res.status(400).json({ error: 'bbox and date are required' });
-      return;
-    }
-
-    // Validate bbox format
-    const parts = String(bbox).split(',');
-    if (parts.length !== 4 || parts.some(p => isNaN(Number(p)))) {
-      res.status(400).json({ error: 'bbox must be "minLng,minLat,maxLng,maxLat"' });
-      return;
-    }
-
-    const response = await fetch(`${env.mlServiceUrl}/detect`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bbox, date }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'ML service error' }));
-      res.status(response.status).json(error);
-      return;
-    }
-
-    const data = await response.json();
-    res.status(201).json(data);
-  } catch (err) {
-    next(err);
-  }
-});
-
 export default router;

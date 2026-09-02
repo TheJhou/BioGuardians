@@ -3,7 +3,6 @@ import { query } from '../db/pool.js';
 import { validateId } from '../middleware/validateId.js';
 import { cacheMiddleware, cacheInvalidateAll } from '../cache/cache.js';
 import { parseParam, getParam } from '../utils/params.js';
-import { env } from '../config/env.js';
 
 const router = Router();
 
@@ -142,51 +141,6 @@ router.get('/:id/especies', validateId, async (req, res, next) => {
     const id = parseParam(req.params.id)!;
     const { rows } = await query('SELECT * FROM especies_em_area($1)', [id]);
     res.json(rows);
-  } catch (err) { next(err); }
-});
-
-// POST /api/areas/:id/detect — trigger satellite animal detection for this protected area
-router.post('/:id/detect', validateId, async (req, res, next) => {
-  try {
-    const id = parseParam(req.params.id)!;
-    const { date } = req.body;
-
-    if (!date) {
-      res.status(400).json({ error: 'date is required (YYYY-MM-DD)' });
-      return;
-    }
-
-    const { rows } = await query(
-      `SELECT
-         ROUND(ST_XMin(geom)::numeric, 6) || ',' ||
-         ROUND(ST_YMin(geom)::numeric, 6) || ',' ||
-         ROUND(ST_XMax(geom)::numeric, 6) || ',' ||
-         ROUND(ST_YMax(geom)::numeric, 6) AS bbox
-       FROM area_protegida
-       WHERE id = $1`,
-      [id]
-    );
-
-    if (rows.length === 0) {
-      res.status(404).json({ error: 'Area not found' });
-      return;
-    }
-
-    const bbox = rows[0].bbox;
-    const response = await fetch(`${env.mlServiceUrl}/detect`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bbox, date }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'ML service error' }));
-      res.status(response.status).json(error);
-      return;
-    }
-
-    const data = (await response.json()) as Record<string, unknown>;
-    res.status(201).json({ ...data, area_id: id, bbox });
   } catch (err) { next(err); }
 });
 

@@ -38,6 +38,13 @@ def test_classifier_jaguar_pantanal():
         tile_size=640,
         host="0.0.0.0",
         port=8001,
+        openrouter_api_key="",  # empty → heuristic fallback
+        openrouter_model="anthropic/claude-sonnet-4",
+        yolo_device="cpu",
+        yolo_workers=4,
+        db_pool_max=10,
+        batch_concurrency=4,
+        http_timeout=120,
     )
     clf = SpeciesClassifier(settings)
     clf.load()
@@ -66,6 +73,13 @@ def test_classifier_domestic_cow():
         tile_size=640,
         host="0.0.0.0",
         port=8001,
+        openrouter_api_key="",
+        openrouter_model="anthropic/claude-sonnet-4",
+        yolo_device="cpu",
+        yolo_workers=4,
+        db_pool_max=10,
+        batch_concurrency=4,
+        http_timeout=120,
     )
     clf = SpeciesClassifier(settings)
     crop = np.zeros((50, 50, 3), dtype=np.uint8)

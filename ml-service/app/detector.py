@@ -86,6 +86,8 @@ class AnimalDetector:
             tile,
             classes=ANIMAL_CLASS_IDS,
             conf=self._settings.confidence_threshold,
+            device=self._settings.yolo_device,
+            workers=self._settings.yolo_workers,
             verbose=False,
         )
 

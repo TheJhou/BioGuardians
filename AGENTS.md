@@ -61,8 +61,7 @@
 
 ## Backend
 - Rotas principais: `/api/health`, `/api/especies`, `/api/areas`, `/api/ocorrencias`, `/api/dashboard`, `/api/referencias`
-- Rota proxy ML: `/api/deteccoes` (proxy para o microserviço Python na porta 8001)
-- Detecção por área protegida: `POST /api/areas/:id/detect` (calcula bbox da UC e encaminha para `/detect` do ML service)
+- Rota proxy ML (somente leitura): `GET /api/deteccoes/jobs`, `GET /api/deteccoes/jobs/:id` (proxy para o microserviço Python na porta 8001)
 - Cache LRU em memória com invalidação por rota
 - OpenTelemetry condicional (só ativa com `OTEL_EXPORTER_OTLP_ENDPOINT`)
 
@@ -73,8 +72,35 @@
 - Pipeline: buscar imagem → detectar animais (YOLOv8) → classificar espécie → salvar como `ocorrencia` com `fonte='deteccao_satelite'`
 - Ocorrências detectadas aparecem automaticamente no mapa existente (sem UI separada)
 - Tabelas: `deteccao_job`, `deteccao`, `modelo_ml` (migration 014)
-- Env vars: `INPE_EMAIL` (cadastro em dgi.inpe.br), `ML_SERVICE_URL`
-- Endpoints: `POST /detect`, `GET /jobs`, `GET /jobs/:id`, `GET /health`
+- Env vars: `INPE_EMAIL` (cadastro em dgi.inpe.br), `ML_SERVICE_URL`, `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`
+- Endpoints: `POST /batch` (interno), `GET /jobs`, `GET /jobs/:id`, `GET /health`
+- **Sem trigger público**: detecção é disparada offline via CLI ou endpoint interno, nunca pela API pública
+- `POST /batch` não é proxyado pelo backend nem exposto no Nginx — só acessível dentro da rede Docker
+
+### Classificação por IA (OpenRouter + Claude Sonnet 4)
+- Após YOLOv8 detectar um animal, o recorte da imagem é enviado ao OpenRouter (Claude Sonnet 4)
+- A IA retorna: nome científico, nome popular, descrição e categoria de ameaça (CR/EN/VU/NT/LC/DD)
+- Se a espécie não existe no banco, é criada automaticamente (`find_or_create_species`)
+- Descrição e categoria de ameaça sobrescrevem os dados existentes na tabela `especie`
+- Se `OPENROUTER_API_KEY` não estiver configurada, cai pro classificador heurístico (fallback)
+- Custo por imagem: ~$0.01-0.03 (Claude Sonnet 4, 600 max tokens)
+
+### Batch de detecção (offline)
+- Processa todas as áreas protegidas lendo `area_protegida.geom` do banco
+- Cada área vira um job em `deteccao_job` com bbox calculado do polígono
+- Disparo via CLI dentro do container:
+  ```bash
+  docker exec bioguardians-ml python -m app.cli batch --date 2026-09-01
+  docker exec bioguardians-ml python -m app.cli batch --date 2026-09-01 --area-ids 1,2,3
+  ```
+- Ou via endpoint interno (dentro da rede Docker):
+  ```bash
+  curl -X POST http://ml-service:8001/batch -H "Content-Type: application/json" -d '{"date":"2026-09-01"}'
+  ```
+- Cron na VM (exemplo — domingo 03:00):
+  ```bash
+  0 3 * * 0 docker exec bioguardians-ml python -m app.cli batch --date $(date -d '7 days ago' +\%Y-\%m-\%d) >> /var/log/bioguardians-batch.log 2>&1
+  ```
 
 ## Carga de dados
 - Scripts em `scripts/data/` carregam dados reais de MMA, GBIF, speciesLink e CNUC

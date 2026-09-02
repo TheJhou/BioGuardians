@@ -130,7 +130,7 @@ class DetectionPipeline:
         # Crop the detected region for classification
         crop = self._crop_detection(img_array, det)
 
-        # Classify species
+        # Classify species via AI (OpenRouter VLM) or heuristic fallback
         result = self._classifier.classify(
             crop=crop,
             coco_class_name=det.class_name,
@@ -139,10 +139,24 @@ class DetectionPipeline:
             detection_confidence=det.confidence,
         )
 
-        # Determine species_id if classification is confident enough
+        # Determine species_id: find existing or create new if confident enough
         especie_id: Optional[int] = None
         if result.nome_cientifico and result.confidence >= self._settings.species_confidence_threshold:
-            especie_id = await self._db.find_species_by_name(result.nome_cientifico)
+            categoria = result.categoria_ameaca or "DD"
+            especie_id = await self._db.find_or_create_species(
+                nome_cientifico=result.nome_cientifico,
+                nome_popular=result.nome_popular,
+                categoria_ameaca=categoria,
+                descricao=result.descricao,
+            )
+
+            # Update species info (overwrite descricao, categoria_ameaca, nome_popular)
+            await self._db.update_species_info(
+                especie_id=especie_id,
+                descricao=result.descricao,
+                categoria_ameaca=result.categoria_ameaca,
+                nome_popular=result.nome_popular,
+            )
 
         # Save detection record
         bbox_pixel = f"{det.bbox_x},{det.bbox_y},{det.bbox_w},{det.bbox_h}"
@@ -154,7 +168,7 @@ class DetectionPipeline:
             lat=lat,
             lon=lon,
             bbox_pixel=bbox_pixel,
-            recorte_url=None,  # could save crop to disk in the future
+            recorte_url=None,
         )
         await self._db.save_detection(det_record)
 
@@ -165,11 +179,11 @@ class DetectionPipeline:
                 lat=lat,
                 lon=lon,
                 data_evento=capture_date,
-                base_registro=f"CBERS-4A WPM deteccao automatica (confianca: {result.confidence:.2f})",
+                base_registro=f"CBERS-4A WPM deteccao automatica ({result.method}, confianca: {result.confidence:.2f})",
             )
             logger.info(
-                "Job %d: occurrence created for species_id=%d at (%.4f, %.4f)",
-                job_id, especie_id, lat, lon,
+                "Job %d: occurrence created for species_id=%d (%s) at (%.4f, %.4f) [%s]",
+                job_id, especie_id, result.nome_cientifico, lat, lon, result.method,
             )
 
         return True
@@ -230,3 +244,77 @@ class DetectionPipeline:
         x2 = min(w, det.bbox_x + det.bbox_w)
         y2 = min(h, det.bbox_y + det.bbox_h)
         return img_array[y1:y2, x1:x2]
+
+    async def run_batch(
+        self,
+        target_date: date,
+        area_ids: Optional[list[int]] = None,
+    ) -> dict:
+        """Process all protected areas (or a subset by IDs) in batch.
+
+        For each area, computes the bbox from its polygon geometry,
+        creates a detection job, and runs the full pipeline.
+        Areas are processed with limited concurrency (BATCH_CONCURRENCY).
+
+        Args:
+            target_date: desired satellite image date
+            area_ids: optional list of area_protegida IDs to process
+
+        Returns:
+            Summary dict with total_areas, processadas, erros, total_deteccoes.
+        """
+        import asyncio
+
+        areas = await self._db.list_protected_areas()
+        if area_ids:
+            id_set = set(area_ids)
+            areas = [a for a in areas if a["id"] in id_set]
+
+        results = {
+            "total_areas": len(areas),
+            "processadas": 0,
+            "erros": 0,
+            "total_deteccoes": 0,
+        }
+
+        concurrency = self._settings.batch_concurrency
+        logger.info(
+            "Batch: processing %d protected areas for date %s (concurrency=%d)",
+            len(areas), target_date, concurrency,
+        )
+
+        async def process_one(area: dict) -> None:
+            area_id = area["id"]
+            area_name = area["nome"]
+            bbox = area["bbox"]
+
+            logger.info("Batch: area %d (%s) bbox=%s", area_id, area_name, bbox)
+
+            try:
+                job_id = await self._db.create_job(
+                    bbox=bbox,
+                    data_captura=target_date,
+                    satelite="CBERS-4A",
+                    instrumento="WPM",
+                    produto="L4_DN",
+                )
+                total = await self.run(job_id, bbox, target_date)
+                results["processadas"] += 1
+                results["total_deteccoes"] += total
+            except Exception as exc:
+                logger.error(
+                    "Batch: area %d (%s) failed: %s",
+                    area_id, area_name, exc, exc_info=True,
+                )
+                results["erros"] += 1
+
+        semaphore = asyncio.Semaphore(concurrency)
+
+        async def gated(area: dict) -> None:
+            async with semaphore:
+                await process_one(area)
+
+        await asyncio.gather(*(gated(a) for a in areas))
+
+        logger.info("Batch: completed — %s", results)
+        return results

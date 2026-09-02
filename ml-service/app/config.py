@@ -16,6 +16,13 @@ class Settings:
     tile_size: int
     host: str
     port: int
+    openrouter_api_key: str
+    openrouter_model: str
+    yolo_device: str           # "cpu" or "cuda"
+    yolo_workers: int          # dataloader workers for YOLOv8
+    db_pool_max: int           # asyncpg pool max connections
+    batch_concurrency: int     # parallel areas in batch mode
+    http_timeout: int          # timeout for OpenRouter API calls (seconds)
 
 
 def _required(key: str) -> str:
@@ -37,4 +44,11 @@ def load_settings() -> Settings:
         tile_size=int(os.environ.get("TILE_SIZE", "640")),
         host=os.environ.get("HOST", "0.0.0.0"),
         port=int(os.environ.get("PORT", "8001")),
+        openrouter_api_key=os.environ.get("OPENROUTER_API_KEY", ""),
+        openrouter_model=os.environ.get("OPENROUTER_MODEL", "anthropic/claude-sonnet-4"),
+        yolo_device=os.environ.get("YOLO_DEVICE", "cpu"),
+        yolo_workers=int(os.environ.get("YOLO_WORKERS", "4")),
+        db_pool_max=int(os.environ.get("DB_POOL_MAX", "10")),
+        batch_concurrency=int(os.environ.get("BATCH_CONCURRENCY", "4")),
+        http_timeout=int(os.environ.get("HTTP_TIMEOUT", "120")),
     )

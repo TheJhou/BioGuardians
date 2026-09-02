@@ -45,6 +45,13 @@ services:
     environment:
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@host.docker.internal:${DB_PORT}/${DB_NAME}
       INPE_EMAIL: ${INPE_EMAIL:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-anthropic/claude-sonnet-4}
+      YOLO_DEVICE: ${YOLO_DEVICE:-cpu}
+      YOLO_WORKERS: ${YOLO_WORKERS:-4}
+      DB_POOL_MAX: ${DB_POOL_MAX:-10}
+      BATCH_CONCURRENCY: ${BATCH_CONCURRENCY:-4}
+      HTTP_TIMEOUT: ${HTTP_TIMEOUT:-120}
     ports:
       - "127.0.0.1:8001:8001"
     extra_hosts:
@@ -52,8 +59,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 8G
-          cpus: "2"
+          memory: 48G
+          cpus: "8"
 
   # ---------- Frontend (nginx + proxy reverso) ----------
   frontend:
