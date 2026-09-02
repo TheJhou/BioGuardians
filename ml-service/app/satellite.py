@@ -106,8 +106,10 @@ class Cbers4aFetcher:
         output_dir: str,
     ) -> Optional[SatelliteImage]:
         """Search using cbers4asat library."""
+        # cbers4asat expects bbox as a tuple of floats: (xmin, ymin, xmax, ymax)
+        bbox_tuple = tuple(float(x) for x in bbox.split(","))
         products = self._api.query(
-            location=bbox,
+            location=bbox_tuple,
             initial_date=initial,
             end_date=end,
             cloud=self._settings.max_cloud_cover,
