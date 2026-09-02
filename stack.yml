@@ -7,8 +7,8 @@ services:
       - NODE_ENV=production
       - PORT=3001
       - DATABASE_URL=${DATABASE_URL}
-      - FRONTEND_URL=${FRONTEND_URL:-https://financemobile.com.br}
-      - CORS_ORIGIN=${FRONTEND_URL:-https://financemobile.com.br}
+      - FRONTEND_URL=${FRONTEND_URL}
+      - CORS_ORIGIN=${FRONTEND_URL}
       - GBIF_API_BASE=https://api.gbif.org/v1
       - ML_SERVICE_URL=http://ml-service:8001
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
@@ -49,14 +49,14 @@ services:
     restart: unless-stopped
     environment:
       - DATABASE_URL=${DATABASE_URL}
-      - INPE_EMAIL=${INPE_EMAIL:-}
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
-      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-anthropic/claude-sonnet-4}
-      - YOLO_DEVICE=${YOLO_DEVICE:-cpu}
-      - YOLO_WORKERS=${YOLO_WORKERS:-4}
-      - DB_POOL_MAX=${DB_POOL_MAX:-10}
-      - BATCH_CONCURRENCY=${BATCH_CONCURRENCY:-4}
-      - HTTP_TIMEOUT=${HTTP_TIMEOUT:-120}
+      - INPE_EMAIL=${INPE_EMAIL}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL}
+      - YOLO_DEVICE=${YOLO_DEVICE}
+      - YOLO_WORKERS=${YOLO_WORKERS}
+      - DB_POOL_MAX=${DB_POOL_MAX}
+      - BATCH_CONCURRENCY=${BATCH_CONCURRENCY}
+      - HTTP_TIMEOUT=${HTTP_TIMEOUT}
     ports:
       - "127.0.0.1:8001:8001"
     networks:
@@ -151,7 +151,7 @@ services:
     restart: unless-stopped
     environment:
       - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/var/lib/grafana/dashboards/bioguardians-overview.json
     volumes:

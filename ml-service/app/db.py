@@ -50,7 +50,7 @@ class Database:
             row = await conn.fetchrow(
                 """INSERT INTO deteccao_job
                      (bbox, data_captura, satelite, instrumento, produto, status)
-                   VALUES ($1, $2, $3, $4, $5, 'pendente')
+                   VALUES ($1::varchar, $2, $3::varchar, $4::varchar, $5::varchar, 'pendente')
                    RETURNING id""",
                 bbox,
                 data_captura,
@@ -72,12 +72,12 @@ class Database:
         async with self._pool.acquire() as conn:
             await conn.execute(
                 """UPDATE deteccao_job
-                   SET status = $2,
+                   SET status = $2::varchar,
                        total_deteccoes = $3,
                        erro = $4,
                        scene_id = COALESCE($5, scene_id),
                        imagem_url = COALESCE($6, imagem_url),
-                       concluido_em = CASE WHEN $2 IN ('concluido', 'erro') THEN now() ELSE concluido_em END
+                       concluido_em = CASE WHEN $2::varchar IN ('concluido', 'erro') THEN now() ELSE concluido_em END
                    WHERE id = $1""",
                 job_id,
                 status,
