@@ -274,15 +274,31 @@ class Cbers4aFetcher:
         )
 
     def _pick_best_feature(self, features: list) -> dict:
-        """Pick the GeoJSON feature with lowest cloud cover."""
+        """Pick the most recent GeoJSON feature (closest to target date).
+
+        Falls back to lowest cloud cover as tiebreaker.
+        """
         best = None
-        best_cloud = 999.0
+        best_score = (-1, 999.0)  # (timestamp, cloud_cover)
+
         for feat in features:
             props = feat.get("properties", {})
+            date_str = props.get("datetime", "")
             cloud = float(props.get("eo:cloud_cover", props.get("cloud_cover", 100)))
-            if cloud < best_cloud:
-                best_cloud = cloud
+
+            # Parse date to timestamp — more recent = higher score
+            timestamp = 0
+            if date_str:
+                try:
+                    timestamp = date.fromisoformat(date_str[:10]).toordinal()
+                except (ValueError, TypeError):
+                    pass
+
+            # Pick most recent date; use cloud cover as tiebreaker
+            if (timestamp, -cloud) > (best_score[0], -best_score[1]):
+                best_score = (timestamp, cloud)
                 best = feat
+
         return best or features[0]
 
     def _compose_rgb_tif(
