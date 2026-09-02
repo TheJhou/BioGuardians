@@ -106,10 +106,11 @@ class Cbers4aFetcher:
         output_dir: str,
     ) -> Optional[SatelliteImage]:
         """Search using cbers4asat library."""
-        # cbers4asat expects bbox as a tuple of floats: (xmin, ymin, xmax, ymax)
-        bbox_tuple = tuple(float(x) for x in bbox.split(","))
+        # cbers4asat expects bbox as a list of floats: [xmin, ymin, xmax, ymax]
+        # A tuple is interpreted as path_row (Tuple[int, int]).
+        bbox_list = [float(x) for x in bbox.split(",")]
         products = self._api.query(
-            location=bbox_tuple,
+            location=bbox_list,
             initial_date=initial,
             end_date=end,
             cloud=self._settings.max_cloud_cover,
@@ -117,17 +118,21 @@ class Cbers4aFetcher:
             collections=[collection],
         )
 
-        if not products:
+        # cbers4asat returns a GeoJSON FeatureCollection
+        features = products.get("features", []) if isinstance(products, dict) else []
+        if not features:
             logger.info("No products found in %s for the given range", collection)
             return None
 
-        # Pick the best: lowest cloud cover, closest to target date.
-        best = self._pick_best_product(products)
-        scene_id = best.get("scene_id", list(products.keys())[0])
+        # Pick the best: lowest cloud cover
+        best = self._pick_best_feature(features)
+        scene_id = best.get("id", "unknown")
 
-        # Download
-        downloaded = self._api.download(
-            products,
+        # Download — cbers4asat expects the full FeatureCollection or a filtered one
+        # Build a FeatureCollection with only the best feature
+        best_fc = {"type": "FeatureCollection", "features": [best]}
+        self._api.download(
+            best_fc,
             threads=1,
             outdir=output_dir,
             with_folder=False,
@@ -142,14 +147,26 @@ class Cbers4aFetcher:
         image_path = os.path.join(output_dir, sorted(tif_files)[-1])
 
         product_type = "L4_DN" if "L4_DN" in collection else "PCA_FUSED"
+        props = best.get("properties", {})
+        cloud = float(props.get("eo:cloud_cover", props.get("cloud_cover", 0)))
+
+        # Parse capture date from properties
+        capture_date = initial
+        date_str = props.get("datetime", "")
+        if date_str:
+            try:
+                capture_date = date.fromisoformat(date_str[:10])
+            except ValueError:
+                pass
+
         return SatelliteImage(
             path=image_path,
             scene_id=str(scene_id),
             satellite="CBERS-4A",
             instrument="WPM",
             product=product_type,
-            capture_date=best.get("date", initial),
-            cloud_cover=float(best.get("cloud_cover", 0)),
+            capture_date=capture_date,
+            cloud_cover=cloud,
         )
 
     def _search_stac(
@@ -235,13 +252,14 @@ class Cbers4aFetcher:
             cloud_cover=float(cloud),
         )
 
-    def _pick_best_product(self, products: dict) -> dict:
-        """Pick the product with lowest cloud cover."""
+    def _pick_best_feature(self, features: list) -> dict:
+        """Pick the GeoJSON feature with lowest cloud cover."""
         best = None
-        best_cloud = 999
-        for scene_id, info in products.items():
-            cloud = float(info.get("cloud_cover", info.get("cloud", 100)))
+        best_cloud = 999.0
+        for feat in features:
+            props = feat.get("properties", {})
+            cloud = float(props.get("eo:cloud_cover", props.get("cloud_cover", 100)))
             if cloud < best_cloud:
                 best_cloud = cloud
-                best = {"scene_id": scene_id, "cloud_cover": cloud, "date": info.get("date")}
-        return best or {"scene_id": "", "cloud_cover": 0, "date": None}
+                best = feat
+        return best or features[0]
