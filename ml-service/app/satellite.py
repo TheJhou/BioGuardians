@@ -70,8 +70,9 @@ class Cbers4aFetcher:
         initial = target_date - timedelta(days=self._settings.date_search_range_days)
         end = target_date + timedelta(days=self._settings.date_search_range_days)
 
-        # Try L4 DN first (orthorectified), then fused product.
-        for collection in [COLLECTION_L4_DN, COLLECTION_FUSED]:
+        # Try pan-sharpened (0.8m) first — much better for animal detection.
+        # Fall back to L4 DN (2m) if fused is not available.
+        for collection in [COLLECTION_FUSED, COLLECTION_L4_DN]:
             try:
                 image = self._try_collection(collection, bbox, initial, end, out)
                 if image:
@@ -129,7 +130,8 @@ class Cbers4aFetcher:
         scene_id = best.get("id", "unknown")
 
         # Download — cbers4asat requires bands parameter
-        # CBERS-4A WPM bands: red, green, blue (for RGB composite)
+        # CBERS-4A WPM RGB bands: red, green, blue
+        # Both L4_DN and PCA_FUSED support these band names
         best_fc = {"type": "FeatureCollection", "features": [best]}
         self._api.download(
             best_fc,

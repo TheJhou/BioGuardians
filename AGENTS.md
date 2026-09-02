@@ -69,7 +69,9 @@
 ## ML Service (detecção por satélite)
 - Microserviço Python isolado em `ml-service/` (FastAPI + YOLOv8 + PyTorch)
 - Porta 8001, container Docker separado (`bioguardians-ml`)
-- Busca imagens CBERS-4A WPM (2m resolução) no INPE via biblioteca `cbers4asat`
+- Busca imagens CBERS-4A WPM no INPE via biblioteca `cbers4asat`
+- **Preferência por pan-sharpened (PCA_FUSED)**: 0.8m de resolução (2.5x melhor que L4_DN de 2m). Cai pra L4_DN só se fused não estiver disponível.
+- Composição RGB: as 3 bandas (R, G, B) são baixadas separadamente e combinadas num único GeoTIFF antes da detecção
 - Pipeline: buscar imagem → compor RGB → CLAHE → detectar animais (YOLOv8 + SAHI) → classificar espécie (IA) → salvar como `ocorrencia` com `fonte='deteccao_satelite'`
 - **SAHI** (Slicing Aided Hyper Inference): sliceia a imagem em patches de 512x512 com 20% overlap pra detectar objetos pequenos. Melhora detecção em imagens grandes de satélite.
 - **CLAHE**: realce de contraste adaptativo aplicado antes da detecção pra distinguir animais da vegetação
