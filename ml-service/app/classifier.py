@@ -124,12 +124,15 @@ def _parse_ai_response(raw) -> Optional[dict]:
         lines = [l for l in lines if not l.strip().startswith("```")]
         text = "\n".join(lines).strip()
 
+    logger.info("Parsing VLM response (%d chars): %r", len(text), text[:500])
+
     # Try direct parse first
     data = None
     try:
         data = json.loads(text)
-    except json.JSONDecodeError:
-        pass
+        logger.info("Direct JSON parse succeeded")
+    except json.JSONDecodeError as exc:
+        logger.info("Direct JSON parse failed: %s", exc)
 
     # If direct parse failed, try to extract JSON from within the text
     if data is None:
@@ -139,19 +142,22 @@ def _parse_ai_response(raw) -> Optional[dict]:
         if match:
             try:
                 data = json.loads(match.group())
-            except json.JSONDecodeError:
-                pass
+                logger.info("Regex JSON extraction succeeded: %r", match.group()[:200])
+            except json.JSONDecodeError as exc:
+                logger.info("Regex JSON extraction failed: %s", exc)
 
     # Some models return a key-value fragment without surrounding braces
     # e.g. '\n  "nome_cientifico": "panthera onca",\n  ...'
     if data is None:
+        wrapped = "{" + text + "}"
         try:
-            data = json.loads("{" + text + "}")
-        except json.JSONDecodeError:
-            pass
+            data = json.loads(wrapped)
+            logger.info("Brace-wrapped JSON parse succeeded: %r", wrapped[:200])
+        except json.JSONDecodeError as exc:
+            logger.info("Brace-wrapped JSON parse failed: %s", exc)
 
     if data is None:
-        logger.warning("VLM returned non-JSON response: %s", text[:300])
+        logger.warning("VLM returned non-JSON response: %s", text[:500])
         return None
 
     # Normalize fields
@@ -223,7 +229,11 @@ class SpeciesClassifier:
             try:
                 return self._classify_with_vlm(crop, lat, lon, detection_confidence)
             except Exception as exc:
-                logger.error("VLM classification failed, falling back to heuristic: %s", exc)
+                logger.error(
+                    "VLM classification failed (type=%s), falling back to heuristic: %r",
+                    type(exc).__name__, exc,
+                )
+                logger.exception("VLM classification traceback")
 
         return self._heuristic.classify(coco_class_name, lat, lon, detection_confidence)
 
@@ -268,9 +278,12 @@ class SpeciesClassifier:
             resp = client.post(OPENROUTER_URL, json=payload, headers=headers)
 
         if resp.status_code != 200:
+            logger.error("OpenRouter API error %d: %s", resp.status_code, resp.text[:500])
             raise RuntimeError(
                 f"OpenRouter API error {resp.status_code}: {resp.text[:300]}"
             )
+
+        logger.info("OpenRouter response status=%d len=%d", resp.status_code, len(resp.text))
 
         try:
             data = resp.json()
@@ -283,8 +296,10 @@ class SpeciesClassifier:
         try:
             content = data["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as exc:
-            logger.error("Unexpected OpenRouter response structure: %s", str(data)[:300])
+            logger.error("Unexpected OpenRouter response structure: %s", str(data)[:500])
             raise RuntimeError(f"Cannot extract content from response: {exc}") from exc
+
+        logger.info("OpenRouter content type=%s len=%d", type(content).__name__, len(str(content)))
 
         # Some models return content as a list of parts
         if isinstance(content, list):
