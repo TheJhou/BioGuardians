@@ -176,20 +176,23 @@ docker compose -f docker-compose.prod.yml -f docker-compose.observability.yml up
 ### Arquitetura alvo
 ```
 Internet → Cloudflare (DNS + HTTPS) → Nginx na VM → Docker
-  your-domain.com     → 127.0.0.1:8080 (frontend)
-  api.your-domain.com → 127.0.0.1:3001 (backend)
+  financemobile.com.br              → 127.0.0.1:8080  (frontend)
+  api.financemobile.com.br          → 127.0.0.1:3001  (backend)
+  grafana.financemobile.com.br      → 127.0.0.1:3000  (Grafana)
+  pgadmin.financemobile.com.br      → 127.0.0.1:5050  (pgAdmin — direto na VM)
+  portainer.financemobile.com.br    → 127.0.0.1:9443  (Portainer — direto na VM)
 ```
 
 ### Variáveis de ambiente
-- `VITE_API_URL=https://api.your-domain.com/api` (frontend — deve terminar em `/api`)
-- `FRONTEND_URL=https://your-domain.com` (backend — CORS origin exata)
-- `CORS_ORIGIN=https://your-domain.com` (backend)
+- `VITE_API_URL=https://api.financemobile.com.br/api` (frontend — deve terminar em `/api`)
+- `FRONTEND_URL=https://financemobile.com.br` (backend — CORS origin exata)
+- `CORS_ORIGIN=https://financemobile.com.br` (backend)
 - `VITE_MAPTILER_API_KEY` (frontend — obrigatório para o mapa)
 
 ### Portas
 - Abertas para Internet: 80, 443, 22
 - Acesso administrativo/local: 8080 (frontend via Nginx), 9443 (Portainer)
-- Fechadas externamente: 3000, 3001, 5432, 9090, 3100, 3200, 4317
+- Fechadas externamente: 3000, 3001, 5050, 5432, 9090, 3100, 3200, 4317
 
 ### Deploy
 - O workflow `deploy.yml` builda imagens GHCR, aplica migrations, renderiza `stack.yml` e sobe na VM.
@@ -198,55 +201,17 @@ Internet → Cloudflare (DNS + HTTPS) → Nginx na VM → Docker
 - Nginx termina TLS e faz proxy reverso para `127.0.0.1:8080` e `127.0.0.1:3001`.
 - Certificados ficam em `/etc/cloudflare/` (ou similar) com permissão 600 na chave privada.
 
-- Fechadas para externo: 3000, 3001, 5432
+- Fechadas para externo: 3000, 3001, 5050, 5432
 - Frontend expõe `127.0.0.1:8080` (só Nginx da VM acessa)
 - Backend expõe `127.0.0.1:3001` (só Nginx da VM acessa)
 
 ### Nginx
-- Configurar na VM em: `/etc/nginx/sites-available/your-domain`
+- Config no repo: `infra/nginx/bioguardians.conf`
+- Configurar na VM em: `/etc/nginx/sites-available/bioguardians`
 - Certificado Cloudflare Origin CA: `/etc/cloudflare/origin-ca.crt`
 - Chave privada: `/etc/cloudflare/origin-ca.key`
 - NÃO commitar certificado/chave no Git.
-
-Exemplo de config (substitua `your-domain.com`):
-```nginx
-upstream frontend { server 127.0.0.1:8080; }
-upstream backend  { server 127.0.0.1:3001; }
-
-server {
-  listen 80;
-  server_name your-domain.com api.your-domain.com;
-  return 301 https://$host$request_uri;
-}
-
-server {
-  listen 443 ssl http2;
-  server_name your-domain.com;
-  ssl_certificate     /etc/cloudflare/origin-ca.crt;
-  ssl_certificate_key /etc/cloudflare/origin-ca.key;
-  location / {
-    proxy_pass http://frontend;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-  }
-}
-
-server {
-  listen 443 ssl http2;
-  server_name api.your-domain.com;
-  ssl_certificate     /etc/cloudflare/origin-ca.crt;
-  ssl_certificate_key /etc/cloudflare/origin-ca.key;
-  client_max_body_size 10M;
-  location / {
-    proxy_pass http://backend;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-  }
-}
+- pgAdmin e Portainer rodam direto na VM (fora do stack.yml Docker Compose)
 ```
 
 ### Cloudflare
