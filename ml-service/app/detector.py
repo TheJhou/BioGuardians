@@ -41,7 +41,9 @@ COCO_ANIMAL_LABELS = {
 }
 
 # SAHI slicing parameters
-SLICE_SIZE = 512
+# 640x640 matches YOLOv8 native input size, avoiding unnecessary upscaling
+# from 512 and reducing the number of slices (~30% fewer tiles on large images).
+SLICE_SIZE = 640
 OVERLAP_RATIO = 0.2
 
 # Post-filter: reject detections outside this bbox size range (pixels)
