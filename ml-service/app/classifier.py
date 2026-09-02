@@ -41,20 +41,17 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 PROMPT = """You are a wildlife biologist specialized in Brazilian fauna.
 Analyze this satellite image crop showing a detected animal.
 
-Respond ONLY with a JSON object (no markdown, no explanation) with these fields:
+Return a JSON object with exactly these fields:
 {
-  "nome_cientifico": "scientific name in lowercase, e.g. panthera onca",
-  "nome_popular": "common name in Portuguese, e.g. onça-pintada",
-  "descricao": "a 2-3 sentence description in Portuguese covering appearance, habitat and behavior",
-  "categoria_ameaca": "extinction risk category — one of: CR, EN, VU, NT, LC, DD",
-  "confianca": "your confidence level from 0.0 to 1.0"
+  "nome_cientifico": "scientific name in lowercase or null",
+  "nome_popular": "common name in Portuguese or null",
+  "descricao": "2-3 sentence description in Portuguese",
+  "categoria_ameaca": "one of: CR, EN, VU, NT, LC, DD",
+  "confianca": "number from 0.0 to 1.0"
 }
 
-Context: the animal was detected in a satellite image (CBERS-4A WPM, 2m resolution)
-in a Brazilian protected area. Biome inferred from coordinates: {biome}.
-
-If you cannot identify the species with reasonable confidence, set nome_cientifico to null
-and confianca to a low value."""
+Context: satellite image (CBERS-4A WPM) in a Brazilian protected area. Biome: {biome}.
+If you cannot identify the species, set nome_cientifico to null and confianca to 0.0."""
 
 
 # ---- Heuristic fallback (kept for when API key is not configured) ----
@@ -110,18 +107,43 @@ def _crop_to_base64_jpeg(crop: np.ndarray, quality: int = 85) -> str:
     return base64.b64encode(buf.tobytes()).decode("ascii")
 
 
-def _parse_ai_response(raw: str) -> Optional[dict]:
-    """Parse the JSON response from the VLM, tolerating markdown fences."""
+def _parse_ai_response(raw) -> Optional[dict]:
+    """Parse the JSON response from the VLM, tolerating markdown fences and extra text."""
+    if raw is None:
+        logger.warning("VLM returned None content")
+        return None
+
+    if not isinstance(raw, str):
+        raw = str(raw)
+
     text = raw.strip()
+
+    # Strip markdown code fences
     if text.startswith("```"):
-        # Strip markdown code fences
         lines = text.split("\n")
         lines = [l for l in lines if not l.strip().startswith("```")]
         text = "\n".join(lines).strip()
+
+    # Try direct parse first
+    data = None
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
-        logger.warning("VLM returned non-JSON response: %s", text[:200])
+        pass
+
+    # If direct parse failed, try to extract JSON from within the text
+    if data is None:
+        import re
+        # Find the first { ... } block (greedy but balanced-ish via regex)
+        match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', text, re.DOTALL)
+        if match:
+            try:
+                data = json.loads(match.group())
+            except json.JSONDecodeError:
+                pass
+
+    if data is None:
+        logger.warning("VLM returned non-JSON response: %s", text[:300])
         return None
 
     # Normalize fields
@@ -226,6 +248,7 @@ class SpeciesClassifier:
             ],
             "max_tokens": 600,
             "temperature": 0.2,
+            "response_format": {"type": "json_object"},
         }
 
         headers = {
@@ -242,7 +265,22 @@ class SpeciesClassifier:
             )
 
         data = resp.json()
-        content = data["choices"][0]["message"]["content"]
+
+        # Extract content safely — some models return content as list
+        try:
+            content = data["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError) as exc:
+            logger.error("Unexpected OpenRouter response structure: %s", str(data)[:300])
+            raise RuntimeError(f"Cannot extract content from response: {exc}") from exc
+
+        # Some models return content as a list of parts
+        if isinstance(content, list):
+            content = " ".join(
+                part.get("text", "") if isinstance(part, dict) else str(part)
+                for part in content
+            )
+
+        logger.debug("VLM raw response: %s", str(content)[:200])
         parsed = _parse_ai_response(content)
 
         if parsed is None or not parsed["nome_cientifico"]:
