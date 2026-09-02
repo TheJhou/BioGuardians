@@ -226,8 +226,8 @@ jobs:
           OPENROUTER_MODEL='${{ secrets.OPENROUTER_MODEL || 'anthropic/claude-sonnet-4' }}'
           YOLO_DEVICE='${{ secrets.YOLO_DEVICE || 'cpu' }}'
           YOLO_WORKERS='${{ secrets.YOLO_WORKERS || '4' }}'
-          DB_POOL_MAX='${{ secrets.DB_POOL_MAX || '10' }}'
-          BATCH_CONCURRENCY='${{ secrets.BATCH_CONCURRENCY || '4' }}'
+          DB_POOL_MAX='${{ secrets.DB_POOL_MAX || '20' }}'
+          BATCH_CONCURRENCY='${{ secrets.BATCH_CONCURRENCY || '8' }}'
           HTTP_TIMEOUT='${{ secrets.HTTP_TIMEOUT || '120' }}'
           DB_PASSWORD_ENC=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$DB_PASSWORD'))")
           export DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD_ENC}@${DB_HOST}:${DB_PORT}/${DB_NAME}"

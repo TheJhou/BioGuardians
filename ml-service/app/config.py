@@ -48,7 +48,7 @@ def load_settings() -> Settings:
         openrouter_model=os.environ.get("OPENROUTER_MODEL", "anthropic/claude-sonnet-4"),
         yolo_device=os.environ.get("YOLO_DEVICE", "cpu"),
         yolo_workers=int(os.environ.get("YOLO_WORKERS", "4")),
-        db_pool_max=int(os.environ.get("DB_POOL_MAX", "10")),
-        batch_concurrency=int(os.environ.get("BATCH_CONCURRENCY", "4")),
+        db_pool_max=int(os.environ.get("DB_POOL_MAX", "20")),
+        batch_concurrency=int(os.environ.get("BATCH_CONCURRENCY", "8")),
         http_timeout=int(os.environ.get("HTTP_TIMEOUT", "120")),
     )
