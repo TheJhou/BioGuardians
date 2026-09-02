@@ -76,19 +76,22 @@ class DetectionPipeline:
             geo = GeoReference(image.path)
             geo.load()
 
-            # Step 3: Read image as numpy array (RGB)
+            # Step 3: Read image as numpy array (BGR for OpenCV)
             img_array = self._read_image_as_rgb(image.path)
             if img_array is None:
                 raise RuntimeError(f"Failed to read image: {image.path}")
 
+            # Step 3b: Apply CLAHE contrast enhancement to help detection
+            img_array = self._enhance_contrast(img_array)
+
             logger.info(
-                "Job %d: image loaded %dx%d, running detection",
+                "Job %d: image loaded %dx%d (CLAHE enhanced), running detection",
                 job_id,
                 img_array.shape[1],
                 img_array.shape[0],
             )
 
-            # Step 4: Run YOLOv8 detection (tiled)
+            # Step 4: Run YOLOv8 detection (SAHI sliced)
             detections = self._detector.detect_image(img_array)
             logger.info("Job %d: %d raw detections", job_id, len(detections))
 
@@ -234,6 +237,31 @@ class DetectionPipeline:
         except Exception as exc:
             logger.error("Failed to read image %s: %s", path, exc)
             return None
+
+    def _enhance_contrast(self, img: np.ndarray) -> np.ndarray:
+        """Apply CLAHE (Contrast Limited Adaptive Histogram Equalization).
+
+        Enhances local contrast to help distinguish animals from
+        background vegetation in satellite imagery.
+        """
+        try:
+            import cv2
+
+            # Convert to LAB color space
+            lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+            l, a, b = cv2.split(lab)
+
+            # Apply CLAHE to the L channel
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            l = clahe.apply(l)
+
+            # Merge back and convert to BGR
+            enhanced = cv2.merge([l, a, b])
+            enhanced = cv2.cvtColor(enhanced, cv2.COLOR_LAB2BGR)
+            return enhanced
+        except Exception as exc:
+            logger.warning("CLAHE enhancement failed, using original image: %s", exc)
+            return img
 
     def _crop_detection(
         self,

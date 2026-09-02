@@ -139,13 +139,31 @@ class Cbers4aFetcher:
             with_folder=False,
         )
 
-        # Find the downloaded file
-        tif_files = [f for f in os.listdir(output_dir) if f.endswith(".tif")]
-        if not tif_files:
+        # Find downloaded band files and compose a single RGB GeoTIFF
+        # cbers4asat downloads each band as a separate .tif file
+        band_files = sorted(
+            [f for f in os.listdir(output_dir) if f.endswith(".tif") and "BAND" in f]
+        )
+        if not band_files:
+            # Fallback: try any .tif file
+            band_files = sorted(
+                [f for f in os.listdir(output_dir) if f.endswith(".tif")]
+            )
+
+        if not band_files:
             logger.warning("Download completed but no .tif found in %s", output_dir)
             return None
 
-        image_path = os.path.join(output_dir, sorted(tif_files)[-1])
+        if len(band_files) >= 3:
+            # Compose 3 bands into a single RGB GeoTIFF
+            image_path = self._compose_rgb_tif(
+                [os.path.join(output_dir, f) for f in band_files[:3]],
+                output_dir,
+                scene_id,
+            )
+        else:
+            # Single band — use as-is
+            image_path = os.path.join(output_dir, band_files[0])
 
         product_type = "L4_DN" if "L4_DN" in collection else "PCA_FUSED"
         props = best.get("properties", {})
@@ -264,3 +282,61 @@ class Cbers4aFetcher:
                 best_cloud = cloud
                 best = feat
         return best or features[0]
+
+    def _compose_rgb_tif(
+        self,
+        band_paths: list[str],
+        output_dir: str,
+        scene_id: str,
+    ) -> str:
+        """Compose 3 separate band TIFs into a single RGB GeoTIFF.
+
+        cbers4asat downloads each band as a separate file (BAND1, BAND2, BAND3).
+        This method stacks them into a single 3-band GeoTIFF preserving georeferencing.
+
+        Args:
+            band_paths: list of paths to individual band TIFs (blue, green, red)
+            output_dir: directory to write the composed file
+            scene_id: scene identifier for the output filename
+
+        Returns:
+            Path to the composed RGB GeoTIFF.
+        """
+        import rasterio
+        from rasterio.merge import merge as _unused  # noqa: F401
+
+        logger.info("Composing RGB GeoTIFF from %d bands", len(band_paths))
+
+        # Read each band and stack into a single array
+        bands = []
+        profile = None
+        for bp in band_paths:
+            with rasterio.open(bp) as src:
+                if profile is None:
+                    profile = src.profile
+                bands.append(src.read(1))
+
+        # Update profile for 3-band output
+        profile.update(count=3, dtype="uint8")
+
+        # Normalize each band to 0-255 and stack
+        import numpy as np
+        stacked = []
+        for band in bands:
+            b_min, b_max = float(band.min()), float(band.max())
+            if b_max > b_min:
+                normalized = ((band - b_min) / (b_max - b_min) * 255).astype(np.uint8)
+            else:
+                normalized = np.zeros_like(band, dtype=np.uint8)
+            stacked.append(normalized)
+
+        # Write as BGR order (OpenCV convention expected by pipeline)
+        # cbers4asat bands: BAND1=Blue, BAND2=Green, BAND3=Red
+        # rasterio writes band order: 1, 2, 3 → we write B, G, R
+        output_path = os.path.join(output_dir, f"{scene_id}_RGB.tif")
+        with rasterio.open(output_path, "w", **profile) as dst:
+            for i, band_data in enumerate(stacked, 1):
+                dst.write(band_data, i)
+
+        logger.info("RGB GeoTIFF composed: %s", output_path)
+        return output_path

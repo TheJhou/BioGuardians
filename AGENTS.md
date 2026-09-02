@@ -70,7 +70,11 @@
 - Microserviço Python isolado em `ml-service/` (FastAPI + YOLOv8 + PyTorch)
 - Porta 8001, container Docker separado (`bioguardians-ml`)
 - Busca imagens CBERS-4A WPM (2m resolução) no INPE via biblioteca `cbers4asat`
-- Pipeline: buscar imagem → detectar animais (YOLOv8) → classificar espécie → salvar como `ocorrencia` com `fonte='deteccao_satelite'`
+- Pipeline: buscar imagem → compor RGB → CLAHE → detectar animais (YOLOv8 + SAHI) → classificar espécie (IA) → salvar como `ocorrencia` com `fonte='deteccao_satelite'`
+- **SAHI** (Slicing Aided Hyper Inference): sliceia a imagem em patches de 512x512 com 20% overlap pra detectar objetos pequenos. Melhora detecção em imagens grandes de satélite.
+- **CLAHE**: realce de contraste adaptativo aplicado antes da detecção pra distinguir animais da vegetação
+- **Modelo YOLOv8 COCO é placeholder**: treinado em fotos de nível do solo, não em imagens de satélite. Detecção será baixa em CBERS-4A (2m). Pra produção, precisa treinar um modelo customizado com dados anotados de fauna em imagens de satélite.
+- **Filtro de bbox**: detecções fora do range 3-200 pixels são descartadas (muito pequenas = ruído, muito grandes = não é animal)
 - Ocorrências detectadas aparecem automaticamente no mapa existente (sem UI separada)
 - Tabelas: `deteccao_job`, `deteccao`, `modelo_ml` (migration 014)
 - Rastreio de IA: `deteccao.metodo_classificacao` ('ai' ou 'heuristic'), `modelo_ia`, `confianca_ia` (migration 015)
