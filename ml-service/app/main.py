@@ -9,7 +9,7 @@ Endpoints:
 
 import logging
 from contextlib import asynccontextmanager
-from datetime import date
+from datetime import date as date_type
 from typing import Optional
 from pydantic import BaseModel, Field
 
@@ -85,7 +85,7 @@ app = FastAPI(
 class JobSummary(BaseModel):
     id: int
     bbox: str
-    data_captura: date
+    data_captura: date_type
     satelite: str
     status: str
     total_deteccoes: int
@@ -112,7 +112,7 @@ class JobDetail(JobSummary):
 
 
 class BatchRequest(BaseModel):
-    date: date = Field(..., description="Target satellite image date (YYYY-MM-DD)")
+    date: date_type = Field(..., description="Target satellite image date (YYYY-MM-DD)")
     area_ids: Optional[list[int]] = Field(
         None, description="Specific area IDs to process (optional, defaults to all)"
     )
