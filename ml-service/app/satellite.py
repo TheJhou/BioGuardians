@@ -281,7 +281,7 @@ class Cbers4aFetcher:
         2. Among scenes with cloud <= 40%, pick the one with lowest cloud
         3. If no scene has cloud <= 40%, pick the least cloudy overall
         """
-        CLOUD_THRESHOLD = 40.0
+        CLOUD_THRESHOLD = 30.0
 
         # Parse all features into (timestamp, cloud, feature) tuples
         parsed = []
