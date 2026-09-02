@@ -169,6 +169,9 @@ class DetectionPipeline:
             lon=lon,
             bbox_pixel=bbox_pixel,
             recorte_url=None,
+            metodo_classificacao=result.method,
+            modelo_ia=self._settings.openrouter_model if result.method == "ai" else None,
+            confianca_ia=result.confidence if result.method == "ai" else None,
         )
         await self._db.save_detection(det_record)
 

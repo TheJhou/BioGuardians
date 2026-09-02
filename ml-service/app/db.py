@@ -18,6 +18,9 @@ class DetectionRecord:
     lon: float
     bbox_pixel: Optional[str]
     recorte_url: Optional[str]
+    metodo_classificacao: str = "heuristic"  # 'ai' or 'heuristic'
+    modelo_ia: Optional[str] = None
+    confianca_ia: Optional[float] = None
 
 
 class Database:
@@ -91,8 +94,9 @@ class Database:
         async with self._pool.acquire() as conn:
             row = await conn.fetchrow(
                 """INSERT INTO deteccao
-                     (job_id, especie_id, nome_cientifico, confianca, lat, lon, bbox_pixel, recorte_url)
-                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                     (job_id, especie_id, nome_cientifico, confianca, lat, lon,
+                      bbox_pixel, recorte_url, metodo_classificacao, modelo_ia, confianca_ia)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::varchar, $10, $11)
                    RETURNING id""",
                 det.job_id,
                 det.especie_id,
@@ -102,6 +106,9 @@ class Database:
                 det.lon,
                 det.bbox_pixel,
                 det.recorte_url,
+                det.metodo_classificacao,
+                det.modelo_ia,
+                det.confianca_ia,
             )
             return row["id"]
 

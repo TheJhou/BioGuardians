@@ -44,6 +44,7 @@
 12. `012_spatial_optimization.sql` — otimizações espaciais (simplificação de geometrias)
 13. `013_imagem_url.sql` — coluna imagem_url na tabela especie
 14. `014_deteccao_satelite.sql` — tabelas deteccao_job, deteccao, modelo_ml (ML service)
+15. `015_rastreio_ia.sql` — rastreio de classificação por IA na tabela deteccao
 
 ## Decisões de modelagem
 - SRID 4326 (WGS84) para todas as geometrias
@@ -72,6 +73,7 @@
 - Pipeline: buscar imagem → detectar animais (YOLOv8) → classificar espécie → salvar como `ocorrencia` com `fonte='deteccao_satelite'`
 - Ocorrências detectadas aparecem automaticamente no mapa existente (sem UI separada)
 - Tabelas: `deteccao_job`, `deteccao`, `modelo_ml` (migration 014)
+- Rastreio de IA: `deteccao.metodo_classificacao` ('ai' ou 'heuristic'), `modelo_ia`, `confianca_ia` (migration 015)
 - Env vars: `INPE_EMAIL` (cadastro em dgi.inpe.br), `ML_SERVICE_URL`, `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`
 - Endpoints: `POST /batch` (interno), `GET /jobs`, `GET /jobs/:id`, `GET /health`
 - **Sem trigger público**: detecção é disparada offline via CLI ou endpoint interno, nunca pela API pública
