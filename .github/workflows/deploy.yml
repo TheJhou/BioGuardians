@@ -233,6 +233,13 @@ jobs:
           export DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD_ENC}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
           export FRONTEND_URL
           export INPE_EMAIL
+          export OPENROUTER_API_KEY
+          export OPENROUTER_MODEL
+          export YOLO_DEVICE
+          export YOLO_WORKERS
+          export DB_POOL_MAX
+          export BATCH_CONCURRENCY
+          export HTTP_TIMEOUT
           envsubst < stack.yml > stack.rendered.yml
 
       - name: Upload stack renderizada
