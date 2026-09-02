@@ -134,13 +134,21 @@ def _parse_ai_response(raw) -> Optional[dict]:
     # If direct parse failed, try to extract JSON from within the text
     if data is None:
         import re
-        # Find the first { ... } block (greedy but balanced-ish via regex)
+        # Find the first { ... } block
         match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', text, re.DOTALL)
         if match:
             try:
                 data = json.loads(match.group())
             except json.JSONDecodeError:
                 pass
+
+    # Some models return a key-value fragment without surrounding braces
+    # e.g. '\n  "nome_cientifico": "panthera onca",\n  ...'
+    if data is None:
+        try:
+            data = json.loads("{" + text + "}")
+        except json.JSONDecodeError:
+            pass
 
     if data is None:
         logger.warning("VLM returned non-JSON response: %s", text[:300])
@@ -264,7 +272,12 @@ class SpeciesClassifier:
                 f"OpenRouter API error {resp.status_code}: {resp.text[:300]}"
             )
 
-        data = resp.json()
+        try:
+            data = resp.json()
+        except json.JSONDecodeError as exc:
+            raw_text = resp.text[:500]
+            logger.error("OpenRouter response is not valid JSON: %s", raw_text)
+            raise RuntimeError(f"OpenRouter returned non-JSON response: {exc}") from exc
 
         # Extract content safely — some models return content as list
         try:
@@ -280,7 +293,8 @@ class SpeciesClassifier:
                 for part in content
             )
 
-        logger.debug("VLM raw response: %s", str(content)[:200])
+        # DEBUG: log raw VLM response to understand parsing failures
+        logger.info("VLM raw response (%d chars): %s", len(str(content)), repr(str(content)[:500]))
         parsed = _parse_ai_response(content)
 
         if parsed is None or not parsed["nome_cientifico"]:
