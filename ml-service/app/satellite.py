@@ -115,7 +115,7 @@ class Cbers4aFetcher:
             initial_date=initial,
             end_date=end,
             cloud=self._settings.max_cloud_cover,
-            limit=5,
+            limit=10,
             collections=[collection],
         )
 
@@ -274,32 +274,57 @@ class Cbers4aFetcher:
         )
 
     def _pick_best_feature(self, features: list) -> dict:
-        """Pick the most recent GeoJSON feature (closest to target date).
+        """Pick the best scene from up to 10 recent features.
 
-        Falls back to lowest cloud cover as tiebreaker.
+        Strategy:
+        1. Sort by date (most recent first)
+        2. Among scenes with cloud <= 40%, pick the one with lowest cloud
+        3. If no scene has cloud <= 40%, pick the least cloudy overall
         """
-        best = None
-        best_score = (-1, 999.0)  # (timestamp, cloud_cover)
+        CLOUD_THRESHOLD = 40.0
 
+        # Parse all features into (timestamp, cloud, feature) tuples
+        parsed = []
         for feat in features:
             props = feat.get("properties", {})
             date_str = props.get("datetime", "")
             cloud = float(props.get("eo:cloud_cover", props.get("cloud_cover", 100)))
-
-            # Parse date to timestamp — more recent = higher score
             timestamp = 0
             if date_str:
                 try:
                     timestamp = date.fromisoformat(date_str[:10]).toordinal()
                 except (ValueError, TypeError):
                     pass
+            parsed.append((timestamp, cloud, feat))
 
-            # Pick most recent date; use cloud cover as tiebreaker
-            if (timestamp, -cloud) > (best_score[0], -best_score[1]):
-                best_score = (timestamp, cloud)
-                best = feat
+        if not parsed:
+            return features[0]
 
-        return best or features[0]
+        # Sort by most recent first
+        parsed.sort(key=lambda x: x[0], reverse=True)
+
+        # Take the 10 most recent (already limited by query, but be safe)
+        recent = parsed[:10]
+
+        # Filter to cloud <= 40%
+        acceptable = [p for p in recent if p[1] <= CLOUD_THRESHOLD]
+
+        if acceptable:
+            # Among acceptable, pick lowest cloud
+            best = min(acceptable, key=lambda x: x[1])
+            logger.info(
+                "Selected scene: cloud=%.1f%% (date_ord=%d) from %d acceptable",
+                best[1], best[0], len(acceptable),
+            )
+            return best[2]
+
+        # No scene under 40% cloud — pick the least cloudy available
+        best = min(recent, key=lambda x: x[1])
+        logger.info(
+            "No scene under %.0f%% cloud, using best available: cloud=%.1f%%",
+            CLOUD_THRESHOLD, best[1],
+        )
+        return best[2]
 
     def _compose_rgb_tif(
         self,
