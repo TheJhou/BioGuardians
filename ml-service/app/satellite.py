@@ -128,11 +128,12 @@ class Cbers4aFetcher:
         best = self._pick_best_feature(features)
         scene_id = best.get("id", "unknown")
 
-        # Download — cbers4asat expects the full FeatureCollection or a filtered one
-        # Build a FeatureCollection with only the best feature
+        # Download — cbers4asat requires bands parameter
+        # CBERS-4A WPM bands: red, green, blue (for RGB composite)
         best_fc = {"type": "FeatureCollection", "features": [best]}
         self._api.download(
             best_fc,
+            bands=["red", "green", "blue"],
             threads=1,
             outdir=output_dir,
             with_folder=False,
