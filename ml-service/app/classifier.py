@@ -42,13 +42,13 @@ PROMPT = """You are a wildlife biologist specialized in Brazilian fauna.
 Analyze this satellite image crop showing a detected animal.
 
 Return a JSON object with exactly these fields:
-{
+{{
   "nome_cientifico": "scientific name in lowercase or null",
   "nome_popular": "common name in Portuguese or null",
   "descricao": "2-3 sentence description in Portuguese",
   "categoria_ameaca": "one of: CR, EN, VU, NT, LC, DD",
   "confianca": "number from 0.0 to 1.0"
-}
+}}
 
 Context: satellite image (CBERS-4A WPM) in a Brazilian protected area. Biome: {biome}.
 If you cannot identify the species, set nome_cientifico to null and confianca to 0.0."""
