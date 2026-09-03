@@ -171,30 +171,23 @@ def finetune(
 
     # Custom collator for Qwen2-VL
     def collate_fn(batch):
-        """Collate messages into model inputs."""
-        # Process all conversations
+        """Collate messages into model inputs using qwen_vl_utils."""
+        from qwen_vl_utils import process_vision_info
+
         texts = []
-        images_list = []
         for messages in batch:
             text = processor.apply_chat_template(
                 messages, tokenize=False, add_generation_prompt=False
             )
             texts.append(text)
-            # Extract images from the user message
-            image_items = [
-                content["image"]
-                for msg in messages
-                for content in (msg["content"] if isinstance(msg["content"], list) else [])
-                if isinstance(content, dict) and content.get("type") == "image"
-            ]
-            images_list.append(image_items)
 
-        # Flatten images for processor
-        all_images = [img for imgs in images_list for img in imgs]
+        # process_vision_info extracts images from the message format
+        image_inputs, video_inputs = process_vision_info(batch)
 
         batch_inputs = processor(
             text=texts,
-            images=all_images,
+            images=image_inputs,
+            videos=video_inputs,
             padding=True,
             return_tensors="pt",
         )
@@ -215,13 +208,13 @@ def finetune(
         per_device_eval_batch_size=batch_size,
         gradient_accumulation_steps=grad_accum,
         learning_rate=lr,
-        warmup_ratio=0.03,
+        warmup_steps=10,
         lr_scheduler_type="cosine",
-        logging_steps=10,
+        logging_steps=5,
         eval_strategy="steps",
-        eval_steps=50,
+        eval_steps=20,
         save_strategy="steps",
-        save_steps=100,
+        save_steps=50,
         save_total_limit=3,
         bf16=True,
         gradient_checkpointing=True,

@@ -174,6 +174,7 @@ def run_prepare_dataset(args: argparse.Namespace) -> None:
         min_per_species=args.min_per_species,
         val_ratio=args.val_ratio,
         max_per_species=args.max_per_species,
+        max_total=getattr(args, "max_total", 0),
     )
 
 
@@ -261,6 +262,10 @@ def main() -> None:
     dataset_parser.add_argument(
         "--val-ratio", type=float, default=0.15,
         help="Validation split ratio (default: 0.15)",
+    )
+    dataset_parser.add_argument(
+        "--max-total", type=int, default=0,
+        help="Cap total images (0=no limit, for testing)",
     )
     dataset_parser.set_defaults(func=run_prepare_dataset)
 

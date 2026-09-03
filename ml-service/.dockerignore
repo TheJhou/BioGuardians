@@ -1,0 +1,8 @@
+hf_cache/
+models/
+__pycache__/
+*.pyc
+images/
+data/
+dataset/
+.env

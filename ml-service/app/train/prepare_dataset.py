@@ -116,8 +116,15 @@ class WIDownloader:
                 img_resp.raise_for_status()
 
                 ct = img_resp.headers.get("content-type", "")
-                if not ct.startswith("image/"):
+                # GCS sometimes returns application/octet-stream for JPEGs
+                if not ct.startswith("image/") and ct != "application/octet-stream":
                     logger.warning("Not image for %s: %s", image_id, ct)
+                    return None
+
+                # Verify it's actually an image by checking magic bytes
+                content = img_resp.content
+                if not (content[:2] == b'\xff\xd8' or content[:4] == b'\x89PNG'):
+                    logger.warning("Invalid image magic bytes for %s", image_id)
                     return None
 
                 dest.write_bytes(img_resp.content)
@@ -133,7 +140,8 @@ class WIDownloader:
 
 
 def prepare_dataset(data_dir: str, output_dir: str, min_per_species: int = 10,
-                    val_ratio: float = 0.15, max_per_species: int = 0):
+                    val_ratio: float = 0.15, max_per_species: int = 0,
+                    max_total: int = 0):
     """Download images and create train/val JSONL files.
 
     Args:
@@ -142,6 +150,7 @@ def prepare_dataset(data_dir: str, output_dir: str, min_per_species: int = 10,
         min_per_species: minimum images per species to include
         val_ratio: fraction of images per species for validation
         max_per_species: cap images per species (0 = no limit)
+        max_total: cap total images across all species (0 = no limit)
     """
     data_dir = Path(data_dir)
     output_dir = Path(output_dir)
@@ -262,6 +271,8 @@ def prepare_dataset(data_dir: str, output_dir: str, min_per_species: int = 10,
         train_items = records[val_count:]
 
         for item in train_items + val_items:
+            if max_total > 0 and downloaded + failed >= max_total:
+                break
             local_path = downloader.download(item["image_id"], item["location"])
             if local_path is None:
                 failed += 1
@@ -316,6 +327,8 @@ if __name__ == "__main__":
     parser.add_argument("--max-per-species", type=int, default=0,
                         help="Cap images per species (0=no limit)")
     parser.add_argument("--val-ratio", type=float, default=0.15)
+    parser.add_argument("--max-total", type=int, default=0,
+                        help="Cap total images (0=no limit)")
     args = parser.parse_args()
 
     prepare_dataset(
@@ -324,4 +337,5 @@ if __name__ == "__main__":
         min_per_species=args.min_per_species,
         val_ratio=args.val_ratio,
         max_per_species=args.max_per_species,
+        max_total=args.max_total,
     )
