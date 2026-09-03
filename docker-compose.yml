@@ -60,7 +60,6 @@ services:
       CACHE_TTL_MS: ${CACHE_TTL_MS:-30000}
       CACHE_MAX: ${CACHE_MAX:-100}
       GBIF_API_BASE: https://api.gbif.org/v1
-      ML_SERVICE_URL: http://ml-service:8001
     ports:
       - "127.0.0.1:3001:3001"
     volumes:
@@ -99,9 +98,10 @@ services:
           memory: 512M
           cpus: "1"
 
-  # ---------- ML Service (Python + FastAPI + YOLOv8, GPU) ----------
-  # Local dev with NVIDIA RTX 4060 via Docker Desktop + WSL2.
-  # Requires nvidia-container-toolkit (bundled in Docker Desktop >= 4.34).
+  # ---------- ML Service (Python + FastAPI + VLM, GPU) ----------
+  # Runs locally with NVIDIA RTX 4060 via Docker Desktop + WSL2.
+  # Classifies camera trap images using Qwen2-VL (local) or OpenRouter (fallback).
+  # NOT deployed to the Oracle VM — runs on the local GPU machine only.
   ml-service:
     build:
       context: ./ml-service
@@ -116,20 +116,18 @@ services:
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       OPENROUTER_MODEL: ${OPENROUTER_MODEL:-anthropic/claude-sonnet-4}
       YOLO_DEVICE: ${YOLO_DEVICE:-cuda}
-      YOLO_WORKERS: ${YOLO_WORKERS:-4}
-      YOLO_BATCH_SIZE: ${YOLO_BATCH_SIZE:-32}
       DB_POOL_MAX: ${DB_POOL_MAX:-20}
-      BATCH_CONCURRENCY: ${BATCH_CONCURRENCY:-4}
       HTTP_TIMEOUT: ${HTTP_TIMEOUT:-120}
       VLM_CONCURRENCY: ${VLM_CONCURRENCY:-8}
       IMAGE_STORAGE_DIR: /app/images
-      DATA_DIR: /data
+      WI_EMAIL: ${WI_EMAIL:-}
+      WI_PASSWORD: ${WI_PASSWORD:-}
     ports:
       - "127.0.0.1:8001:8001"
     volumes:
-      # Camera trap datasets (read-only) — mount under ./dados or wherever
+      # Camera trap datasets (read-only)
       - ./dados:/data:ro
-      # Persisted crops / downloaded images
+      # Persisted downloaded images
       - bioguardians_ml_images:/app/images
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]

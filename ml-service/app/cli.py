@@ -134,7 +134,7 @@ async def run_status(args: argparse.Namespace) -> None:
 
     print(f"Job {job['id']}:")
     print(f"  Status:              {job['status']}")
-    print(f"  Source:              {job.get('source', 'satellite')}")
+    print(f"  Source:              {job.get('source', 'camera_trap')}")
     print(f"  Total classified:    {job['total_deteccoes']}")
     print(f"  Total images:        {job.get('total_imagens', 0)}")
     print(f"  Images processed:    {job.get('imagens_processadas', 0)}")

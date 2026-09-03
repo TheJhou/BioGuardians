@@ -60,9 +60,7 @@ def _build_source(
             raise ValueError("data_dir is required for local_dir source")
         return LocalDirectorySource(directory=data_dir)
     if source_type == "satellite":
-        raise ValueError(
-            "Satellite source requires bbox and date — use the legacy /batch endpoint"
-        )
+        raise ValueError("Satellite source is no longer supported — use 'camera_trap' or 'local_dir'")
     raise ValueError(f"Unknown source type: {source_type}")
 
 
@@ -97,25 +95,15 @@ async def lifespan(app: FastAPI):
                     continue
 
                 job_id = job["id"]
-                source_type = job.get("source", "satellite")
+                source_type = job.get("source", "camera_trap")
                 data_dir = job.get("data_dir")
 
                 logger.info("Worker: picked job %d (source=%s)", job_id, source_type)
 
-                if source_type == "satellite":
-                    # Legacy satellite batch — process all protected areas
-                    # for the job's target date. This uses run_batch_satellite
-                    # which creates sub-jobs per area internally.
-                    target_date = job.get("data_captura", date_type.today())
-                    logger.info("Worker: satellite job %d for date %s", job_id, target_date)
-                    await pipeline.run_batch_satellite(target_date)
-                    # Mark this umbrella job as done
-                    await db.update_job_status(job_id, "concluido")
-                else:
-                    project_id = job.get("project_id")
-                    limit = job.get("p_limit")
-                    source = _build_source(source_type, data_dir, project_id=project_id, limit=limit)
-                    await pipeline.run(job_id, source)
+                project_id = job.get("project_id")
+                limit = job.get("p_limit")
+                source = _build_source(source_type, data_dir, project_id=project_id, limit=limit)
+                await pipeline.run(job_id, source)
 
             except asyncio.CancelledError:
                 logger.info("Worker loop cancelled")
@@ -144,7 +132,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="BioGuardians ML Service",
-    description="Animal detection and species classification from camera traps and satellite imagery",
+    description="Species classification from camera trap photos using VLM",
     version="2.0.0",
     lifespan=lifespan,
 )
@@ -159,7 +147,7 @@ class JobSummary(BaseModel):
     satelite: Optional[str] = None
     status: str
     total_deteccoes: int
-    source: str = "satellite"
+    source: str = "camera_trap"
     total_imagens: int = 0
     imagens_processadas: int = 0
     criado_em: str
@@ -290,7 +278,7 @@ async def list_jobs(
             satelite=j.get("satelite"),
             status=j["status"],
             total_deteccoes=j["total_deteccoes"],
-            source=j.get("source", "satellite"),
+            source=j.get("source", "camera_trap"),
             total_imagens=j.get("total_imagens", 0),
             imagens_processadas=j.get("imagens_processadas", 0),
             criado_em=j["criado_em"].isoformat() if j.get("criado_em") else "",
@@ -317,7 +305,7 @@ async def get_job(job_id: int):
         satelite=job.get("satelite"),
         status=job["status"],
         total_deteccoes=job["total_deteccoes"],
-        source=job.get("source", "satellite"),
+        source=job.get("source", "camera_trap"),
         total_imagens=job.get("total_imagens", 0),
         imagens_processadas=job.get("imagens_processadas", 0),
         criado_em=job["criado_em"].isoformat() if job.get("criado_em") else "",

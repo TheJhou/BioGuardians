@@ -58,15 +58,12 @@ jobs:
           CHANGED=$(git diff --name-only HEAD~1 HEAD || echo "")
           echo "$CHANGED" | grep -qE '^(backend/|db/)' && BE_CHANGED="true" || BE_CHANGED="false"
           echo "$CHANGED" | grep -qE '^(frontend/|observability/|stack\.yml)' && FE_CHANGED="true" || FE_CHANGED="false"
-          echo "$CHANGED" | grep -qE '^ml-service/' && ML_CHANGED="true" || ML_CHANGED="false"
           if [ -z "$CHANGED" ]; then
             BE_CHANGED="true"
             FE_CHANGED="true"
-            ML_CHANGED="true"
           fi
           echo "frontend=$FE_CHANGED" >> "$GITHUB_OUTPUT"
           echo "backend=$BE_CHANGED"  >> "$GITHUB_OUTPUT"
-          echo "ml=$ML_CHANGED"       >> "$GITHUB_OUTPUT"
 
       - name: Valida integridade das migrations
         run: |
@@ -100,11 +97,9 @@ jobs:
         run: |
           MATRIX=$(jq -cn \
             --argjson f "${{ steps.changes.outputs.frontend }}" \
-            --argjson b "${{ steps.changes.outputs.backend }}" \
-            --argjson m "${{ steps.changes.outputs.ml }}" '[
+            --argjson b "${{ steps.changes.outputs.backend }}" '[
               {"service":"frontend","context":"./frontend","dockerfile":"frontend/Dockerfile","should_build":$f},
-              {"service":"backend","context":"./backend","dockerfile":"backend/Dockerfile","should_build":$b},
-              {"service":"ml","context":"./ml-service","dockerfile":"ml-service/Dockerfile","should_build":$m}
+              {"service":"backend","context":"./backend","dockerfile":"backend/Dockerfile","should_build":$b}
             ]')
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
 

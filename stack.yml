@@ -10,7 +10,6 @@ services:
       - FRONTEND_URL=${FRONTEND_URL}
       - CORS_ORIGIN=${FRONTEND_URL}
       - GBIF_API_BASE=https://api.gbif.org/v1
-      - ML_SERVICE_URL=http://ml-service:8001
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://otel-collector:4318
       - OTEL_SERVICE_NAME=bioguardians-backend
@@ -40,32 +39,6 @@ services:
         limits:
           memory: 512M
           cpus: "1"
-    depends_on:
-      - backend
-
-  ml-service:
-    image: ${IMAGE}-ml:latest
-    container_name: bioguardians-ml
-    restart: unless-stopped
-    environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - INPE_EMAIL=${INPE_EMAIL}
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - OPENROUTER_MODEL=${OPENROUTER_MODEL}
-      - YOLO_DEVICE=${YOLO_DEVICE}
-      - YOLO_WORKERS=${YOLO_WORKERS}
-      - DB_POOL_MAX=${DB_POOL_MAX}
-      - BATCH_CONCURRENCY=${BATCH_CONCURRENCY}
-      - HTTP_TIMEOUT=${HTTP_TIMEOUT}
-    ports:
-      - "127.0.0.1:8001:8001"
-    networks:
-      - bioguardians-network
-    deploy:
-      resources:
-        limits:
-          memory: 48G
-          cpus: "8"
     depends_on:
       - backend
 

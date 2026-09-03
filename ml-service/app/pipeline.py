@@ -322,37 +322,3 @@ class ClassificationPipeline:
 
         logger.info("Reclassified %d/%d detections", classified, len(pending))
         return classified
-
-    # ------------------------------------------------------------------
-    # Legacy satellite batch (kept for backward compatibility)
-    # ------------------------------------------------------------------
-
-    async def run_batch_satellite(
-        self,
-        target_date: date,
-        area_ids: Optional[list[int]] = None,
-    ) -> dict:
-        """Legacy satellite batch — delegates to the satellite source."""
-        from .sources.satellite import SatelliteSource
-        from datetime import timedelta
-
-        areas = await self._db.get_areas_for_batch(area_ids)
-        if not areas:
-            return {"total": 0, "jobs": []}
-
-        jobs = []
-        for area in areas:
-            job_id = await self._db.create_job(
-                source="satellite",
-                data_dir=f"area_{area['id']}_{target_date}",
-                area_id=area["id"],
-            )
-            source = SatelliteSource(
-                bbox=area["bbox"],
-                date=target_date,
-                settings=self._settings,
-            )
-            count = await self.run(job_id, source)
-            jobs.append({"job_id": job_id, "area_id": area["id"], "detections": count})
-
-        return {"total": len(jobs), "jobs": jobs}
