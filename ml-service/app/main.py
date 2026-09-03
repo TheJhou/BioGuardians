@@ -46,12 +46,17 @@ pipeline: Optional[DetectionPipeline] = None
 _worker_task: Optional[asyncio.Task] = None
 
 
-def _build_source(source_type: str, data_dir: Optional[str] = None) -> ImageSource:
+def _build_source(
+    source_type: str,
+    data_dir: Optional[str] = None,
+    project_id: Optional[str] = None,
+    limit: Optional[int] = None,
+) -> ImageSource:
     """Build an ImageSource from a source type tag and optional data dir."""
     if source_type == "camera_trap":
         if not data_dir:
             raise ValueError("data_dir is required for camera_trap source")
-        return CameraTrapSource(data_dir=data_dir)
+        return CameraTrapSource(data_dir=data_dir, project_id=project_id, limit=limit)
     if source_type == "local_dir":
         if not data_dir:
             raise ValueError("data_dir is required for local_dir source")
@@ -112,7 +117,9 @@ async def lifespan(app: FastAPI):
                     # Mark this umbrella job as done
                     await db.update_job_status(job_id, "concluido")
                 else:
-                    source = _build_source(source_type, data_dir)
+                    project_id = job.get("project_id")
+                    limit = job.get("p_limit")
+                    source = _build_source(source_type, data_dir, project_id=project_id, limit=limit)
                     await pipeline.run(job_id, source)
 
             except asyncio.CancelledError:
@@ -185,6 +192,8 @@ class JobDetail(JobSummary):
 class IngestRequest(BaseModel):
     source: str = Field(..., description="Image source type: 'camera_trap' or 'local_dir'")
     data_dir: Optional[str] = Field(None, description="Path to the dataset directory")
+    project_id: Optional[str] = Field(None, description="Filter to a single project (camera_trap only)")
+    limit: Optional[int] = Field(None, ge=1, le=100000, description="Max images to process (camera_trap only)")
 
 
 class IngestResponse(BaseModel):
@@ -243,6 +252,8 @@ async def ingest(req: IngestRequest):
     job_id = await db.create_job(
         source=req.source,
         data_dir=req.data_dir,
+        project_id=req.project_id,
+        p_limit=req.limit,
     )
 
     logger.info("Ingest: created job %d (source=%s, data_dir=%s)", job_id, req.source, req.data_dir)

@@ -58,12 +58,20 @@ async def run_ingest(args: argparse.Namespace) -> None:
     job_id = await db.create_job(
         source=args.source,
         data_dir=args.data_dir,
+        project_id=getattr(args, "project_id", None),
+        p_limit=getattr(args, "limit", None),
     )
-    logger.info("Created job %d (source=%s, data_dir=%s)", job_id, args.source, args.data_dir)
+    logger.info("Created job %d (source=%s, data_dir=%s, project_id=%s, limit=%s)",
+                job_id, args.source, args.data_dir,
+                getattr(args, "project_id", None), getattr(args, "limit", None))
 
     # Build source and run synchronously
     if args.source == "camera_trap":
-        source = CameraTrapSource(data_dir=args.data_dir)
+        source = CameraTrapSource(
+            data_dir=args.data_dir,
+            project_id=getattr(args, "project_id", None),
+            limit=getattr(args, "limit", None),
+        )
     elif args.source == "local_dir":
         source = LocalDirectorySource(directory=args.data_dir)
     else:
@@ -215,6 +223,14 @@ def main() -> None:
     ingest_parser.add_argument(
         "--data-dir", type=str, required=True,
         help="Path to the dataset directory",
+    )
+    ingest_parser.add_argument(
+        "--project-id", type=str, default=None,
+        help="Filter to a single project (camera_trap only)",
+    )
+    ingest_parser.add_argument(
+        "--limit", type=int, default=None,
+        help="Max images to process (camera_trap only, for testing)",
     )
     ingest_parser.set_defaults(func=run_ingest)
 

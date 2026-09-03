@@ -74,6 +74,8 @@ class Database:
         produto: Optional[str] = None,
         source: str = "satellite",
         data_dir: Optional[str] = None,
+        project_id: Optional[str] = None,
+        p_limit: Optional[int] = None,
     ) -> int:
         """Create a new detection job.
 
@@ -84,8 +86,8 @@ class Database:
         async with self._pool.acquire() as conn:
             row = await conn.fetchrow(
                 """INSERT INTO deteccao_job
-                     (bbox, data_captura, satelite, instrumento, produto, status, source, data_dir)
-                   VALUES ($1, $2, $3::varchar, $4::varchar, $5::varchar, 'pendente', $6::varchar, $7)
+                     (bbox, data_captura, satelite, instrumento, produto, status, source, data_dir, project_id, p_limit)
+                   VALUES ($1, $2, $3::varchar, $4::varchar, $5::varchar, 'pendente', $6::varchar, $7, $8::varchar, $9)
                    RETURNING id""",
                 bbox,
                 data_captura or date.today(),
@@ -94,6 +96,8 @@ class Database:
                 produto,
                 source,
                 data_dir,
+                project_id,
+                p_limit,
             )
             return row["id"]
 
