@@ -2,12 +2,11 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# System dependencies: GDAL for rasterio, OpenGL for OpenCV.
+# System dependencies: OpenGL for OpenCV.
+# GDAL removed — rasterio is no longer used (satellite source moved out).
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
-    libgdal-dev \
-    gdal-bin \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

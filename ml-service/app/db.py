@@ -1,4 +1,9 @@
-"""Database operations using asyncpg — saves detection jobs and detections."""
+"""Database operations using asyncpg.
+
+Handles detection jobs, per-image checkpoints (imagem_job), detections,
+species lookup/creation, and occurrences. Supports both the legacy
+satellite workflow and the new bulk camera trap workflow.
+"""
 
 import asyncpg
 from dataclasses import dataclass
@@ -6,10 +11,12 @@ from typing import Optional
 from datetime import datetime, date
 
 from .config import Settings
+from .sources.base import ImageItem
 
 
 @dataclass
 class DetectionRecord:
+    """A single detection to be saved."""
     job_id: int
     especie_id: Optional[int]
     nome_cientifico: Optional[str]
@@ -18,9 +25,22 @@ class DetectionRecord:
     lon: float
     bbox_pixel: Optional[str]
     recorte_url: Optional[str]
-    metodo_classificacao: str = "heuristic"  # 'ai' or 'heuristic'
+    metodo_classificacao: str = "heuristic"
     modelo_ia: Optional[str] = None
     confianca_ia: Optional[float] = None
+    image_job_id: Optional[int] = None
+    status: str = "detected"
+
+
+@dataclass
+class ImageJobRecord:
+    """Checkpoint record for a single image within a job."""
+    id: int
+    job_id: int
+    source: str
+    source_image_id: str
+    status: str
+    detection_count: int
 
 
 class Database:
@@ -41,25 +61,39 @@ class Database:
         if self._pool:
             await self._pool.close()
 
+    # ------------------------------------------------------------------
+    # Jobs (deteccao_job)
+    # ------------------------------------------------------------------
+
     async def create_job(
         self,
-        bbox: str,
-        data_captura: date,
-        satelite: str,
-        instrumento: str,
-        produto: str,
+        bbox: Optional[str] = None,
+        data_captura: Optional[date] = None,
+        satelite: Optional[str] = None,
+        instrumento: Optional[str] = None,
+        produto: Optional[str] = None,
+        source: str = "satellite",
+        data_dir: Optional[str] = None,
     ) -> int:
+        """Create a new detection job.
+
+        Fields are optional to support both satellite and camera trap
+        sources. Satellite jobs pass bbox/satelite/instrumento/produto;
+        camera trap jobs pass source='camera_trap' and data_dir.
+        """
         async with self._pool.acquire() as conn:
             row = await conn.fetchrow(
                 """INSERT INTO deteccao_job
-                     (bbox, data_captura, satelite, instrumento, produto, status)
-                   VALUES ($1::varchar, $2, $3::varchar, $4::varchar, $5::varchar, 'pendente')
+                     (bbox, data_captura, satelite, instrumento, produto, status, source, data_dir)
+                   VALUES ($1, $2, $3::varchar, $4::varchar, $5::varchar, 'pendente', $6::varchar, $7)
                    RETURNING id""",
                 bbox,
-                data_captura,
+                data_captura or date.today(),
                 satelite,
                 instrumento,
                 produto,
+                source,
+                data_dir,
             )
             return row["id"]
 
@@ -90,13 +124,150 @@ class Database:
                 imagem_url,
             )
 
+    async def increment_job_progress(self, job_id: int) -> None:
+        """Increment the imagens_processadas counter for a job."""
+        async with self._pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE deteccao_job SET imagens_processadas = imagens_processadas + 1 WHERE id = $1",
+                job_id,
+            )
+
+    async def get_next_pending_job(self) -> Optional[dict]:
+        """Atomically pick the next pending job for the worker loop.
+
+        Uses FOR UPDATE SKIP LOCKED so multiple workers (if any) don't
+        pick the same job.
+        """
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """UPDATE deteccao_job
+                   SET status = 'processando'
+                   WHERE id = (
+                       SELECT id FROM deteccao_job
+                       WHERE status = 'pendente'
+                       ORDER BY criado_em
+                       FOR UPDATE SKIP LOCKED
+                       LIMIT 1
+                   )
+                   RETURNING *"""
+            )
+            return dict(row) if row else None
+
+    async def get_job(self, job_id: int) -> Optional[dict]:
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow("SELECT * FROM deteccao_job WHERE id = $1", job_id)
+            return dict(row) if row else None
+
+    async def list_jobs(self, limit: int = 20, offset: int = 0) -> list[dict]:
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(
+                """SELECT * FROM deteccao_job
+                   ORDER BY criado_em DESC
+                   LIMIT $1 OFFSET $2""",
+                limit,
+                offset,
+            )
+            return [dict(r) for r in rows]
+
+    async def list_protected_areas(self) -> list[dict]:
+        """Return id, name and bbox of all protected areas (satellite batch)."""
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(
+                """SELECT id,
+                          nome,
+                          ST_XMin(geom) || ',' || ST_YMin(geom) || ',' ||
+                          ST_XMax(geom) || ',' || ST_YMax(geom) AS bbox
+                   FROM area_protegida
+                   ORDER BY id"""
+            )
+            return [dict(r) for r in rows]
+
+    # ------------------------------------------------------------------
+    # Image checkpoint (imagem_job)
+    # ------------------------------------------------------------------
+
+    async def upsert_image_job(self, job_id: int, item: ImageItem) -> ImageJobRecord:
+        """Insert or fetch an image checkpoint record.
+
+        If the image already exists (same source + source_image_id),
+        return the existing record — this provides idempotency so
+        reprocessing a job skips already-completed images.
+        """
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """INSERT INTO imagem_job
+                     (job_id, source, source_image_id, path, lat, lon,
+                      timestamp, camera_id, project_id, deployment_id, image_hash, status)
+                   VALUES ($1, $2::varchar, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending')
+                   ON CONFLICT (source, source_image_id) DO NOTHING
+                   RETURNING id, job_id, source, source_image_id, status, detection_count""",
+                job_id,
+                item.source,
+                item.image_id,
+                item.path,
+                item.lat,
+                item.lon,
+                item.timestamp,
+                item.camera_id,
+                item.project_id,
+                item.deployment_id,
+                item.image_hash,
+            )
+
+            if row is None:
+                # Already existed — fetch it
+                row = await conn.fetchrow(
+                    """SELECT id, job_id, source, source_image_id, status, detection_count
+                       FROM imagem_job
+                       WHERE job_id = $1 AND source = $2 AND source_image_id = $3""",
+                    job_id,
+                    item.source,
+                    item.image_id,
+                )
+
+            return ImageJobRecord(
+                id=row["id"],
+                job_id=row["job_id"],
+                source=row["source"],
+                source_image_id=row["source_image_id"],
+                status=row["status"],
+                detection_count=row["detection_count"],
+            )
+
+    async def update_image_status(
+        self,
+        image_job_id: int,
+        status: str,
+        detection_count: int = 0,
+        error: Optional[str] = None,
+    ) -> None:
+        """Update the status of an image checkpoint."""
+        async with self._pool.acquire() as conn:
+            await conn.execute(
+                """UPDATE imagem_job
+                   SET status = $2::imagem_status,
+                       detection_count = $3,
+                       error = $4
+                   WHERE id = $1""",
+                image_job_id,
+                status,
+                detection_count,
+                error,
+            )
+
+    # ------------------------------------------------------------------
+    # Detections (deteccao)
+    # ------------------------------------------------------------------
+
     async def save_detection(self, det: DetectionRecord) -> int:
+        """Save a detection record."""
         async with self._pool.acquire() as conn:
             row = await conn.fetchrow(
                 """INSERT INTO deteccao
                      (job_id, especie_id, nome_cientifico, confianca, lat, lon,
-                      bbox_pixel, recorte_url, metodo_classificacao, modelo_ia, confianca_ia)
-                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::varchar, $10, $11)
+                      bbox_pixel, recorte_url, metodo_classificacao, modelo_ia,
+                      confianca_ia, image_job_id, status)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::varchar, $10, $11, $12, $13::deteccao_status)
                    RETURNING id""",
                 det.job_id,
                 det.especie_id,
@@ -109,30 +280,86 @@ class Database:
                 det.metodo_classificacao,
                 det.modelo_ia,
                 det.confianca_ia,
+                det.image_job_id,
+                det.status,
             )
             return row["id"]
 
-    async def create_occurrence(
-        self,
-        especie_id: int,
-        lat: float,
-        lon: float,
-        data_evento: date,
-        base_registro: str,
-    ) -> int:
+    async def list_unclassified_detections(self, limit: int = 100) -> list[dict]:
+        """Fetch detections with status='detected' for Fase 2 classification.
+
+        Joins imagem_job to get the source (for context) and image path
+        (for re-cropping if the saved crop is unavailable).
+        """
         async with self._pool.acquire() as conn:
-            row = await conn.fetchrow(
-                """INSERT INTO ocorrencia
-                     (especie_id, lat, lon, geom, data_evento, fonte, base_registro)
-                   VALUES ($1, $2, $3, ST_SetSRID(ST_MakePoint($3, $2), 4326), $4, 'deteccao_satelite', $5)
-                   RETURNING id""",
-                especie_id,
-                lat,
-                lon,
-                data_evento,
-                base_registro,
+            rows = await conn.fetch(
+                """SELECT d.id, d.job_id, d.confianca, d.lat, d.lon,
+                          d.bbox_pixel, d.recorte_url,
+                          ij.source, ij.path AS image_path, ij.timestamp,
+                          d.image_job_id
+                   FROM deteccao d
+                   JOIN imagem_job ij ON ij.id = d.image_job_id
+                   WHERE d.status = 'detected'
+                   ORDER BY d.confianca DESC
+                   LIMIT $1""",
+                limit,
             )
-            return row["id"]
+            return [dict(r) for r in rows]
+
+    async def update_detection_classification(
+        self,
+        detection_id: int,
+        especie_id: Optional[int],
+        nome_cientifico: Optional[str],
+        metodo_classificacao: str,
+        modelo_ia: Optional[str],
+        confianca_ia: Optional[float],
+        status: str,
+    ) -> None:
+        """Update a detection with the VLM classification result."""
+        async with self._pool.acquire() as conn:
+            await conn.execute(
+                """UPDATE deteccao
+                   SET especie_id = $2,
+                       nome_cientifico = $3,
+                       metodo_classificacao = $4::varchar,
+                       modelo_ia = $5,
+                       confianca_ia = $6,
+                       status = $7::deteccao_status
+                   WHERE id = $1""",
+                detection_id,
+                especie_id,
+                nome_cientifico,
+                metodo_classificacao,
+                modelo_ia,
+                confianca_ia,
+                status,
+            )
+
+    async def update_detection_status(self, detection_id: int, status: str) -> None:
+        """Update only the status of a detection."""
+        async with self._pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE deteccao SET status = $2::deteccao_status WHERE id = $1",
+                detection_id,
+                status,
+            )
+
+    async def get_job_detections(self, job_id: int) -> list[dict]:
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(
+                """SELECT d.*, e.nome_popular
+                   FROM deteccao d
+                   LEFT JOIN especie e ON e.id = d.especie_id
+                   WHERE d.job_id = $1
+                   ORDER BY d.confianca DESC""",
+                job_id,
+            )
+            return [dict(r) for r in rows]
+
+    # ------------------------------------------------------------------
+    # Species (especie)
+    # ------------------------------------------------------------------
 
     async def find_species_by_name(self, nome_cientifico: str) -> Optional[int]:
         async with self._pool.acquire() as conn:
@@ -149,14 +376,9 @@ class Database:
         categoria_ameaca: str = "DD",
         descricao: Optional[str] = None,
     ) -> int:
-        """Find a species by scientific name, or create it if it doesn't exist.
-
-        When creating, extracts the genus from the scientific name and creates
-        a minimal taxon entry (genus rank, no parent) if the genus doesn't exist.
-        """
+        """Find a species by scientific name, or create it if it doesn't exist."""
         nome_cientifico = nome_cientifico.lower().strip()
         async with self._pool.acquire() as conn:
-            # Try to find existing species
             row = await conn.fetchrow(
                 "SELECT id FROM especie WHERE nome_cientifico = $1",
                 nome_cientifico,
@@ -164,10 +386,8 @@ class Database:
             if row:
                 return row["id"]
 
-            # Extract genus (first word of binomial)
             genus_name = nome_cientifico.split()[0] if " " in nome_cientifico else nome_cientifico
 
-            # Find or create genus taxon
             taxon_row = await conn.fetchrow(
                 """SELECT id FROM taxon WHERE nome = $1 AND "rank" = 'genero'""",
                 genus_name,
@@ -182,7 +402,6 @@ class Database:
                 )
                 genero_id = inserted["id"]
 
-            # Create the species
             inserted = await conn.fetchrow(
                 """INSERT INTO especie
                      (nome_cientifico, nome_popular, categoria_ameaca, genero_id, descricao, status)
@@ -203,10 +422,7 @@ class Database:
         categoria_ameaca: Optional[str] = None,
         nome_popular: Optional[str] = None,
     ) -> None:
-        """Update species description, risk category and/or popular name.
-
-        Overwrites existing values when the new values are not None.
-        """
+        """Update species description, risk category and/or popular name."""
         fields = []
         params = []
         idx = 1
@@ -238,43 +454,36 @@ class Database:
                 *params,
             )
 
-    async def get_job(self, job_id: int) -> Optional[dict]:
-        async with self._pool.acquire() as conn:
-            row = await conn.fetchrow("SELECT * FROM deteccao_job WHERE id = $1", job_id)
-            return dict(row) if row else None
+    # ------------------------------------------------------------------
+    # Occurrences (ocorrencia)
+    # ------------------------------------------------------------------
 
-    async def get_job_detections(self, job_id: int) -> list[dict]:
-        async with self._pool.acquire() as conn:
-            rows = await conn.fetch(
-                """SELECT d.*, e.nome_popular
-                   FROM deteccao d
-                   LEFT JOIN especie e ON e.id = d.especie_id
-                   WHERE d.job_id = $1
-                   ORDER BY d.confianca DESC""",
-                job_id,
-            )
-            return [dict(r) for r in rows]
+    async def create_occurrence(
+        self,
+        especie_id: int,
+        lat: float,
+        lon: float,
+        data_evento: date,
+        base_registro: str,
+        fonte: str = "deteccao_satelite",
+    ) -> int:
+        """Create an occurrence record.
 
-    async def list_jobs(self, limit: int = 20, offset: int = 0) -> list[dict]:
+        The fonte parameter allows distinguishing between satellite
+        detections ('deteccao_satelite') and camera trap detections
+        ('camera_trap').
+        """
         async with self._pool.acquire() as conn:
-            rows = await conn.fetch(
-                """SELECT * FROM deteccao_job
-                   ORDER BY criado_em DESC
-                   LIMIT $1 OFFSET $2""",
-                limit,
-                offset,
+            row = await conn.fetchrow(
+                """INSERT INTO ocorrencia
+                     (especie_id, lat, lon, geom, data_evento, fonte, base_registro)
+                   VALUES ($1, $2, $3, ST_SetSRID(ST_MakePoint($3, $2), 4326), $4, $5::fonte_ocorrencia_tipo, $6)
+                   RETURNING id""",
+                especie_id,
+                lat,
+                lon,
+                data_evento,
+                fonte,
+                base_registro,
             )
-            return [dict(r) for r in rows]
-
-    async def list_protected_areas(self) -> list[dict]:
-        """Return id, name and bbox of all protected areas for batch processing."""
-        async with self._pool.acquire() as conn:
-            rows = await conn.fetch(
-                """SELECT id,
-                          nome,
-                          ST_XMin(geom) || ',' || ST_YMin(geom) || ',' ||
-                          ST_XMax(geom) || ',' || ST_YMax(geom) AS bbox
-                   FROM area_protegida
-                   ORDER BY id"""
-            )
-            return [dict(r) for r in rows]
+            return row["id"]

@@ -1,16 +1,23 @@
-"""Animal detection using YOLOv8 + SAHI for small object detection.
+"""Animal detection using YOLOv8.
 
-Uses a YOLOv8 model with SAHI (Slicing Aided Hyper Inference) to detect
-animals in large satellite image tiles. SAHI slices the image into
-overlapping patches, runs detection on each, and merges results with NMS.
+Uses a YOLOv8 model (COCO-pretrained) to detect animals in images.
+Designed for camera trap photos (ground-level animal photos) where
+the COCO model works well. Also handles satellite imagery via the
+same interface, though detection rate on satellite images is lower.
 
 COCO animal classes: 14=bird, 15=cat, 16=dog, 17=horse, 18=sheep,
 19=cow, 20=elephant, 21=bear, 22=zebra, 23=giraffe.
 
-Note: The COCO model is a placeholder. It was trained on ground-level
-photos, not satellite imagery. Detection rate on 2m CBERS-4A will be low.
-A custom model trained on annotated wildlife satellite data is needed
-for production use.
+For camera trap photos of Brazilian fauna (tapir, capivara, paca,
+queixada, etc.), the COCO model detects them as generic "dog"/"cat"/
+"bird" — sufficient to confirm animal presence and crop the region
+for VLM classification. A custom model trained on annotated Brazilian
+camera trap data is a future improvement.
+
+SAHI (Slicing Aided Hyper Inference) was removed — camera trap images
+are small enough (typically 1920x1080 or less) to process directly.
+For very large satellite images, the pipeline can still tile manually
+if needed.
 """
 
 import logging
@@ -40,16 +47,12 @@ COCO_ANIMAL_LABELS = {
     23: "giraffe",
 }
 
-# SAHI slicing parameters
-# 640x640 matches YOLOv8 native input size, avoiding unnecessary upscaling
-# from 512 and reducing the number of slices (~30% fewer tiles on large images).
-SLICE_SIZE = 640
-OVERLAP_RATIO = 0.2
-
-# Post-filter: reject detections outside this bbox size range (pixels)
-# At 2m resolution, an animal should be roughly 3-50 pixels
-MIN_BBOX_SIZE = 3
-MAX_BBOX_SIZE = 200
+# Post-filter: reject detections outside this bbox size range (pixels).
+# Camera trap: animals occupy a large portion of the frame (50-2000px).
+# Satellite: animals are tiny (3-200px) — but satellite detection is
+# low-priority now. These thresholds are calibrated for camera trap.
+MIN_BBOX_SIZE = 50
+MAX_BBOX_SIZE = 2000
 
 
 @dataclass
@@ -62,65 +65,48 @@ class Detection:
     confidence: float
     class_id: int
     class_name: str
-    tile_offset_x: int   # offset of the tile within the full image
+    tile_offset_x: int   # offset of the tile within the full image (0 for direct inference)
     tile_offset_y: int
 
 
 class AnimalDetector:
-    """YOLOv8-based animal detector with SAHI small-object support."""
+    """YOLOv8-based animal detector."""
 
     def __init__(self, settings: Settings):
         self._settings = settings
         self._model = None
-        self._sahi_model = None
 
     def load(self) -> None:
-        """Load the YOLOv8 model and wrap it for SAHI inference."""
+        """Load the YOLOv8 model."""
         from ultralytics import YOLO
 
         model_path = self._settings.model_path
-        logger.info("Loading YOLOv8 model from %s", model_path)
+        logger.info("Loading YOLOv8 model from %s (device=%s)", model_path, self._settings.yolo_device)
         self._model = YOLO(model_path)
         logger.info("YOLOv8 model loaded")
 
-        # Wrap with SAHI for sliced inference on large images
-        try:
-            from sahi import AutoDetectionModel
-            self._sahi_model = AutoDetectionModel.from_pretrained(
-                model_type="ultralytics",
-                model_path=model_path,
-                confidence_threshold=self._settings.confidence_threshold,
-                device=self._settings.yolo_device,
-            )
-            logger.info(
-                "SAHI enabled: slice=%dx%d overlap=%.0f%%",
-                SLICE_SIZE, SLICE_SIZE, OVERLAP_RATIO * 100,
-            )
-        except ImportError:
-            logger.warning("SAHI not installed, falling back to manual tiling")
-            self._sahi_model = None
-
-    def detect_tile(
+    def detect_image(
         self,
-        tile: np.ndarray,
-        tile_offset_x: int = 0,
-        tile_offset_y: int = 0,
+        image: np.ndarray,
+        tile_size: Optional[int] = None,
     ) -> list[Detection]:
-        """Run detection on a single image tile (fallback without SAHI).
+        """Run detection on a single image.
+
+        Filters detections by bbox size to reject objects that are
+        too large or too small to be animals.
 
         Args:
-            tile: numpy array (H, W, 3) in RGB
-            tile_offset_x: x offset of this tile in the full image
-            tile_offset_y: y offset of this tile in the full image
+            image: numpy array (H, W, 3) in BGR (OpenCV convention)
+            tile_size: unused (kept for API compatibility)
 
         Returns:
-            List of Detection objects with absolute pixel coordinates.
+            List of detections, filtered by size.
         """
         if self._model is None:
             raise RuntimeError("Detector not loaded — call load() first")
 
         results = self._model(
-            tile,
+            image,
             classes=ANIMAL_CLASS_IDS,
             conf=self._settings.confidence_threshold,
             device=self._settings.yolo_device,
@@ -128,55 +114,9 @@ class AnimalDetector:
             verbose=False,
         )
 
-        detections: list[Detection] = []
-        for result in results:
-            boxes = result.boxes
-            if boxes is None:
-                continue
-            for box in boxes:
-                x1, y1, x2, y2 = box.xyxy[0].tolist()
-                cls_id = int(box.cls[0])
-                conf = float(box.conf[0])
+        detections = self._parse_results(results)
 
-                det = Detection(
-                    bbox_x=int(x1) + tile_offset_x,
-                    bbox_y=int(y1) + tile_offset_y,
-                    bbox_w=int(x2 - x1),
-                    bbox_h=int(y2 - y1),
-                    confidence=conf,
-                    class_id=cls_id,
-                    class_name=COCO_ANIMAL_LABELS.get(cls_id, f"class_{cls_id}"),
-                    tile_offset_x=tile_offset_x,
-                    tile_offset_y=tile_offset_y,
-                )
-                detections.append(det)
-
-        return detections
-
-    def detect_image(
-        self,
-        image: np.ndarray,
-        tile_size: Optional[int] = None,
-    ) -> list[Detection]:
-        """Run detection on a full image.
-
-        Uses SAHI sliced inference if available, otherwise falls back
-        to manual tiling. Filters detections by bbox size to reject
-        objects that are too large or too small to be animals.
-
-        Args:
-            image: numpy array (H, W, 3) in BGR (OpenCV convention)
-            tile_size: tile dimension in pixels (used by fallback only)
-
-        Returns:
-            List of all detections across all tiles, filtered by size.
-        """
-        if self._sahi_model is not None:
-            detections = self._detect_with_sahi(image)
-        else:
-            detections = self._detect_with_tiling(image, tile_size)
-
-        # Filter by bbox size — reject objects outside plausible animal range
+        # Filter by bbox size
         filtered = [
             d for d in detections
             if MIN_BBOX_SIZE <= d.bbox_w <= MAX_BBOX_SIZE
@@ -190,70 +130,83 @@ class AnimalDetector:
                 rejected, MIN_BBOX_SIZE, MAX_BBOX_SIZE,
             )
 
-        logger.info("Total detections across %dx%d image: %d", image.shape[1], image.shape[0], len(filtered))
+        logger.info("Detections on %dx%d image: %d", image.shape[1], image.shape[0], len(filtered))
         return filtered
 
-    def _detect_with_sahi(self, image: np.ndarray) -> list[Detection]:
-        """Run SAHI sliced inference on the full image."""
-        from sahi.predict import get_sliced_prediction
+    def detect_batch(
+        self,
+        images: list[np.ndarray],
+    ) -> list[list[Detection]]:
+        """Run detection on a batch of images (GPU-accelerated).
 
-        # SAHI expects RGB; our image is BGR (OpenCV convention)
-        if image.shape[2] == 3:
-            image_rgb = image[:, :, ::-1].copy()  # BGR → RGB
-        else:
-            image_rgb = image
+        Uses YOLOv8's native batch inference for efficiency. The
+        batch size is controlled by YOLO_BATCH_SIZE in settings.
 
-        result = get_sliced_prediction(
-            image_rgb,
-            self._sahi_model,
-            slice_height=SLICE_SIZE,
-            slice_width=SLICE_SIZE,
-            overlap_height_ratio=OVERLAP_RATIO,
-            overlap_width_ratio=OVERLAP_RATIO,
-            perform_standard_pred=True,
-            verbose=0,
-        )
+        Args:
+            images: list of numpy arrays (H, W, 3) in BGR
 
-        detections: list[Detection] = []
-        for obj in result.object_prediction_list:
-            bbox = obj.bbox
-            cls_id = int(obj.category.id) if hasattr(obj.category, 'id') else 0
-            cls_name = obj.category.name if hasattr(obj.category, 'name') else "unknown"
+        Returns:
+            List of detection lists, one per input image (filtered by size).
+        """
+        if self._model is None:
+            raise RuntimeError("Detector not loaded — call load() first")
 
-            # Only keep animal classes
-            if cls_id not in ANIMAL_CLASS_IDS:
-                continue
+        if not images:
+            return []
 
-            det = Detection(
-                bbox_x=int(bbox.minx),
-                bbox_y=int(bbox.miny),
-                bbox_w=int(bbox.maxx - bbox.minx),
-                bbox_h=int(bbox.maxy - bbox.miny),
-                confidence=float(obj.score.value),
-                class_id=cls_id,
-                class_name=cls_name,
-                tile_offset_x=0,
-                tile_offset_y=0,
+        batch_size = getattr(self._settings, "yolo_batch_size", 16)
+        all_results: list[list[Detection]] = []
+
+        for i in range(0, len(images), batch_size):
+            batch = images[i:i + batch_size]
+            logger.info(
+                "detect_batch: processing batch %d-%d of %d (batch_size=%d)",
+                i, min(i + batch_size, len(images)), len(images), len(batch),
             )
-            detections.append(det)
+
+            results = self._model(
+                batch,
+                classes=ANIMAL_CLASS_IDS,
+                conf=self._settings.confidence_threshold,
+                device=self._settings.yolo_device,
+                workers=self._settings.yolo_workers,
+                verbose=False,
+            )
+
+            for result in results:
+                detections = self._parse_results([result])
+                filtered = [
+                    d for d in detections
+                    if MIN_BBOX_SIZE <= d.bbox_w <= MAX_BBOX_SIZE
+                    and MIN_BBOX_SIZE <= d.bbox_h <= MAX_BBOX_SIZE
+                ]
+                all_results.append(filtered)
+
+        return all_results
+
+    def _parse_results(self, results) -> list[Detection]:
+        """Parse YOLOv8 results into Detection objects."""
+        detections: list[Detection] = []
+        for result in results:
+            boxes = result.boxes
+            if boxes is None:
+                continue
+            for box in boxes:
+                x1, y1, x2, y2 = box.xyxy[0].tolist()
+                cls_id = int(box.cls[0])
+                conf = float(box.conf[0])
+
+                det = Detection(
+                    bbox_x=int(x1),
+                    bbox_y=int(y1),
+                    bbox_w=int(x2 - x1),
+                    bbox_h=int(y2 - y1),
+                    confidence=conf,
+                    class_id=cls_id,
+                    class_name=COCO_ANIMAL_LABELS.get(cls_id, f"class_{cls_id}"),
+                    tile_offset_x=0,
+                    tile_offset_y=0,
+                )
+                detections.append(det)
 
         return detections
-
-    def _detect_with_tiling(self, image: np.ndarray, tile_size: Optional[int] = None) -> list[Detection]:
-        """Fallback: manual tiling without SAHI."""
-        ts = tile_size or self._settings.tile_size
-        h, w = image.shape[:2]
-        all_detections: list[Detection] = []
-
-        for y in range(0, h, ts):
-            for x in range(0, w, ts):
-                tile = image[y : y + ts, x : x + ts]
-                if tile.size == 0:
-                    continue
-                dets = self.detect_tile(tile, tile_offset_x=x, tile_offset_y=y)
-                all_detections.extend(dets)
-                logger.debug(
-                    "Tile (%d, %d): %d detections", x, y, len(dets)
-                )
-
-        return all_detections

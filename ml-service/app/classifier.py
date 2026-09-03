@@ -6,6 +6,9 @@ Sends the detected animal crop to a vision-language model that:
 3. Classifies the extinction risk (IUCN/MMA category)
 
 Falls back to the heuristic classifier if OPENROUTER_API_KEY is not set.
+
+The prompt is generic — the `context` parameter tells the VLM whether
+the image is a camera trap photo, a satellite crop, etc.
 """
 
 import base64
@@ -39,7 +42,7 @@ VALID_CATEGORIES = {"CR", "EN", "VU", "NT", "LC", "DD"}
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 PROMPT = """You are a wildlife biologist specialized in Brazilian fauna.
-Analyze this satellite image crop showing a detected animal.
+Analyze this image showing a detected animal.
 
 Return a JSON object with exactly these fields:
 {{
@@ -50,7 +53,7 @@ Return a JSON object with exactly these fields:
   "confianca": "number from 0.0 to 1.0"
 }}
 
-Context: satellite image (CBERS-4A WPM) in a Brazilian protected area. Biome: {biome}.
+Context: {context}. Biome: {biome}.
 If you cannot identify the species, set nome_cientifico to null and confianca to 0.0."""
 
 
@@ -95,8 +98,6 @@ def infer_biome(lat: float, lon: float) -> str:
 
 def _crop_to_base64_jpeg(crop: np.ndarray, quality: int = 85) -> str:
     """Encode a numpy crop as base64 JPEG string."""
-    # OpenCV expects BGR; our crops are BGR already (read from rasterio as BGR).
-    # If the crop is very small, upscale it so the VLM can see details.
     h, w = crop.shape[:2]
     if h < 128 or w < 128:
         scale = max(128 / h, 128 / w)
@@ -137,7 +138,6 @@ def _parse_ai_response(raw) -> Optional[dict]:
     # If direct parse failed, try to extract JSON from within the text
     if data is None:
         import re
-        # Find the first { ... } block
         match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', text, re.DOTALL)
         if match:
             try:
@@ -147,7 +147,6 @@ def _parse_ai_response(raw) -> Optional[dict]:
                 logger.info("Regex JSON extraction failed: %s", exc)
 
     # Some models return a key-value fragment without surrounding braces
-    # e.g. '\n  "nome_cientifico": "panthera onca",\n  ...'
     if data is None:
         wrapped = "{" + text + "}"
         try:
@@ -212,6 +211,7 @@ class SpeciesClassifier:
         lat: float,
         lon: float,
         detection_confidence: float,
+        context: str = "camera trap photo in a Brazilian protected area",
     ) -> ClassificationResult:
         """Classify a detected animal crop to a Brazilian species.
 
@@ -221,13 +221,15 @@ class SpeciesClassifier:
             lat: latitude of detection center
             lon: longitude of detection center
             detection_confidence: YOLOv8 detection confidence
+            context: description of the image source for the VLM prompt
+                (e.g. "camera trap photo", "satellite image crop")
 
         Returns:
             ClassificationResult with species, description, risk and confidence.
         """
         if self._settings.openrouter_api_key:
             try:
-                return self._classify_with_vlm(crop, lat, lon, detection_confidence)
+                return self._classify_with_vlm(crop, lat, lon, detection_confidence, context)
             except Exception as exc:
                 logger.error(
                     "VLM classification failed (type=%s), falling back to heuristic: %r",
@@ -243,12 +245,13 @@ class SpeciesClassifier:
         lat: float,
         lon: float,
         detection_confidence: float,
+        context: str,
     ) -> ClassificationResult:
         """Send crop to OpenRouter VLM and parse the response."""
         biome = infer_biome(lat, lon)
         b64 = _crop_to_base64_jpeg(crop)
 
-        prompt = PROMPT.format(biome=biome)
+        prompt = PROMPT.format(context=context, biome=biome)
 
         payload = {
             "model": self._settings.openrouter_model,
@@ -292,7 +295,6 @@ class SpeciesClassifier:
             logger.error("OpenRouter response is not valid JSON: %s", raw_text)
             raise RuntimeError(f"OpenRouter returned non-JSON response: {exc}") from exc
 
-        # Extract content safely — some models return content as list
         try:
             content = data["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as exc:
@@ -301,14 +303,12 @@ class SpeciesClassifier:
 
         logger.info("OpenRouter content type=%s len=%d", type(content).__name__, len(str(content)))
 
-        # Some models return content as a list of parts
         if isinstance(content, list):
             content = " ".join(
                 part.get("text", "") if isinstance(part, dict) else str(part)
                 for part in content
             )
 
-        # DEBUG: log raw VLM response to understand parsing failures
         logger.info("VLM raw response (%d chars): %s", len(str(content)), repr(str(content)[:500]))
         parsed = _parse_ai_response(content)
 

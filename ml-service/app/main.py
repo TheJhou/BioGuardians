@@ -1,12 +1,19 @@
-"""FastAPI application — ML microservice for satellite animal detection.
+"""FastAPI application — ML microservice for animal detection.
 
 Endpoints:
-  POST /batch        — trigger batch processing of all protected areas (internal)
-  GET  /jobs         — list recent jobs
-  GET  /jobs/{id}    — get job status + detections
-  GET  /health       — health check
+  POST /ingest          — submit a new image processing job (async)
+  POST /classify        — trigger Fase 2 classification of pending detections
+  GET  /jobs            — list recent jobs
+  GET  /jobs/{id}       — get job status + detections
+  GET  /jobs/{id}/progress — detailed progress (images, detections, classified)
+  GET  /health          — health check
+
+A background worker loop polls for pending jobs and processes them
+automatically (Fase 1 — detection). Fase 2 (classification) is
+triggered manually via POST /classify to control VLM API usage.
 """
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from datetime import date as date_type
@@ -17,10 +24,12 @@ from fastapi import FastAPI, HTTPException, Query
 
 from .config import load_settings, Settings
 from .db import Database
-from .satellite import Cbers4aFetcher
 from .detector import AnimalDetector
 from .classifier import SpeciesClassifier
 from .pipeline import DetectionPipeline
+from .sources.base import ImageSource
+from .sources.local_dir import LocalDirectorySource
+from .sources.camera_trap import CameraTrapSource
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,16 +40,33 @@ logger = logging.getLogger(__name__)
 # --- Globals (initialized in lifespan) ---
 settings: Optional[Settings] = None
 db: Optional[Database] = None
-fetcher: Optional[Cbers4aFetcher] = None
 detector: Optional[AnimalDetector] = None
 classifier: Optional[SpeciesClassifier] = None
 pipeline: Optional[DetectionPipeline] = None
+_worker_task: Optional[asyncio.Task] = None
+
+
+def _build_source(source_type: str, data_dir: Optional[str] = None) -> ImageSource:
+    """Build an ImageSource from a source type tag and optional data dir."""
+    if source_type == "camera_trap":
+        if not data_dir:
+            raise ValueError("data_dir is required for camera_trap source")
+        return CameraTrapSource(data_dir=data_dir)
+    if source_type == "local_dir":
+        if not data_dir:
+            raise ValueError("data_dir is required for local_dir source")
+        return LocalDirectorySource(directory=data_dir)
+    if source_type == "satellite":
+        raise ValueError(
+            "Satellite source requires bbox and date — use the legacy /batch endpoint"
+        )
+    raise ValueError(f"Unknown source type: {source_type}")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application startup/shutdown lifecycle."""
-    global settings, db, fetcher, detector, classifier, pipeline
+    global settings, db, detector, classifier, pipeline, _worker_task
 
     logger.info("Starting BioGuardians ML service...")
     settings = load_settings()
@@ -50,9 +76,6 @@ async def lifespan(app: FastAPI):
     await db.connect()
     logger.info("Database connected")
 
-    # Satellite fetcher
-    fetcher = Cbers4aFetcher(settings)
-
     # ML models
     detector = AnimalDetector(settings)
     detector.load()
@@ -61,21 +84,65 @@ async def lifespan(app: FastAPI):
     classifier.load()
 
     # Pipeline
-    pipeline = DetectionPipeline(settings, db, fetcher, detector, classifier)
+    pipeline = DetectionPipeline(settings, db, detector, classifier)
 
-    logger.info("ML service ready")
+    # Background worker: process pending jobs
+    async def worker_loop():
+        logger.info("Worker loop started — polling for pending jobs")
+        while True:
+            try:
+                job = await db.get_next_pending_job()
+                if job is None:
+                    await asyncio.sleep(5)
+                    continue
+
+                job_id = job["id"]
+                source_type = job.get("source", "satellite")
+                data_dir = job.get("data_dir")
+
+                logger.info("Worker: picked job %d (source=%s)", job_id, source_type)
+
+                if source_type == "satellite":
+                    # Legacy satellite batch — process all protected areas
+                    # for the job's target date. This uses run_batch_satellite
+                    # which creates sub-jobs per area internally.
+                    target_date = job.get("data_captura", date_type.today())
+                    logger.info("Worker: satellite job %d for date %s", job_id, target_date)
+                    await pipeline.run_batch_satellite(target_date)
+                    # Mark this umbrella job as done
+                    await db.update_job_status(job_id, "concluido")
+                else:
+                    source = _build_source(source_type, data_dir)
+                    await pipeline.run(job_id, source)
+
+            except asyncio.CancelledError:
+                logger.info("Worker loop cancelled")
+                break
+            except Exception as exc:
+                logger.error("Worker loop error: %s", exc, exc_info=True)
+                await asyncio.sleep(10)
+
+    _worker_task = asyncio.create_task(worker_loop())
+
+    logger.info("ML service ready (GPU device=%s)", settings.yolo_device)
     yield
 
     # Shutdown
     logger.info("Shutting down ML service...")
+    if _worker_task:
+        _worker_task.cancel()
+        try:
+            await _worker_task
+        except asyncio.CancelledError:
+            pass
     if db:
         await db.close()
 
 
 app = FastAPI(
     title="BioGuardians ML Service",
-    description="Satellite animal detection and species classification",
-    version="1.0.0",
+    description="Animal detection and species classification from camera traps and satellite imagery",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -84,11 +151,14 @@ app = FastAPI(
 
 class JobSummary(BaseModel):
     id: int
-    bbox: str
+    bbox: Optional[str] = None
     data_captura: date_type
-    satelite: str
+    satelite: Optional[str] = None
     status: str
     total_deteccoes: int
+    source: str = "satellite"
+    total_imagens: int = 0
+    imagens_processadas: int = 0
     criado_em: str
     concluido_em: Optional[str] = None
     erro: Optional[str] = None
@@ -103,6 +173,7 @@ class DetectionItem(BaseModel):
     lon: float
     bbox_pixel: Optional[str] = None
     nome_popular: Optional[str] = None
+    status: str = "detected"
 
 
 class JobDetail(JobSummary):
@@ -111,18 +182,36 @@ class JobDetail(JobSummary):
     deteccoes: list[DetectionItem] = []
 
 
-class BatchRequest(BaseModel):
-    date: date_type = Field(..., description="Target satellite image date (YYYY-MM-DD)")
-    area_ids: Optional[list[int]] = Field(
-        None, description="Specific area IDs to process (optional, defaults to all)"
-    )
+class IngestRequest(BaseModel):
+    source: str = Field(..., description="Image source type: 'camera_trap' or 'local_dir'")
+    data_dir: Optional[str] = Field(None, description="Path to the dataset directory")
 
 
-class BatchResponse(BaseModel):
-    total_areas: int
-    processadas: int
-    erros: int
+class IngestResponse(BaseModel):
+    job_id: int
+    status: str
+    message: str
+
+
+class ClassifyRequest(BaseModel):
+    limit: int = Field(100, ge=1, le=1000, description="Max detections to classify")
+
+
+class ClassifyResponse(BaseModel):
+    classified: int
+    message: str
+
+
+class ProgressResponse(BaseModel):
+    job_id: int
+    status: str
+    total_imagens: int
+    imagens_processadas: int
     total_deteccoes: int
+    pending_classification: int
+    classified: int
+    rejected: int
+    inconclusive: int
 
 
 # --- Endpoints ---
@@ -133,23 +222,50 @@ async def health():
     return {
         "status": "ok",
         "model_loaded": detector is not None and detector._model is not None,
-        "classifier": "heuristic",
+        "device": settings.yolo_device if settings else "unknown",
+        "classifier": "vlm" if (settings and settings.openrouter_api_key) else "heuristic",
     }
 
 
-@app.post("/batch", response_model=BatchResponse)
-async def batch(req: BatchRequest):
-    """Trigger batch processing of all protected areas.
+@app.post("/ingest", response_model=IngestResponse)
+async def ingest(req: IngestRequest):
+    """Submit a new image processing job.
 
-    Not exposed publicly — only accessible within the Docker network.
-    Reads area_protegida polygons from the database, computes bbox for
-    each, and runs the detection pipeline.
+    Creates a deteccao_job with status='pendente' and returns immediately.
+    The background worker picks it up and processes it via Fase 1 (detection).
     """
-    try:
-        results = await pipeline.run_batch(req.date, req.area_ids)
-        return BatchResponse(**results)
-    except Exception as exc:
-        raise HTTPException(500, f"Batch failed: {exc}")
+    if req.source not in ("camera_trap", "local_dir"):
+        raise HTTPException(400, f"Unsupported source: {req.source}. Use 'camera_trap' or 'local_dir'.")
+
+    if not req.data_dir:
+        raise HTTPException(400, "data_dir is required")
+
+    job_id = await db.create_job(
+        source=req.source,
+        data_dir=req.data_dir,
+    )
+
+    logger.info("Ingest: created job %d (source=%s, data_dir=%s)", job_id, req.source, req.data_dir)
+
+    return IngestResponse(
+        job_id=job_id,
+        status="pendente",
+        message=f"Job {job_id} created. The worker will process it automatically.",
+    )
+
+
+@app.post("/classify", response_model=ClassifyResponse)
+async def classify(req: ClassifyRequest):
+    """Trigger Fase 2 — classify pending detections via VLM.
+
+    Processes up to `limit` detections with status='detected'.
+    Call repeatedly to process all pending detections.
+    """
+    classified = await pipeline.classify_pending(limit=req.limit)
+    return ClassifyResponse(
+        classified=classified,
+        message=f"Classified {classified} detections. Call again to process more.",
+    )
 
 
 @app.get("/jobs", response_model=list[JobSummary])
@@ -162,11 +278,14 @@ async def list_jobs(
     return [
         JobSummary(
             id=j["id"],
-            bbox=j["bbox"],
+            bbox=j.get("bbox"),
             data_captura=j["data_captura"],
-            satelite=j["satelite"],
+            satelite=j.get("satelite"),
             status=j["status"],
             total_deteccoes=j["total_deteccoes"],
+            source=j.get("source", "satellite"),
+            total_imagens=j.get("total_imagens", 0),
+            imagens_processadas=j.get("imagens_processadas", 0),
             criado_em=j["criado_em"].isoformat() if j.get("criado_em") else "",
             concluido_em=j["concluido_em"].isoformat() if j.get("concluido_em") else None,
             erro=j.get("erro"),
@@ -186,11 +305,14 @@ async def get_job(job_id: int):
 
     return JobDetail(
         id=job["id"],
-        bbox=job["bbox"],
+        bbox=job.get("bbox"),
         data_captura=job["data_captura"],
-        satelite=job["satelite"],
+        satelite=job.get("satelite"),
         status=job["status"],
         total_deteccoes=job["total_deteccoes"],
+        source=job.get("source", "satellite"),
+        total_imagens=job.get("total_imagens", 0),
+        imagens_processadas=job.get("imagens_processadas", 0),
         criado_em=job["criado_em"].isoformat() if job.get("criado_em") else "",
         concluido_em=job["concluido_em"].isoformat() if job.get("concluido_em") else None,
         erro=job.get("erro"),
@@ -206,7 +328,42 @@ async def get_job(job_id: int):
                 lon=d["lon"],
                 bbox_pixel=d.get("bbox_pixel"),
                 nome_popular=d.get("nome_popular"),
+                status=d.get("status", "detected"),
             )
             for d in detections
         ],
+    )
+
+
+@app.get("/jobs/{job_id}/progress", response_model=ProgressResponse)
+async def get_job_progress(job_id: int):
+    """Get detailed progress for a job (images, detections, classification status)."""
+    job = await db.get_job(job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+
+    # Get detection status counts
+    async with db._pool.acquire() as conn:
+        counts = await conn.fetchrow(
+            """SELECT
+                   COUNT(*) FILTER (WHERE status = 'detected') AS pending,
+                   COUNT(*) FILTER (WHERE status = 'classified') AS classified,
+                   COUNT(*) FILTER (WHERE status = 'rejected') AS rejected,
+                   COUNT(*) FILTER (WHERE status = 'inconclusive') AS inconclusive,
+                   COUNT(*) AS total
+               FROM deteccao
+               WHERE job_id = $1""",
+            job_id,
+        )
+
+    return ProgressResponse(
+        job_id=job_id,
+        status=job["status"],
+        total_imagens=job.get("total_imagens", 0),
+        imagens_processadas=job.get("imagens_processadas", 0),
+        total_deteccoes=counts["total"] if counts else 0,
+        pending_classification=counts["pending"] if counts else 0,
+        classified=counts["classified"] if counts else 0,
+        rejected=counts["rejected"] if counts else 0,
+        inconclusive=counts["inconclusive"] if counts else 0,
     )

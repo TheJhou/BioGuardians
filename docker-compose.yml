@@ -99,7 +99,9 @@ services:
           memory: 512M
           cpus: "1"
 
-  # ---------- ML Service (Python + FastAPI + YOLOv8) ----------
+  # ---------- ML Service (Python + FastAPI + YOLOv8, GPU) ----------
+  # Local dev with NVIDIA RTX 4060 via Docker Desktop + WSL2.
+  # Requires nvidia-container-toolkit (bundled in Docker Desktop >= 4.34).
   ml-service:
     build:
       context: ./ml-service
@@ -111,16 +113,24 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
-      INPE_EMAIL: ${INPE_EMAIL:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       OPENROUTER_MODEL: ${OPENROUTER_MODEL:-anthropic/claude-sonnet-4}
-      YOLO_DEVICE: ${YOLO_DEVICE:-cpu}
+      YOLO_DEVICE: ${YOLO_DEVICE:-cuda}
       YOLO_WORKERS: ${YOLO_WORKERS:-4}
+      YOLO_BATCH_SIZE: ${YOLO_BATCH_SIZE:-32}
       DB_POOL_MAX: ${DB_POOL_MAX:-20}
-      BATCH_CONCURRENCY: ${BATCH_CONCURRENCY:-8}
+      BATCH_CONCURRENCY: ${BATCH_CONCURRENCY:-4}
       HTTP_TIMEOUT: ${HTTP_TIMEOUT:-120}
+      VLM_CONCURRENCY: ${VLM_CONCURRENCY:-8}
+      IMAGE_STORAGE_DIR: /app/images
+      DATA_DIR: /data
     ports:
       - "127.0.0.1:8001:8001"
+    volumes:
+      # Camera trap datasets (read-only) — mount under ./dados or wherever
+      - ./dados:/data:ro
+      # Persisted crops / downloaded images
+      - bioguardians_ml_images:/app/images
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
       interval: 30s
@@ -129,9 +139,12 @@ services:
       start_period: 30s
     deploy:
       resources:
-        limits:
-          memory: 48G
-          cpus: "8"
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
 volumes:
   bioguardians_pgdata:
+  bioguardians_ml_images:
