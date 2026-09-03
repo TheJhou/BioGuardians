@@ -1,40 +1,56 @@
 """Camera trap dataset image source — Wildlife Insights export.
 
-Parses a Wildlife Insights "all-platform-data" export:
+Parses a Wildlife Insights "all-platform-data" export and downloads
+images via the WI GraphQL API (requires WI_EMAIL + WI_PASSWORD).
 
-    <data_dir>/
-        projects.csv     — project metadata (not used by the pipeline directly)
-        cameras.csv      — camera hardware info
-        deployments.csv  — camera_id, lat/lon, start/end dates, placename
-        sequences.csv    — grouped image sequences (not used by the pipeline)
-        images.csv       — one row per image with URL, taxonomy, timestamp
+Flow:
+1. Login via POST /v1/auth/sign-in → JWT token
+2. For each image in images.csv:
+   a. Skip blanks, humans, unidentified
+   b. Parse the viewer URL to extract downloadId, projectId, imageUUID
+   c. Query POST /graphql-data-file { getDataFilePublicDownloadUrl }
+      → returns a signed Google Cloud Storage URL
+   d. Download the image from GCS to local cache
+   e. Yield ImageItem with metadata from the CSV
 
-Pipeline behaviour:
-1. Parse deployments.csv to build a deployment_id -> (lat, lon, camera info) map
-2. Stream images.csv row by row
-3. Skip rows where is_blank=1 or species is empty or class is missing
-4. Skip Homo sapiens (researchers, etc.)
-5. Download the image from the location URL if it has not been cached
-6. Yield an ImageItem with lat/lon/timestamp/camera_id/project_id/deployment_id
+The token expires after ~24h. For long runs, the source refreshes
+the token if a 401 is returned.
 
-Images are downloaded lazily as the pipeline iterates — not all upfront.
-A local cache under `IMAGE_STORAGE_DIR`/camera_trap/ avoids re-downloading
-images across runs. The cache filename is the WI image_id (UUID).
+Credentials come from WI_EMAIL and WI_PASSWORD env vars.
 """
 
 import csv
 import hashlib
 import logging
 import os
+import re
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Iterator, Optional
+from urllib.parse import urlparse
 
 import httpx
 
 from .base import ImageItem
 
 logger = logging.getLogger(__name__)
+
+WI_API_BASE = "https://api.wildlifeinsights.org"
+WI_GRAPHQL_DATA_FILE = WI_API_BASE + "/graphql-data-file"
+WI_SIGNIN_URL = WI_API_BASE + "/v1/auth/sign-in"
+
+# GraphQL query to get a signed GCS URL for an image
+GQL_GET_IMAGE_URL = """query ($downloadId: Int!, $projectId: Int, $imageUUID: String!) {
+  getDataFilePublicDownloadUrl(downloadId: $downloadId, projectId: $projectId, imageUUID: $imageUUID) {
+    url
+  }
+}"""
+
+# Pattern: /download/{downloadId}/project/{projectId}/data-files/{imageUUID}
+VIEWER_URL_RE = re.compile(
+    r"/download/(\d+)/project/(\d+)/data-files/([0-9a-f\-]+)"
+)
 
 
 class CameraTrapSource:
@@ -61,8 +77,48 @@ class CameraTrapSource:
         self._storage_dir = Path(settings.image_storage_dir) / "camera_trap"
         self._storage_dir.mkdir(parents=True, exist_ok=True)
 
+        # WI credentials for image download
+        self._wi_email = os.environ.get("WI_EMAIL", "")
+        self._wi_password = os.environ.get("WI_PASSWORD", "")
+        self._token: Optional[str] = None
+        self._token_expires: float = 0  # unix timestamp
+
         # deployment_id -> {"lat": float, "lon": float, "camera_id": str, "placename": str}
         self._deployments = self._load_deployments()
+
+    # ------------------------------------------------------------------
+    # Authentication
+    # ------------------------------------------------------------------
+
+    def _ensure_token(self) -> str:
+        """Login to WI and cache the token. Refreshes if expired."""
+        if self._token and time.time() < self._token_expires - 60:
+            return self._token
+
+        if not self._wi_email or not self._wi_password:
+            raise RuntimeError(
+                "WI_EMAIL and WI_PASSWORD env vars are required to download "
+                "images from Wildlife Insights"
+            )
+
+        logger.info("Logging in to Wildlife Insights as %s", self._wi_email)
+        with httpx.Client(timeout=30) as client:
+            resp = client.post(
+                WI_SIGNIN_URL,
+                json={"email": self._wi_email, "password": self._wi_password},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+
+        self._token = data["token"]
+        # Token expires in ~24h (86400s). Use 23h to be safe.
+        self._token_expires = time.time() + 23 * 3600
+        logger.info("WI token acquired (expires in ~23h)")
+        return self._token
+
+    # ------------------------------------------------------------------
+    # Deployments
+    # ------------------------------------------------------------------
 
     def _load_deployments(self) -> dict:
         """Load deployments.csv into a lookup map."""
@@ -91,8 +147,74 @@ class CameraTrapSource:
         logger.info("Loaded %d deployments from CSV", len(deployments))
         return deployments
 
-    def _download_image(self, image_id: str, url: str) -> Optional[Path]:
-        """Download an image from a URL to the local cache.
+    # ------------------------------------------------------------------
+    # Image download via WI GraphQL API
+    # ------------------------------------------------------------------
+
+    def _parse_viewer_url(self, url: str) -> Optional[dict]:
+        """Extract downloadId, projectId, imageUUID from a WI viewer URL.
+
+        URL format: https://app.wildlifeinsights.org/download/{downloadId}/project/{projectId}/data-files/{imageUUID}
+        """
+        m = VIEWER_URL_RE.search(url)
+        if not m:
+            return None
+        return {
+            "downloadId": int(m.group(1)),
+            "projectId": int(m.group(2)),
+            "imageUUID": m.group(3),
+        }
+
+    def _get_image_url(self, download_id: int, project_id: int, image_uuid: str) -> Optional[str]:
+        """Query WI GraphQL for the signed GCS URL of an image.
+
+        Retries once with a fresh token if we get 401.
+        """
+        variables = {
+            "downloadId": download_id,
+            "projectId": project_id,
+            "imageUUID": image_uuid,
+        }
+
+        for attempt in range(2):
+            token = self._ensure_token()
+            try:
+                with httpx.Client(timeout=30) as client:
+                    resp = client.post(
+                        WI_GRAPHQL_DATA_FILE,
+                        json={"query": GQL_GET_IMAGE_URL, "variables": variables},
+                        headers={"Authorization": f"Bearer {token}"},
+                    )
+
+                if resp.status_code == 401:
+                    logger.warning("WI token expired, refreshing (attempt %d)", attempt + 1)
+                    self._token = None
+                    continue
+
+                resp.raise_for_status()
+                data = resp.json()
+                result = (data.get("data") or {}).get("getDataFilePublicDownloadUrl")
+                if result and result.get("url"):
+                    return result["url"]
+
+                logger.warning("No URL returned for image %s: %s", image_uuid, str(data)[:200])
+                return None
+
+            except Exception as exc:
+                logger.warning("GraphQL request failed for image %s: %s", image_uuid, exc)
+                if attempt == 0:
+                    self._token = None  # force re-login
+                    continue
+                return None
+
+        return None
+
+    def _download_image(self, image_id: str, viewer_url: str) -> Optional[Path]:
+        """Download an image from WI to the local cache.
+
+        1. Parse the viewer URL to extract downloadId/projectId/imageUUID
+        2. Query GraphQL for the signed GCS URL
+        3. Download the image from GCS
 
         Returns the local path, or None if download fails.
         """
@@ -102,16 +224,41 @@ class CameraTrapSource:
         if dest.exists() and dest.stat().st_size > 0:
             return dest
 
+        # Parse viewer URL
+        params = self._parse_viewer_url(viewer_url)
+        if not params:
+            logger.warning("Cannot parse WI viewer URL: %s", viewer_url[:100])
+            return None
+
+        # Get signed GCS URL
+        gcs_url = self._get_image_url(
+            params["downloadId"], params["projectId"], params["imageUUID"]
+        )
+        if not gcs_url:
+            return None
+
+        # Download from GCS
         try:
             with httpx.Client(timeout=60, follow_redirects=True) as client:
-                resp = client.get(url)
+                resp = client.get(gcs_url)
                 resp.raise_for_status()
+
+            ct = resp.headers.get("content-type", "")
+            if not ct.startswith("image/"):
+                logger.warning("WI returned non-image content-type for %s: %s", image_id, ct)
+                return None
+
             dest.write_bytes(resp.content)
-            logger.debug("Downloaded %s -> %s", url, dest)
+            logger.debug("Downloaded %s -> %s (%d bytes)", image_id, dest, len(resp.content))
             return dest
+
         except Exception as exc:
-            logger.warning("Failed to download image %s from %s: %s", image_id, url, exc)
+            logger.warning("Failed to download image %s from GCS: %s", image_id, exc)
             return None
+
+    # ------------------------------------------------------------------
+    # Hashing
+    # ------------------------------------------------------------------
 
     def _compute_hash(self, path: Path) -> str:
         """Compute SHA-256 hash of a file for deduplication."""
@@ -128,11 +275,14 @@ class CameraTrapSource:
                 return datetime.strptime(ts.strip(), fmt)
             except ValueError:
                 continue
-        # Fallback: try date only
         try:
             return datetime.strptime(ts.strip()[:10], "%Y-%m-%d")
         except ValueError:
             return None
+
+    # ------------------------------------------------------------------
+    # Main iteration
+    # ------------------------------------------------------------------
 
     def iter_images(self) -> Iterator[ImageItem]:
         """Yield ImageItem objects from the Wildlife Insights export."""
@@ -146,7 +296,7 @@ class CameraTrapSource:
         skipped_blank = 0
         skipped_no_species = 0
         skipped_human = 0
-        skipped_no_image_url = 0
+        skipped_no_url = 0
         skipped_download = 0
 
         with open(csv_path, "r", encoding="utf-8", newline="") as f:
@@ -162,11 +312,12 @@ class CameraTrapSource:
 
                 # Skip blank images
                 is_blank = row.get("is_blank", "").strip().lower() in ("1", "true", "yes")
-                if is_blank:
+                common_name = row.get("common_name", "").strip()
+                if is_blank or common_name.lower() == "blank":
                     skipped_blank += 1
                     continue
 
-                # Skip humans and unidentified
+                # Skip humans
                 genus = row.get("genus", "").strip()
                 species = row.get("species", "").strip()
                 image_class = row.get("class", "").strip()
@@ -175,9 +326,8 @@ class CameraTrapSource:
                     skipped_human += 1
                     continue
 
-                # Skip if no species identified (only genus/family-level IDs are
-                # too vague for our pipeline — YOLO + VLM will classify from scratch)
-                if not species or species == "Blank" or not image_class:
+                # Skip if no species identified
+                if not species or not image_class:
                     skipped_no_species += 1
                     continue
 
@@ -185,10 +335,10 @@ class CameraTrapSource:
                 location = row.get("location", "").strip()
 
                 if not image_id or not location:
-                    skipped_no_image_url += 1
+                    skipped_no_url += 1
                     continue
 
-                # Download image to local cache
+                # Download image via WI API
                 local_path = self._download_image(image_id, location)
                 if local_path is None:
                     skipped_download += 1
@@ -207,9 +357,9 @@ class CameraTrapSource:
                 # Compute hash for dedup
                 image_hash = self._compute_hash(local_path)
 
-                # Build extra metadata for the pipeline
+                # Build extra metadata
                 extra = {
-                    "common_name": row.get("common_name", "").strip(),
+                    "common_name": common_name,
                     "genus": genus,
                     "species": species,
                     "order": row.get("order", "").strip(),
@@ -217,13 +367,11 @@ class CameraTrapSource:
                     "cv_confidence": row.get("cv_confidence", "").strip(),
                     "uncertainty": row.get("uncertainty", "").strip(),
                     "license": row.get("license", "").strip(),
-                    "is_blank": False,  # we filtered blanks
                     "wi_taxon_id": row.get("wi_taxon_id", "").strip(),
                     "wi_location_url": location,
                     "sequence_id": row.get("sequence_id", "").strip(),
                     "identified_by": row.get("identified_by", "").strip(),
                     "fuzzed": row.get("fuzzed", "").strip().lower() == "true",
-                    "deployment_fuzzed": dep.get("placename", "") == "" and row.get("deployment_fuzzed", "").strip().lower() == "true",
                 }
 
                 yield ImageItem(
@@ -246,5 +394,5 @@ class CameraTrapSource:
             "CameraTrapSource: yielded %d images (skipped: blank=%d, no_species=%d, "
             "human=%d, no_url=%d, download_fail=%d)",
             count, skipped_blank, skipped_no_species, skipped_human,
-            skipped_no_image_url, skipped_download,
+            skipped_no_url, skipped_download,
         )

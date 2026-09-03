@@ -1,20 +1,23 @@
 """CLI for the ML service.
 
 Usage:
-  # Submit a camera trap ingestion job (async — worker processes it)
+  # Process images (classify directly with VLM — no YOLO)
   python -m app.cli ingest --source camera_trap --data-dir /data/wildlife-insights
+  python -m app.cli ingest --source camera_trap --data-dir /data/wi --limit 50
   python -m app.cli ingest --source local_dir --data-dir /data/test-images
 
-  # Classify pending detections (Fase 2 — VLM)
+  # Reclassify pending detections from old YOLO runs
   python -m app.cli classify --limit 100
   python -m app.cli classify --all
 
   # Check job status
   python -m app.cli status --job-id 42
 
-  # Legacy satellite batch (all protected areas for a date)
-  python -m app.cli batch --date 2026-09-01
-  python -m app.cli batch --date 2026-09-01 --area-ids 1,2,3
+  # Prepare fine-tuning dataset (download + format)
+  python -m app.cli prepare-dataset --data-dir /data/wi --output-dir /data/dataset
+
+  # Fine-tune Qwen2-VL-2B with QLoRA
+  python -m app.cli finetune --dataset-dir /data/dataset --output-dir /models/qwen2vl-finetuned
 """
 
 import argparse
@@ -25,9 +28,8 @@ from typing import Optional
 
 from .config import load_settings
 from .db import Database
-from .detector import AnimalDetector
-from .classifier import SpeciesClassifier
-from .pipeline import DetectionPipeline
+from .local_classifier import LocalVLMClassifier
+from .pipeline import ClassificationPipeline
 from .sources.local_dir import LocalDirectorySource
 from .sources.camera_trap import CameraTrapSource
 
@@ -39,20 +41,17 @@ logger = logging.getLogger(__name__)
 
 
 async def run_ingest(args: argparse.Namespace) -> None:
-    """Submit an ingestion job and run it synchronously (CLI mode)."""
+    """Process images: classify each with VLM and save to DB."""
     settings = load_settings()
 
     db = Database(settings)
     await db.connect()
     logger.info("Database connected")
 
-    detector = AnimalDetector(settings)
-    detector.load()
-
-    classifier = SpeciesClassifier(settings)
+    classifier = LocalVLMClassifier(settings)
     classifier.load()
 
-    pipeline = DetectionPipeline(settings, db, detector, classifier)
+    pipeline = ClassificationPipeline(settings, db, classifier)
 
     # Create job
     job_id = await db.create_job(
@@ -61,11 +60,10 @@ async def run_ingest(args: argparse.Namespace) -> None:
         project_id=getattr(args, "project_id", None),
         p_limit=getattr(args, "limit", None),
     )
-    logger.info("Created job %d (source=%s, data_dir=%s, project_id=%s, limit=%s)",
-                job_id, args.source, args.data_dir,
-                getattr(args, "project_id", None), getattr(args, "limit", None))
+    logger.info("Created job %d (source=%s, data_dir=%s, limit=%s)",
+                job_id, args.source, args.data_dir, getattr(args, "limit", None))
 
-    # Build source and run synchronously
+    # Build source and run
     if args.source == "camera_trap":
         source = CameraTrapSource(
             data_dir=args.data_dir,
@@ -82,30 +80,26 @@ async def run_ingest(args: argparse.Namespace) -> None:
     total = await pipeline.run(job_id, source)
 
     print()
-    print("==> Detection complete:")
+    print("==> Classification complete:")
     print(f"    Job ID:       {job_id}")
     print(f"    Source:       {args.source}")
-    print(f"    Detections:   {total}")
-    print(f"    Run 'python -m app.cli classify --all' to classify pending detections")
+    print(f"    Classified:   {total}")
 
     await db.close()
 
 
 async def run_classify(args: argparse.Namespace) -> None:
-    """Run Fase 2 classification on pending detections."""
+    """Reclassify pending detections from old YOLO runs."""
     settings = load_settings()
 
     db = Database(settings)
     await db.connect()
     logger.info("Database connected")
 
-    detector = AnimalDetector(settings)
-    detector.load()
-
-    classifier = SpeciesClassifier(settings)
+    classifier = LocalVLMClassifier(settings)
     classifier.load()
 
-    pipeline = DetectionPipeline(settings, db, detector, classifier)
+    pipeline = ClassificationPipeline(settings, db, classifier)
 
     if args.all:
         total_classified = 0
@@ -116,13 +110,11 @@ async def run_classify(args: argparse.Namespace) -> None:
             total_classified += count
             print(f"  Classified {count} detections (total: {total_classified})")
         print()
-        print(f"==> Classification complete: {total_classified} detections classified")
+        print(f"==> Reclassification complete: {total_classified} detections")
     else:
         count = await pipeline.classify_pending(limit=args.limit)
         print()
         print(f"==> Classified {count} detections")
-        if count == args.limit:
-            print(f"    More pending — run again or use --all")
 
     await db.close()
 
@@ -143,7 +135,7 @@ async def run_status(args: argparse.Namespace) -> None:
     print(f"Job {job['id']}:")
     print(f"  Status:              {job['status']}")
     print(f"  Source:              {job.get('source', 'satellite')}")
-    print(f"  Total detections:    {job['total_deteccoes']}")
+    print(f"  Total classified:    {job['total_deteccoes']}")
     print(f"  Total images:        {job.get('total_imagens', 0)}")
     print(f"  Images processed:    {job.get('imagens_processadas', 0)}")
     print(f"  Created:             {job.get('criado_em', '?')}")
@@ -151,7 +143,6 @@ async def run_status(args: argparse.Namespace) -> None:
     if job.get("erro"):
         print(f"  Error:               {job['erro']}")
 
-    # Detection status breakdown
     async with db._pool.acquire() as conn:
         counts = await conn.fetchrow(
             """SELECT
@@ -166,55 +157,50 @@ async def run_status(args: argparse.Namespace) -> None:
     if counts:
         print()
         print("  Detection breakdown:")
-        print(f"    Pending classification: {counts['pending']}")
-        print(f"    Classified:              {counts['classified']}")
-        print(f"    Rejected:                {counts['rejected']}")
-        print(f"    Inconclusive:            {counts['inconclusive']}")
+        print(f"    Pending:    {counts['pending']}")
+        print(f"    Classified: {counts['classified']}")
+        print(f"    Rejected:   {counts['rejected']}")
+        print(f"    Inconclusive: {counts['inconclusive']}")
 
     await db.close()
 
 
-async def run_batch(args: argparse.Namespace) -> None:
-    """Legacy satellite batch — process all protected areas."""
-    settings = load_settings()
+def run_prepare_dataset(args: argparse.Namespace) -> None:
+    """Prepare fine-tuning dataset from WI export."""
+    from .train.prepare_dataset import prepare_dataset
+    prepare_dataset(
+        data_dir=args.data_dir,
+        output_dir=args.output_dir,
+        min_per_species=args.min_per_species,
+        val_ratio=args.val_ratio,
+        max_per_species=args.max_per_species,
+    )
 
-    db = Database(settings)
-    await db.connect()
-    logger.info("Database connected")
 
-    detector = AnimalDetector(settings)
-    detector.load()
-
-    classifier = SpeciesClassifier(settings)
-    classifier.load()
-
-    pipeline = DetectionPipeline(settings, db, detector, classifier)
-
-    area_ids: Optional[list[int]] = None
-    if args.area_ids:
-        area_ids = [int(x) for x in args.area_ids.split(",") if x.strip()]
-
-    logger.info("Starting satellite batch for date=%s, area_ids=%s", args.date, area_ids)
-    results = await pipeline.run_batch_satellite(args.date, area_ids)
-
-    print()
-    print("==> Satellite batch summary:")
-    print(f"    Total areas:    {results['total_areas']}")
-    print(f"    Processed:      {results['processadas']}")
-    print(f"    Errors:         {results['erros']}")
-    print(f"    Detections:     {results['total_deteccoes']}")
-
-    await db.close()
+def run_finetune(args: argparse.Namespace) -> None:
+    """Fine-tune Qwen2-VL-2B with QLoRA."""
+    from .train.finetune import finetune
+    finetune(
+        dataset_dir=args.dataset_dir,
+        output_dir=args.output_dir,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        grad_accum=args.grad_accum,
+        lr=args.lr,
+        lora_r=args.lora_r,
+        lora_alpha=args.lora_alpha,
+        max_samples=args.max_samples,
+    )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="BioGuardians ML CLI — animal detection and classification",
+        description="BioGuardians ML CLI — VLM-based species classification",
     )
     sub = parser.add_subparsers(dest="command")
 
-    # ingest — submit a camera trap / local dir job
-    ingest_parser = sub.add_parser("ingest", help="Process images from a directory")
+    # ingest — process images (classify with VLM)
+    ingest_parser = sub.add_parser("ingest", help="Process and classify images")
     ingest_parser.add_argument(
         "--source", type=str, required=True,
         choices=["camera_trap", "local_dir"],
@@ -230,12 +216,12 @@ def main() -> None:
     )
     ingest_parser.add_argument(
         "--limit", type=int, default=None,
-        help="Max images to process (camera_trap only, for testing)",
+        help="Max images to process (for testing)",
     )
     ingest_parser.set_defaults(func=run_ingest)
 
-    # classify — Fase 2 VLM classification
-    classify_parser = sub.add_parser("classify", help="Classify pending detections (Fase 2)")
+    # classify — reclassify pending detections
+    classify_parser = sub.add_parser("classify", help="Reclassify pending detections")
     classify_parser.add_argument(
         "--limit", type=int, default=100,
         help="Max detections to classify per batch (default: 100)",
@@ -254,21 +240,77 @@ def main() -> None:
     )
     status_parser.set_defaults(func=run_status)
 
-    # batch — legacy satellite batch
-    batch_parser = sub.add_parser("batch", help="Legacy: satellite batch for all protected areas")
-    batch_parser.add_argument(
-        "--date", type=date.fromisoformat, required=True,
-        help="Target satellite image date (YYYY-MM-DD)",
+    # prepare-dataset — download + format WI images for fine-tuning
+    dataset_parser = sub.add_parser("prepare-dataset", help="Prepare fine-tuning dataset from WI export")
+    dataset_parser.add_argument(
+        "--data-dir", type=str, required=True,
+        help="WI export directory (with images.csv)",
     )
-    batch_parser.add_argument(
-        "--area-ids", type=str, default=None,
-        help="Comma-separated area IDs to process (default: all)",
+    dataset_parser.add_argument(
+        "--output-dir", type=str, required=True,
+        help="Where to save the dataset",
     )
-    batch_parser.set_defaults(func=run_batch)
+    dataset_parser.add_argument(
+        "--min-per-species", type=int, default=10,
+        help="Minimum images per species to include (default: 10)",
+    )
+    dataset_parser.add_argument(
+        "--max-per-species", type=int, default=0,
+        help="Cap images per species (0=no limit)",
+    )
+    dataset_parser.add_argument(
+        "--val-ratio", type=float, default=0.15,
+        help="Validation split ratio (default: 0.15)",
+    )
+    dataset_parser.set_defaults(func=run_prepare_dataset)
+
+    # finetune — train Qwen2-VL-2B with QLoRA
+    finetune_parser = sub.add_parser("finetune", help="Fine-tune Qwen2-VL-2B with QLoRA")
+    finetune_parser.add_argument(
+        "--dataset-dir", type=str, required=True,
+        help="Dataset directory (with train.jsonl, val.jsonl)",
+    )
+    finetune_parser.add_argument(
+        "--output-dir", type=str, required=True,
+        help="Where to save the LoRA adapter",
+    )
+    finetune_parser.add_argument(
+        "--epochs", type=int, default=3,
+        help="Number of training epochs (default: 3)",
+    )
+    finetune_parser.add_argument(
+        "--batch-size", type=int, default=2,
+        help="Micro-batch size (default: 2 for 8GB VRAM)",
+    )
+    finetune_parser.add_argument(
+        "--grad-accum", type=int, default=8,
+        help="Gradient accumulation steps (default: 8)",
+    )
+    finetune_parser.add_argument(
+        "--lr", type=float, default=2e-4,
+        help="Learning rate (default: 2e-4)",
+    )
+    finetune_parser.add_argument(
+        "--lora-r", type=int, default=16,
+        help="LoRA rank (default: 16)",
+    )
+    finetune_parser.add_argument(
+        "--lora-alpha", type=int, default=32,
+        help="LoRA alpha (default: 32)",
+    )
+    finetune_parser.add_argument(
+        "--max-samples", type=int, default=0,
+        help="Limit total samples (0=all, for testing)",
+    )
+    finetune_parser.set_defaults(func=run_finetune)
 
     args = parser.parse_args()
     if hasattr(args, "func"):
-        asyncio.run(args.func(args))
+        import inspect
+        if inspect.iscoroutinefunction(args.func):
+            asyncio.run(args.func(args))
+        else:
+            args.func(args)
     else:
         parser.print_help()
 

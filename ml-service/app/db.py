@@ -219,14 +219,26 @@ class Database:
             )
 
             if row is None:
-                # Already existed — fetch it
+                # Already existed (ON CONFLICT) — fetch by unique key, not job_id.
+                # The unique constraint is (source, source_image_id), so the existing
+                # row may belong to a different job. We reuse that row and update
+                # its job_id to the current job so progress is tracked correctly.
                 row = await conn.fetchrow(
-                    """SELECT id, job_id, source, source_image_id, status, detection_count
-                       FROM imagem_job
-                       WHERE job_id = $1 AND source = $2 AND source_image_id = $3""",
+                    """UPDATE imagem_job
+                          SET job_id = $1
+                        WHERE source = $2 AND source_image_id = $3
+                      RETURNING id, job_id, source, source_image_id, status, detection_count""",
                     job_id,
                     item.source,
                     item.image_id,
+                )
+
+            if row is None:
+                # source_image_id was NULL — no conflict, but INSERT returned None.
+                # This shouldn't happen, but handle gracefully.
+                raise RuntimeError(
+                    f"upsert_image_job: could not insert or find image "
+                    f"(source={item.source}, image_id={item.image_id})"
                 )
 
             return ImageJobRecord(

@@ -1,16 +1,16 @@
-"""FastAPI application — ML microservice for animal detection.
+"""FastAPI application — ML microservice for animal classification.
 
 Endpoints:
   POST /ingest          — submit a new image processing job (async)
-  POST /classify        — trigger Fase 2 classification of pending detections
+  POST /classify        — reclassify pending detections from old YOLO runs
   GET  /jobs            — list recent jobs
   GET  /jobs/{id}       — get job status + detections
   GET  /jobs/{id}/progress — detailed progress (images, detections, classified)
   GET  /health          — health check
 
 A background worker loop polls for pending jobs and processes them
-automatically (Fase 1 — detection). Fase 2 (classification) is
-triggered manually via POST /classify to control VLM API usage.
+automatically. Each image is classified directly by the local VLM
+(Qwen2-VL-2B fine-tuned) with OpenRouter/Claude as fallback.
 """
 
 import asyncio
@@ -24,9 +24,8 @@ from fastapi import FastAPI, HTTPException, Query
 
 from .config import load_settings, Settings
 from .db import Database
-from .detector import AnimalDetector
-from .classifier import SpeciesClassifier
-from .pipeline import DetectionPipeline
+from .local_classifier import LocalVLMClassifier
+from .pipeline import ClassificationPipeline
 from .sources.base import ImageSource
 from .sources.local_dir import LocalDirectorySource
 from .sources.camera_trap import CameraTrapSource
@@ -40,9 +39,8 @@ logger = logging.getLogger(__name__)
 # --- Globals (initialized in lifespan) ---
 settings: Optional[Settings] = None
 db: Optional[Database] = None
-detector: Optional[AnimalDetector] = None
-classifier: Optional[SpeciesClassifier] = None
-pipeline: Optional[DetectionPipeline] = None
+classifier: Optional[LocalVLMClassifier] = None
+pipeline: Optional[ClassificationPipeline] = None
 _worker_task: Optional[asyncio.Task] = None
 
 
@@ -71,7 +69,7 @@ def _build_source(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application startup/shutdown lifecycle."""
-    global settings, db, detector, classifier, pipeline, _worker_task
+    global settings, db, classifier, pipeline, _worker_task
 
     logger.info("Starting BioGuardians ML service...")
     settings = load_settings()
@@ -81,15 +79,12 @@ async def lifespan(app: FastAPI):
     await db.connect()
     logger.info("Database connected")
 
-    # ML models
-    detector = AnimalDetector(settings)
-    detector.load()
-
-    classifier = SpeciesClassifier(settings)
+    # VLM classifier (local Qwen2-VL + OpenRouter fallback)
+    classifier = LocalVLMClassifier(settings)
     classifier.load()
 
-    # Pipeline
-    pipeline = DetectionPipeline(settings, db, detector, classifier)
+    # Pipeline (no YOLO — direct VLM classification)
+    pipeline = ClassificationPipeline(settings, db, classifier)
 
     # Background worker: process pending jobs
     async def worker_loop():
@@ -131,7 +126,8 @@ async def lifespan(app: FastAPI):
 
     _worker_task = asyncio.create_task(worker_loop())
 
-    logger.info("ML service ready (GPU device=%s)", settings.yolo_device)
+    logger.info("ML service ready (device=%s, classifier=%s)", settings.yolo_device,
+                "local+openrouter" if classifier._model is not None else "openrouter-only")
     yield
 
     # Shutdown
@@ -230,9 +226,9 @@ async def health():
     """Health check."""
     return {
         "status": "ok",
-        "model_loaded": detector is not None and detector._model is not None,
+        "model_loaded": classifier is not None and classifier._model is not None,
         "device": settings.yolo_device if settings else "unknown",
-        "classifier": "vlm" if (settings and settings.openrouter_api_key) else "heuristic",
+        "classifier": "local_vlm" if (classifier and classifier._model is not None) else "openrouter",
     }
 
 

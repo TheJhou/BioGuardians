@@ -46,8 +46,8 @@ def load_settings() -> Settings:
     return Settings(
         database_url=_required("DATABASE_URL"),
         model_path=os.environ.get("MODEL_PATH", "models/yolov8s.pt"),
-        confidence_threshold=float(os.environ.get("CONFIDENCE_THRESHOLD", "0.25")),
-        species_confidence_threshold=float(os.environ.get("SPECIES_CONFIDENCE_THRESHOLD", "0.5")),
+        confidence_threshold=float(os.environ.get("CONFIDENCE_THRESHOLD", "0.4")),
+        species_confidence_threshold=float(os.environ.get("SPECIES_CONFIDENCE_THRESHOLD", "0.3")),
         host=os.environ.get("HOST", "0.0.0.0"),
         port=int(os.environ.get("PORT", "8001")),
         openrouter_api_key=os.environ.get("OPENROUTER_API_KEY", ""),
