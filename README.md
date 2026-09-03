@@ -11,8 +11,9 @@ Sistema de banco de dados espacial (PostgreSQL + PostGIS) para gestão de
 
 ```
 BioGuardians/
-├── docker-compose.yml            # dev: db, migrate, backend, frontend
+├── docker-compose.yml            # dev: db, migrate, backend, frontend, ml-service (GPU)
 ├── docker-compose.observability.yml  # overlay: grafana, prometheus, tempo, loki
+├── docker-compose.prod.yml       # produção: backend, frontend (sem ML service)
 ├── stack.yml                     # produção: backend, frontend, observabilidade
 ├── .env.example                  # variáveis de ambiente (copiar para .env)
 ├── .github/workflows/deploy.yml  # CI/CD: build, migrate, deploy na VM
@@ -24,6 +25,7 @@ BioGuardians/
 │       └── smoke_test.sql
 ├── backend/                      # Node 22 + Express + TypeScript
 ├── frontend/                     # React 19 + Vite + MapLibre
+├── ml-service/                   # Python + FastAPI + Qwen2-VL (classificação de camera trap)
 ├── scripts/data/                 # importadores de dados (MMA, GBIF, speciesLink, CNUC)
 ├── observability/                # configuração do Grafana, Prometheus, Tempo, Loki
 ├── otel-collector-config.yaml    # configuração do OTel Collector
@@ -111,6 +113,70 @@ Após a carga, atualize as views materializadas do dashboard:
 ```bash
 psql -d $DB_NAME -U $DB_USER -c "SELECT refresh_dashboard();"
 ```
+
+## ML Service — Classificação de Camera Trap com VLM
+
+O `ml-service/` é um microserviço Python (FastAPI + Qwen2-VL-2B + PyTorch) que
+classifica fotos de camera trap usando um VLM (Vision-Language Model) fine-tuned
+localmente na GPU (NVIDIA RTX 4060 8GB VRAM).
+
+> **Roda localmente** na máquina com GPU — **não é deployado na VM de produção**.
+> O backend na VM não tem dependência do ML service em produção.
+
+### Pipeline
+
+```
+Wildlife Insights CSV → download autenticado (GraphQL) → cache local
+    → VLM classifica a imagem completa (sem YOLO, sem crop)
+    → se confiança >= 0.3: salva espécie + ocorrência no banco
+    → se confiança < 0.3: salva como rejeitada
+    → fallback: OpenRouter/Claude Sonnet 4 se o modelo local falhar
+```
+
+### Como usar (local com GPU)
+
+```bash
+# 1. Subir o banco
+docker compose up -d db
+docker compose run --rm migrate
+
+# 2. Buildar a imagem do ML service
+docker build -t bioguardians-ml ./ml-service
+
+# 3. Processar imagens do Wildlife Insights
+docker run --rm --gpus all \
+  -e DATABASE_URL=postgresql://user:pass@host.docker.internal:5432/bioguardians \
+  -e WI_EMAIL=your_email -e WI_PASSWORD=your_password \
+  -e OPENROUTER_API_KEY=your_key \
+  -v /path/to/wildlife-insights-data:/data/wi:ro \
+  -v bioguardians_ml_images:/app/images \
+  bioguardians-ml python -m app.cli ingest --source camera_trap --data-dir /data/wi --limit 50
+
+# 4. Preparar dataset para fine-tune (baixa ~9.680 imagens)
+docker run --rm --gpus all \
+  -e WI_EMAIL=your_email -e WI_PASSWORD=your_password \
+  -v /path/to/wildlife-insights-data:/data/wi:ro \
+  -v /path/to/output:/data/dataset \
+  bioguardians-ml python -m app.cli prepare-dataset --data-dir /data/wi --output-dir /data/dataset
+
+# 5. Fine-tunar Qwen2-VL-2B com QLoRA (~2-4h na RTX 4060)
+docker run --rm --gpus all \
+  -v /path/to/dataset:/data/dataset \
+  -v /path/to/models:/models \
+  bioguardians-ml python -m app.cli finetune --dataset-dir /data/dataset --output-dir /models/qwen2vl-finetuned
+```
+
+### Env vars do ML service
+
+| Variável | Descrição | Default |
+|----------|-----------|---------|
+| `DATABASE_URL` | String de conexão PostgreSQL | (obrigatório) |
+| `OPENROUTER_API_KEY` | Chave OpenRouter (fallback VLM) | vazio |
+| `OPENROUTER_MODEL` | Modelo fallback | `anthropic/claude-sonnet-4` |
+| `YOLO_DEVICE` | Device VLM (`cuda` ou `cpu`) | `cuda` |
+| `WI_EMAIL` / `WI_PASSWORD` | Credenciais Wildlife Insights | vazio |
+| `SPECIES_CONFIDENCE_THRESHOLD` | Threshold de aceitação | `0.3` |
+| `IMAGE_STORAGE_DIR` | Cache de imagens | `/app/images` |
 
 ## Sistema de Migrations
 
