@@ -13,25 +13,31 @@
 -- Controla o checkpoint de cada imagem dentro de um job.
 -- Permite retomar o processamento sem reprocessar imagens
 -- ja concluidas (idempotencia via UNIQUE source+source_image_id).
-CREATE TYPE IF NOT EXISTS imagem_status AS ENUM (
-    'pending',     -- registrada, aguardando deteccao
-    'processing',  -- deteccao em andamento
-    'detected',    -- YOLO rodou, deteccoes salvas, aguardando classificacao
-    'classified',  -- classificacao VLM concluida
-    'completed',   -- pipeline finalizada para esta imagem
-    'failed'       -- erro (ver coluna error)
-);
+DO $$ BEGIN
+    CREATE TYPE imagem_status AS ENUM (
+        'pending',     -- registrada, aguardando deteccao
+        'processing',  -- deteccao em andamento
+        'detected',    -- YOLO rodou, deteccoes salvas, aguardando classificacao
+        'classified',  -- classificacao VLM concluida
+        'completed',   -- pipeline finalizada para esta imagem
+        'failed'       -- erro (ver coluna error)
+    );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- ---------- Status de classificacao por deteccao ----------
 -- Cada deteccao passa por deteccao (YOLO) -> classificacao (VLM).
 -- O resultado da classificacao pode ser confirmado, inconclusivo
 -- ou rejeitado (false positive do YOLO).
-CREATE TYPE IF NOT EXISTS deteccao_status AS ENUM (
-    'detected',      -- YOLO detectou, sem classificacao ainda
-    'classified',    -- VLM classificou com especie
-    'rejected',      -- VLM rejeitou (nao eh animal / false positive)
-    'inconclusive'   -- VLM nao conseguiu classificar
-);
+DO $$ BEGIN
+    CREATE TYPE deteccao_status AS ENUM (
+        'detected',      -- YOLO detectou, sem classificacao ainda
+        'classified',    -- VLM classificou com especie
+        'rejected',      -- VLM rejeitou (nao eh animal / false positive)
+        'inconclusive'   -- VLM nao conseguiu classificar
+    );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- ---------- Controle por imagem (checkpoint) ----------
 CREATE TABLE IF NOT EXISTS imagem_job (
