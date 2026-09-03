@@ -4,9 +4,9 @@
 - **Database**: PostgreSQL 16 + PostGIS 3.4
 - **Backend**: Node.js 22 + Express + TypeScript (porta 3001)
 - **Frontend**: React 19 + Vite + TypeScript + MapLibre GL + MapTiler Cloud
-- **ML Service**: Python 3.11 + FastAPI + YOLOv8 + PyTorch (porta 8001)
-- **Infra**: Docker Compose, Nginx, Oracle Cloud VM
-- **CI/CD**: GitHub Actions (build, migrations, deploy)
+- **ML Service**: Python 3.11 + FastAPI + Qwen2-VL-2B + PyTorch (porta 8001, local com GPU)
+- **Infra**: Docker Compose, Nginx, Oracle Cloud VM (produção) + máquina local com RTX 4060 (ML)
+- **CI/CD**: GitHub Actions (build, migrations, deploy — sem ML service)
 - **Observabilidade**: OpenTelemetry, Grafana, Tempo, Prometheus, Loki
 
 ## Migrations
@@ -45,6 +45,8 @@
 13. `013_imagem_url.sql` — coluna imagem_url na tabela especie
 14. `014_deteccao_satelite.sql` — tabelas deteccao_job, deteccao, modelo_ml (ML service)
 15. `015_rastreio_ia.sql` — rastreio de classificação por IA na tabela deteccao
+16. `016_processamento_bulk.sql` — tabela imagem_job (checkpoint por imagem, idempotência)
+17. `017_job_filtros.sql` — filtros de job (project_id, limit) para camera trap
 
 ## Decisões de modelagem
 - SRID 4326 (WGS84) para todas as geometrias
@@ -62,53 +64,94 @@
 
 ## Backend
 - Rotas principais: `/api/health`, `/api/especies`, `/api/areas`, `/api/ocorrencias`, `/api/dashboard`, `/api/referencias`
-- Rota proxy ML (somente leitura): `GET /api/deteccoes/jobs`, `GET /api/deteccoes/jobs/:id` (proxy para o microserviço Python na porta 8001)
+- Rota proxy ML (somente leitura): `GET /api/deteccoes/jobs`, `GET /api/deteccoes/jobs/:id` (proxy para o ML service na porta 8001 — só funciona quando o ML service está rodando localmente)
 - Cache LRU em memória com invalidação por rota
 - OpenTelemetry condicional (só ativa com `OTEL_EXPORTER_OTLP_ENDPOINT`)
 
-## ML Service (detecção por satélite)
-- Microserviço Python isolado em `ml-service/` (FastAPI + YOLOv8 + PyTorch)
-- Porta 8001, container Docker separado (`bioguardians-ml`)
-- Busca imagens CBERS-4A WPM no INPE via biblioteca `cbers4asat`
-- **Preferência por pan-sharpened (PCA_FUSED)**: 0.8m de resolução (2.5x melhor que L4_DN de 2m). Cai pra L4_DN só se fused não estiver disponível.
-- Composição RGB: as 3 bandas (R, G, B) são baixadas separadamente e combinadas num único GeoTIFF antes da detecção
-- Pipeline: buscar imagem → compor RGB → CLAHE → detectar animais (YOLOv8 + SAHI) → classificar espécie (IA) → salvar como `ocorrencia` com `fonte='deteccao_satelite'`
-- **SAHI** (Slicing Aided Hyper Inference): sliceia a imagem em patches de 512x512 com 20% overlap pra detectar objetos pequenos. Melhora detecção em imagens grandes de satélite.
-- **CLAHE**: realce de contraste adaptativo aplicado antes da detecção pra distinguir animais da vegetação
-- **Modelo YOLOv8 COCO é placeholder**: treinado em fotos de nível do solo, não em imagens de satélite. Detecção será baixa em CBERS-4A (2m). Pra produção, precisa treinar um modelo customizado com dados anotados de fauna em imagens de satélite.
-- **Filtro de bbox**: detecções fora do range 3-200 pixels são descartadas (muito pequenas = ruído, muito grandes = não é animal)
-- Ocorrências detectadas aparecem automaticamente no mapa existente (sem UI separada)
-- Tabelas: `deteccao_job`, `deteccao`, `modelo_ml` (migration 014)
-- Rastreio de IA: `deteccao.metodo_classificacao` ('ai' ou 'heuristic'), `modelo_ia`, `confianca_ia` (migration 015)
-- Env vars: `INPE_EMAIL` (cadastro em dgi.inpe.br), `ML_SERVICE_URL`, `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`
-- Endpoints: `POST /batch` (interno), `GET /jobs`, `GET /jobs/:id`, `GET /health`
-- **Sem trigger público**: detecção é disparada offline via CLI ou endpoint interno, nunca pela API pública
-- `POST /batch` não é proxyado pelo backend nem exposto no Nginx — só acessível dentro da rede Docker
+## ML Service (classificação de camera trap com VLM)
+- Microserviço Python em `ml-service/` (FastAPI + Qwen2-VL-2B + PyTorch)
+- **Roda localmente** na máquina com GPU (RTX 4060 8GB VRAM) — NÃO é deployado na VM de produção
+- Porta 8001, container Docker `bioguardians-ml` (apenas em `docker-compose.yml` dev)
+- **Sem YOLO**: a imagem completa é enviada direto ao VLM (sem detecção/crop prévio)
+- **Sem satélite**: satélite foi descartado pela resolução insuficiente (CBERS-4A 2m não detecta fauna)
 
-### Classificação por IA (OpenRouter + Claude Sonnet 4)
-- Após YOLOv8 detectar um animal, o recorte da imagem é enviado ao OpenRouter (Claude Sonnet 4)
-- A IA retorna: nome científico, nome popular, descrição e categoria de ameaça (CR/EN/VU/NT/LC/DD)
-- Se a espécie não existe no banco, é criada automaticamente (`find_or_create_species`)
-- Descrição e categoria de ameaça sobrescrevem os dados existentes na tabela `especie`
-- Se `OPENROUTER_API_KEY` não estiver configurada, cai pro classificador heurístico (fallback)
-- Custo por imagem: ~$0.01-0.03 (Claude Sonnet 4, 600 max tokens)
+### Pipeline atual
+```
+Wildlife Insights CSV → download autenticado (GraphQL) → cache local
+    → VLM classifica a imagem completa
+    → se confiança >= 0.3: salva espécie + ocorrência no banco
+    → se confiança < 0.3 ou sem espécie: salva como rejeitada
+```
 
-### Batch de detecção (offline)
-- Processa todas as áreas protegidas lendo `area_protegida.geom` do banco
-- Cada área vira um job em `deteccao_job` com bbox calculado do polígono
-- Disparo via CLI dentro do container:
-  ```bash
-  docker exec bioguardians-ml python -m app.cli batch --date 2026-09-01
-  docker exec bioguardians-ml python -m app.cli batch --date 2026-09-01 --area-ids 1,2,3
-  ```
-- Ou via endpoint interno (dentro da rede Docker):
-  ```bash
-  curl -X POST http://ml-service:8001/batch -H "Content-Type: application/json" -d '{"date":"2026-09-01"}'
-  ```
-- Cron na VM (exemplo — domingo 03:00):
-  ```bash
-  0 3 * * 0 docker exec bioguardians-ml python -m app.cli batch --date $(date -d '7 days ago' +\%Y-\%m-\%d) >> /var/log/bioguardians-batch.log 2>&1
-  ```
+### Modelo VLM (Qwen2-VL-2B + QLoRA)
+- **Modelo base**: Qwen2-VL-2B (vision-language model, 2B parâmetros)
+- **Fine-tune**: QLoRA (quantization 4-bit + LoRA adapters) — cabe em 8GB VRAM
+- **Treino local**: dataset Wildlife Insights (~9.680 imagens rotuladas, 72 espécies)
+- **Inferência local**: Qwen2-VL fine-tuned roda na GPU (custo $0/imagem)
+- **Fallback**: OpenRouter/Claude Sonnet 4 quando o modelo local não está disponível ou confiança é baixa
+
+### Fonte de dados — Wildlife Insights
+- Dataset CSV com metadados + URLs autenticadas para download de imagens
+- Autenticação: POST `/v1/auth/sign-in` → token → POST `/graphql-data-file` → URL GCS assinada
+- Filtros: blank, human, no_species são pulados; só imagens com espécie rotulada são processadas
+- Cache: imagens baixadas ficam em `/app/images` (volume Docker) para não rebaixar
+- Estatísticas do dataset: 34.190 imagens total, 9.680 treináveis, 46 espécies com ≥10 imagens
+
+### Arquivos principais
+- `app/pipeline.py` — orquestra download + classificação + persistência
+- `app/local_classifier.py` — VLM local (Qwen2-VL) + fallback OpenRouter
+- `app/sources/camera_trap.py` — source Wildlife Insights (CSV + download autenticado)
+- `app/sources/local_dir.py` — source para pasta local (testes/debug)
+- `app/train/prepare_dataset.py` — baixa imagens e prepara dataset JSONL para fine-tune
+- `app/train/finetune.py` — fine-tune Qwen2-VL-2B com QLoRA
+- `app/config.py` — configurações (VLM device, OpenRouter, thresholds)
+- `app/db.py` — acesso ao PostgreSQL (asyncpg)
+- `app/main.py` — FastAPI app + worker loop
+- `app/cli.py` — CLI com comandos `ingest`, `classify`, `status`, `prepare-dataset`, `finetune`
+
+### Comandos CLI
+```bash
+# Processar imagens (classifica com VLM e salva no banco)
+docker exec bioguardians-ml python -m app.cli ingest --source camera_trap --data-dir /data/wi --limit 50
+
+# Preparar dataset para fine-tune (baixa ~9.680 imagens)
+docker exec bioguardians-ml python -m app.cli prepare-dataset --data-dir /data/wi --output-dir /data/dataset
+
+# Fine-tunar Qwen2-VL-2B (requer GPU, ~2-4h na RTX 4060)
+docker exec bioguardians-ml python -m app.cli finetune --dataset-dir /data/dataset --output-dir /models/qwen2vl-finetuned
+
+# Reclassificar detecções pendentes de jobs antigos
+docker exec bioguardians-ml python -m app.cli classify --all
+
+# Status de um job
+docker exec bioguardians-ml python -m app.cli status --job-id 25
+```
+
+### Endpoints
+- `POST /ingest` — cria job de processamento (worker processa em background)
+- `POST /classify` — reclassifica detecções pendentes de jobs antigos (YOLO legacy)
+- `GET /jobs` — lista jobs recentes
+- `GET /jobs/{id}` — detalhes do job + detecções
+- `GET /jobs/{id}/progress` — progresso detalhado (imagens, classificadas, rejeitadas)
+- `GET /health` — status do serviço + modelo carregado
+
+### Banco de dados
+- Tabelas: `deteccao_job`, `imagem_job`, `deteccao`, `especie`, `ocorrencia`
+- `deteccao.metodo_classificacao` = 'ai' (CHECK constraint só permite 'ai' ou 'heuristic')
+- `deteccao.modelo_ia` = 'qwen2vl-local' ou 'anthropic/claude-sonnet-4'
+- `deteccao.status` = 'classified' ou 'rejected'
+- `imagem_job` tem checkpoint único por `(source, source_image_id)` — idempotente
+- Migrações 016 (bulk) e 017 (job filtros) adicionaram processamento em massa
+
+### Env vars
+- `DATABASE_URL` — string de conexão PostgreSQL
+- `OPENROUTER_API_KEY` — chave OpenRouter (fallback VLM)
+- `OPENROUTER_MODEL` — modelo fallback (default: `anthropic/claude-sonnet-4`)
+- `YOLO_DEVICE` — device VLM: `cuda` ou `cpu` (reaproveita o nome da var)
+- `WI_EMAIL` / `WI_PASSWORD` — credenciais Wildlife Insights
+- `SPECIES_CONFIDENCE_THRESHOLD` — threshold de aceitação (default: 0.3)
+- `IMAGE_STORAGE_DIR` — diretório de cache de imagens (default: `/app/images`)
+- `VLM_CONCURRENCY` — chamadas OpenRouter simultâneas (default: 8)
 
 ## Carga de dados
 - Scripts em `scripts/data/` carregam dados reais de MMA, GBIF, speciesLink e CNUC
@@ -195,8 +238,9 @@ Internet → Cloudflare (DNS + HTTPS) → Nginx na VM → Docker
 - Fechadas externamente: 3000, 3001, 5050, 5432, 9090, 3100, 3200, 4317
 
 ### Deploy
-- O workflow `deploy.yml` builda imagens GHCR, aplica migrations, renderiza `stack.yml` e sobe na VM.
+- O workflow `deploy.yml` builda imagens GHCR de **backend e frontend** (não builda ML service), aplica migrations, renderiza `stack.yml` e sobe na VM.
 - A VM usa `stack.yml` (não `docker-compose.prod.yml`) com `docker compose -f stack.yml up -d`.
+- **ML service NÃO é deployado na VM** — roda localmente na máquina com GPU (RTX 4060).
 - PostgreSQL pode rodar nativamente na VM; o backend conecta via `host.docker.internal` ou IP local.
 - Nginx termina TLS e faz proxy reverso para `127.0.0.1:8080` e `127.0.0.1:3001`.
 - Certificados ficam em `/etc/cloudflare/` (ou similar) com permissão 600 na chave privada.
