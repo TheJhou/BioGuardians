@@ -159,8 +159,10 @@ def finetune(
 
     processor = AutoProcessor.from_pretrained(
         MODEL_ID,
-        max_pixels=1280 * 28 * 28,  # higher resolution for better species detail
-        min_pixels=256 * 28 * 28,
+        # Balance between detail and speed. 500px images -> ~360 28x28 patches,
+        # which is plenty for species classification without slowing training.
+        max_pixels=28 * 28 * 560,
+        min_pixels=224 * 28 * 28,
     )
 
     # Load datasets
@@ -225,7 +227,7 @@ def finetune(
         optim="adamw_torch",
         report_to="none",
         remove_unused_columns=False,
-        dataloader_num_workers=2,
+        dataloader_num_workers=0,
     )
 
     trainer = Trainer(
