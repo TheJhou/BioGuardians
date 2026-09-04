@@ -91,8 +91,8 @@ def finetune(
     batch_size: int = 1,
     grad_accum: int = 8,
     lr: float = 2e-4,
-    lora_r: int = 64,
-    lora_alpha: int = 128,
+    lora_r: int = 32,
+    lora_alpha: int = 64,
     max_samples: int = 0,
 ):
     """Fine-tune Qwen2-VL-2B with QLoRA.
@@ -140,9 +140,8 @@ def finetune(
 
     model = prepare_model_for_kbit_training(model)
 
-    # LoRA config — target attention, MLP projections, embeddings and LM head
-    # Higher rank (64) gives more capacity to learn many species
-    # embed_tokens + lm_head help the model learn species names in JSON output
+    # LoRA config — attention and MLP projections only.
+    # r=32 is enough for 26 species and keeps VRAM under ~6GB on RTX 4060 8GB.
     lora_config = LoraConfig(
         r=lora_r,
         lora_alpha=lora_alpha,
@@ -152,7 +151,6 @@ def finetune(
         target_modules=[
             "q_proj", "k_proj", "v_proj", "o_proj",
             "gate_proj", "up_proj", "down_proj",
-            "embed_tokens", "lm_head",
         ],
     )
 
@@ -215,14 +213,12 @@ def finetune(
         per_device_eval_batch_size=batch_size,
         gradient_accumulation_steps=grad_accum,
         learning_rate=lr,
-        warmup_steps=10,
+        warmup_steps=50,
         lr_scheduler_type="cosine",
-        logging_steps=5,
-        eval_strategy="steps",
-        eval_steps=20,
-        save_strategy="steps",
-        save_steps=50,
-        save_total_limit=3,
+        logging_steps=10,
+        eval_strategy="epoch",
+        save_strategy="epoch",
+        save_total_limit=2,
         bf16=True,
         gradient_checkpointing=True,
         gradient_checkpointing_kwargs={"use_reentrant": False},
@@ -287,8 +283,8 @@ if __name__ == "__main__":
     train_p.add_argument("--batch-size", type=int, default=1)
     train_p.add_argument("--grad-accum", type=int, default=8)
     train_p.add_argument("--lr", type=float, default=2e-4)
-    train_p.add_argument("--lora-r", type=int, default=64)
-    train_p.add_argument("--lora-alpha", type=int, default=128)
+    train_p.add_argument("--lora-r", type=int, default=32)
+    train_p.add_argument("--lora-alpha", type=int, default=64)
     train_p.add_argument("--max-samples", type=int, default=0)
 
     # Merge
