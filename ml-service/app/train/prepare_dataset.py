@@ -23,9 +23,12 @@ import csv
 import json
 import logging
 import os
+import random
 import re
+import threading
 import time
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Optional
 
@@ -46,10 +49,34 @@ GQL_GET_URL = """query ($downloadId: Int!, $projectId: Int, $imageUUID: String!)
 VIEWER_URL_RE = re.compile(r"/download/(\d+)/project/(\d+)/data-files/([0-9a-f\-]+)")
 
 
+class TokenBucket:
+    """Thread-safe token bucket rate limiter."""
+
+    def __init__(self, rate: float, capacity: float):
+        self.rate = rate          # tokens per second
+        self.capacity = capacity  # burst capacity
+        self.tokens = capacity
+        self.last = time.time()
+        self.lock = threading.Lock()
+
+    def acquire(self):
+        with self.lock:
+            now = time.time()
+            elapsed = now - self.last
+            self.tokens = min(self.capacity, self.tokens + elapsed * self.rate)
+            self.last = now
+            if self.tokens < 1.0:
+                wait = (1.0 - self.tokens) / self.rate
+                time.sleep(wait)
+                self.tokens = 0.0
+            else:
+                self.tokens -= 1.0
+
+
 class WIDownloader:
     """Download images from Wildlife Insights via authenticated GraphQL."""
 
-    def __init__(self, email: str, password: str, cache_dir: Path):
+    def __init__(self, email: str, password: str, cache_dir: Path, rate_limiter: TokenBucket):
         self._email = email
         self._password = password
         self._cache_dir = cache_dir
@@ -57,6 +84,7 @@ class WIDownloader:
         self._token: Optional[str] = None
         self._token_expires: float = 0
         self._client = httpx.Client(timeout=60, follow_redirects=True)
+        self._rate_limiter = rate_limiter
 
     def _ensure_token(self) -> str:
         if self._token and time.time() < self._token_expires - 60:
@@ -92,9 +120,11 @@ class WIDownloader:
             logger.warning("Cannot parse URL for %s", image_id)
             return None
 
-        for attempt in range(3):
+        for attempt in range(5):
             try:
                 token = self._ensure_token()
+                # Global rate limiter to avoid WI API 429s and keep GCS busy
+                self._rate_limiter.acquire()
                 r = self._client.post(
                     WI_GRAPHQL,
                     json={"query": GQL_GET_URL, "variables": params},
@@ -102,6 +132,11 @@ class WIDownloader:
                 )
                 if r.status_code == 401:
                     self._token = None
+                    continue
+                if r.status_code == 429:
+                    wait = min(60, 2 ** attempt) + random.uniform(0, 2)
+                    logger.warning("Rate limited for %s, waiting %.1fs", image_id, wait)
+                    time.sleep(wait)
                     continue
                 r.raise_for_status()
                 data = r.json()
@@ -162,7 +197,9 @@ def prepare_dataset(data_dir: str, output_dir: str, min_per_species: int = 10,
     if not email or not password:
         raise RuntimeError("WI_EMAIL and WI_PASSWORD required")
 
-    downloader = WIDownloader(email, password, images_dir)
+    # 6 GraphQL req/s with burst of 8; tune if 429s appear
+    rate_limiter = TokenBucket(rate=6.0, capacity=8.0)
+    downloader = WIDownloader(email, password, images_dir, rate_limiter)
 
     # Load deployments for coordinates
     deployments = {}
@@ -253,55 +290,81 @@ def prepare_dataset(data_dir: str, output_dir: str, min_per_species: int = 10,
     with open(output_dir / "species.json", "w", encoding="utf-8") as f:
         json.dump(species_map, f, indent=2, ensure_ascii=False)
 
-    # Download images and create train/val splits
+    # Download images with concurrent workers and create train/val splits
     train_records = []
     val_records = []
     total = sum(len(r) for r in valid_species.values())
     downloaded = 0
     failed = 0
 
+    # Build the full list of items to download, tagged with split
+    all_items = []
     for sp, records in valid_species.items():
-        # Cap per species if specified
         if max_per_species > 0 and len(records) > max_per_species:
             records = records[:max_per_species]
-
-        # Split into train/val
         val_count = max(1, int(len(records) * val_ratio))
         val_items = records[:val_count]
         train_items = records[val_count:]
+        for item in val_items:
+            all_items.append((item, "val"))
+        for item in train_items:
+            all_items.append((item, "train"))
 
-        for item in train_items + val_items:
-            if max_total > 0 and downloaded + failed >= max_total:
-                break
-            local_path = downloader.download(item["image_id"], item["location"])
+    if max_total > 0 and len(all_items) > max_total:
+        all_items = all_items[:max_total]
+
+    # Download concurrently — 8 workers. WI API may rate-limit (429), handled
+    # by exponential backoff; bursts are allowed, so 8 workers maximize throughput.
+    results = {}  # image_id -> (local_path, item, split)
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = {}
+        for item, split in all_items:
+            fut = pool.submit(downloader.download, item["image_id"], item["location"])
+            futures[fut] = (item, split)
+
+        for fut in as_completed(futures):
+            item, split = futures[fut]
+            try:
+                local_path = fut.result()
+            except Exception as exc:
+                logger.warning("Error for %s: %s", item["image_id"], exc)
+                local_path = None
+
             if local_path is None:
                 failed += 1
-                continue
-            downloaded += 1
-
-            record = {
-                "image_id": item["image_id"],
-                "image_path": str(local_path),
-                "scientific": item["scientific"],
-                "common_name": item["common_name"],
-                "class": item["class"],
-                "order": item["order"],
-                "family": item["family"],
-                "genus": item["genus"],
-                "species": item["species"],
-                "lat": item["lat"],
-                "lon": item["lon"],
-                "timestamp": item["timestamp"],
-            }
-
-            if item in val_items:
-                val_records.append(record)
             else:
-                train_records.append(record)
+                downloaded += 1
+                results[item["image_id"]] = (local_path, item, split)
 
-            if downloaded % 100 == 0:
-                logger.info("Progress: %d/%d downloaded, %d failed",
-                            downloaded, total, failed)
+            done = downloaded + failed
+            if done % 100 == 0:
+                logger.info("Progress: %d/%d downloaded, %d failed (%.0f%%)",
+                            downloaded, total, failed, 100 * done / len(all_items))
+
+    # Build records in original order (train first, then val)
+    for item, split in all_items:
+        r = results.get(item["image_id"])
+        if r is None:
+            continue
+        local_path, _, _ = r
+        record = {
+            "image_id": item["image_id"],
+            "image_path": str(local_path),
+            "scientific": item["scientific"],
+            "common_name": item["common_name"],
+            "class": item["class"],
+            "order": item["order"],
+            "family": item["family"],
+            "genus": item["genus"],
+            "species": item["species"],
+            "lat": item["lat"],
+            "lon": item["lon"],
+            "timestamp": item["timestamp"],
+        }
+        if split == "val":
+            val_records.append(record)
+        else:
+            train_records.append(record)
 
     # Write JSONL files
     with open(output_dir / "train.jsonl", "w", encoding="utf-8") as f:

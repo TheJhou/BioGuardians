@@ -8,3 +8,10 @@ data/
 output/
 *.tif
 *.tiff
+
+hf_cache/
+models/
+images/
+data/
+dataset/
+__pycache__/

@@ -87,12 +87,12 @@ class CameraTrapDataset(Dataset):
 def finetune(
     dataset_dir: str,
     output_dir: str,
-    epochs: int = 3,
-    batch_size: int = 2,
+    epochs: int = 5,
+    batch_size: int = 1,
     grad_accum: int = 8,
     lr: float = 2e-4,
-    lora_r: int = 16,
-    lora_alpha: int = 32,
+    lora_r: int = 64,
+    lora_alpha: int = 128,
     max_samples: int = 0,
 ):
     """Fine-tune Qwen2-VL-2B with QLoRA.
@@ -140,7 +140,9 @@ def finetune(
 
     model = prepare_model_for_kbit_training(model)
 
-    # LoRA config — target attention and MLP projections
+    # LoRA config — target attention, MLP projections, embeddings and LM head
+    # Higher rank (64) gives more capacity to learn many species
+    # embed_tokens + lm_head help the model learn species names in JSON output
     lora_config = LoraConfig(
         r=lora_r,
         lora_alpha=lora_alpha,
@@ -150,13 +152,18 @@ def finetune(
         target_modules=[
             "q_proj", "k_proj", "v_proj", "o_proj",
             "gate_proj", "up_proj", "down_proj",
+            "embed_tokens", "lm_head",
         ],
     )
 
     model = get_peft_model(model, lora_config)
     model.print_trainable_parameters()
 
-    processor = AutoProcessor.from_pretrained(MODEL_ID)
+    processor = AutoProcessor.from_pretrained(
+        MODEL_ID,
+        max_pixels=1280 * 28 * 28,  # higher resolution for better species detail
+        min_pixels=256 * 28 * 28,
+    )
 
     # Load datasets
     train_dataset = CameraTrapDataset(
@@ -276,12 +283,12 @@ if __name__ == "__main__":
     train_p = sub.add_parser("train", help="Fine-tune with QLoRA")
     train_p.add_argument("--dataset-dir", required=True)
     train_p.add_argument("--output-dir", required=True)
-    train_p.add_argument("--epochs", type=int, default=3)
-    train_p.add_argument("--batch-size", type=int, default=2)
+    train_p.add_argument("--epochs", type=int, default=5)
+    train_p.add_argument("--batch-size", type=int, default=1)
     train_p.add_argument("--grad-accum", type=int, default=8)
     train_p.add_argument("--lr", type=float, default=2e-4)
-    train_p.add_argument("--lora-r", type=int, default=16)
-    train_p.add_argument("--lora-alpha", type=int, default=32)
+    train_p.add_argument("--lora-r", type=int, default=64)
+    train_p.add_argument("--lora-alpha", type=int, default=128)
     train_p.add_argument("--max-samples", type=int, default=0)
 
     # Merge
