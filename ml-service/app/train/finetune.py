@@ -89,10 +89,10 @@ def finetune(
     output_dir: str,
     epochs: int = 5,
     batch_size: int = 1,
-    grad_accum: int = 8,
+    grad_accum: int = 4,
     lr: float = 2e-4,
-    lora_r: int = 32,
-    lora_alpha: int = 64,
+    lora_r: int = 16,
+    lora_alpha: int = 32,
     max_samples: int = 0,
 ):
     """Fine-tune Qwen2-VL-2B with QLoRA.
@@ -141,7 +141,7 @@ def finetune(
     model = prepare_model_for_kbit_training(model)
 
     # LoRA config — attention and MLP projections only.
-    # r=32 is enough for 26 species and keeps VRAM under ~6GB on RTX 4060 8GB.
+    # r=16 keeps trainable params ~18M and is safer for 8GB VRAM.
     lora_config = LoraConfig(
         r=lora_r,
         lora_alpha=lora_alpha,
@@ -159,9 +159,9 @@ def finetune(
 
     processor = AutoProcessor.from_pretrained(
         MODEL_ID,
-        # Balance between detail and speed. 500px images -> ~360 28x28 patches,
-        # which is plenty for species classification without slowing training.
-        max_pixels=28 * 28 * 560,
+        # Force smaller resolution to fit 8GB VRAM and avoid OOM on first pass.
+        # 500px images are resized to ~420x420 -> ~225 patches, much faster.
+        max_pixels=28 * 28 * 420,
         min_pixels=224 * 28 * 28,
     )
 
@@ -285,8 +285,8 @@ if __name__ == "__main__":
     train_p.add_argument("--batch-size", type=int, default=1)
     train_p.add_argument("--grad-accum", type=int, default=8)
     train_p.add_argument("--lr", type=float, default=2e-4)
-    train_p.add_argument("--lora-r", type=int, default=32)
-    train_p.add_argument("--lora-alpha", type=int, default=64)
+    train_p.add_argument("--lora-r", type=int, default=16)
+    train_p.add_argument("--lora-alpha", type=int, default=32)
     train_p.add_argument("--max-samples", type=int, default=0)
 
     # Merge
