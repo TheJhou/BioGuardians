@@ -185,12 +185,18 @@ class LocalVLMClassifier:
                 categoria_ameaca=None, confidence=0.0, method="local_vlm",
             )
 
+        confidence = parsed.get("confianca", 0.5)
+        try:
+            confidence = float(confidence)
+        except (ValueError, TypeError):
+            confidence = 0.5
+
         return ClassificationResult(
             nome_cientifico=parsed.get("nome_cientifico"),
             nome_popular=parsed.get("nome_popular"),
             descricao=None,
             categoria_ameaca=None,
-            confidence=parsed.get("confianca", 0.5),
+            confidence=confidence,
             method="local_vlm",
         )
 

@@ -34,7 +34,7 @@ TRAIN_PROMPT = (
     "You are a wildlife biologist. Look at this camera trap photo from Brazil "
     "and identify the animal species. "
     "Respond with ONLY a JSON object: "
-    '{"nome_cientifico": "genus species", "nome_popular": "common name"}'
+    '{"nome_cientifico": "genus species", "nome_popular": "common name", "confianca": 0.0 to 1.0}'
 )
 
 MODEL_ID = "Qwen/Qwen2-VL-2B-Instruct"
@@ -52,6 +52,21 @@ class CameraTrapDataset(Dataset):
             self.records = self.records[:max_samples]
         self.processor = processor
 
+        # Confidence per species: more training examples -> higher base confidence.
+        # This teaches the model to express higher confidence for well-represented species.
+        from collections import Counter
+        counts = Counter(r["scientific"] for r in self.records)
+        max_count = max(counts.values()) if counts else 1
+        min_count = min(counts.values()) if counts else 1
+        self.confidence = {}
+        for sp, n in counts.items():
+            # Scale 0.70 to 0.99 based on relative sample count
+            if max_count == min_count:
+                self.confidence[sp] = 0.90
+            else:
+                ratio = (n - min_count) / (max_count - min_count)
+                self.confidence[sp] = 0.70 + 0.29 * ratio
+
     def __len__(self):
         return len(self.records)
 
@@ -60,10 +75,11 @@ class CameraTrapDataset(Dataset):
         from PIL import Image
         image = Image.open(record["image_path"]).convert("RGB")
 
-        # Target response: JSON with species info
+        # Target response: JSON with species info + confidence
         target = json.dumps({
             "nome_cientifico": record["scientific"],
             "nome_popular": record["common_name"],
+            "confianca": round(self.confidence.get(record["scientific"], 0.85), 2),
         }, ensure_ascii=False)
 
         # Build conversation for Qwen2-VL
