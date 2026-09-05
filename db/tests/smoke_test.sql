@@ -25,7 +25,8 @@ DECLARE
         'categoria_ameaca','bioma','estado','taxon',
         'especie','especie_bioma','especie_estado',
         'area_protegida','ocorrencia','log_auditoria',
-        'schema_migrations'
+        'deteccao','deteccao_job','imagem_job','modelo_ml',
+        'cache_metadata','schema_migrations'
     ];
     missing text[];
 BEGIN
@@ -44,8 +45,8 @@ END $$;
 \echo 'Test 2: Checking reference data counts...'
 DO $$
 BEGIN
-    IF (SELECT count(*) FROM categoria_ameaca) < 6 THEN
-        RAISE EXCEPTION 'categoria_ameaca not fully loaded (expected 6)';
+    IF (SELECT count(*) FROM categoria_ameaca) < 7 THEN
+        RAISE EXCEPTION 'categoria_ameaca not fully loaded (expected 7)';
     END IF;
     IF (SELECT count(*) FROM bioma) < 7 THEN
         RAISE EXCEPTION 'bioma not fully loaded (expected 7)';
@@ -143,8 +144,9 @@ DECLARE
     migration_count integer;
 BEGIN
     SELECT count(*) INTO migration_count FROM schema_migrations;
-    IF migration_count < 8 THEN
-        RAISE EXCEPTION 'schema_migrations has % entries (expected at least 8)', migration_count;
+    -- Consolidated schema: a single 001_initial.sql entry is enough.
+    IF migration_count < 1 THEN
+        RAISE EXCEPTION 'schema_migrations is empty (expected at least 1 entry)';
     END IF;
 END $$;
 
