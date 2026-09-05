@@ -56,6 +56,15 @@ export default function MapPage() {
     setDraft((prev) => ({ ...prev, ...patch }));
   };
 
+  // Chips aplicam na hora — sem depender do botão "Aplicar Filtros"
+  const applyNow = (patch: Partial<MapFilters>) => {
+    setDraft((prev) => {
+      const next = { ...prev, ...patch };
+      setApplied(next);
+      return next;
+    });
+  };
+
   const handleSpeciesInputChange = (value: string) => {
     setSpeciesSearch(value);
     setSelectedEspecieId(null);
@@ -117,7 +126,7 @@ export default function MapPage() {
           <ScrollableChips
             options={fonteOptions}
             selected={draft.fonte ?? null}
-            onSelect={(v) => updateDraft({ fonte: v ?? undefined })}
+            onSelect={(v) => applyNow({ fonte: v ?? undefined })}
             placeholder="Todas"
             />
         </div>
@@ -128,7 +137,7 @@ export default function MapPage() {
           <ScrollableChips
             options={categoriaOptions}
             selected={draft.categoria ?? null}
-            onSelect={(v) => updateDraft({ categoria: v ?? undefined })}
+            onSelect={(v) => applyNow({ categoria: v ?? undefined })}
             placeholder="Todas"
             />
         </div>
