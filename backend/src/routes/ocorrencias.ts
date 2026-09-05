@@ -11,11 +11,17 @@ const router = Router();
 // Supports bbox (minLng,minLat,maxLng,maxLat) to filter by visible map region.
 router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next) => {
   try {
-    const { especie_id, categoria, bioma, fonte, limit, bbox } = req.query;
+    const { especie_id, categoria, bioma, fonte, limit, bbox, incluir_inativos } = req.query;
 
     const conditions: string[] = [];
     const params: unknown[] = [];
     let idx = 1;
+
+    // Default: hide occurrences of inactive species (non-wildlife, e.g. humans/domestic).
+    // Pass incluir_inativos=true to see them.
+    if (incluir_inativos !== 'true') {
+      conditions.push(`e.status = 'ativo'`);
+    }
 
     if (especie_id) {
       conditions.push(`o.especie_id = $${idx++}`);
