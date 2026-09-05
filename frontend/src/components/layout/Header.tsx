@@ -2,11 +2,10 @@ import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 
 const navItems = [
+  { to: '/', label: 'Home' },
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/mapa', label: 'Mapa' },
   { to: '/especies', label: 'Espécies' },
-  { to: '/unidades-conservacao', label: 'Unidades de Conservação' },
-  { to: '/ocorrencias', label: 'Ocorrências' },
   { to: '/relatorios', label: 'Relatórios' },
 ];
 
@@ -25,7 +24,7 @@ export default function Header() {
 
       <nav className="header-nav" aria-label="Navegação principal">
         {navItems.map((item) => (
-          <NavLink key={item.to} to={item.to} className="header-nav-link">
+          <NavLink key={item.to} to={item.to} end={item.to === '/'} className="header-nav-link">
             {item.label}
           </NavLink>
         ))}
@@ -48,6 +47,7 @@ export default function Header() {
             <NavLink
               key={item.to}
               to={item.to}
+              end={item.to === '/'}
               className="header-nav-link"
               onClick={() => setOpen(false)}
             >
