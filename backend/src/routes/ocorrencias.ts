@@ -63,6 +63,7 @@ router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next)
                  'data_evento', o.data_evento,
                  'fonte', o.fonte,
                  'base_registro', o.base_registro,
+                'confianca_ia', o.confianca_ia,
                  'nome_cientifico', e.nome_cientifico,
                  'nome_popular', e.nome_popular,
                  'imagem_url', e.imagem_url,

@@ -90,6 +90,7 @@ export interface OcorrenciaProperties {
   data_evento: string | null;
   fonte: string;
   base_registro: string | null;
+  confianca_ia?: number | null;
   nome_cientifico: string;
   nome_popular: string | null;
   imagem_url: string | null;

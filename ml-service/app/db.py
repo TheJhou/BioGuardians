@@ -555,6 +555,7 @@ class Database:
         data_evento: date,
         base_registro: str,
         fonte: str = "deteccao_satelite",
+        confianca_ia: Optional[float] = None,
     ) -> int:
         """Create an occurrence record.
 
@@ -565,8 +566,8 @@ class Database:
         async with self._pool.acquire() as conn:
             row = await conn.fetchrow(
                 """INSERT INTO ocorrencia
-                     (especie_id, lat, lon, geom, data_evento, fonte, base_registro)
-                   VALUES ($1, $2, $3, ST_SetSRID(ST_MakePoint($3, $2), 4326), $4, $5::fonte_ocorrencia_tipo, $6)
+                     (especie_id, lat, lon, geom, data_evento, fonte, base_registro, confianca_ia)
+                   VALUES ($1, $2, $3, ST_SetSRID(ST_MakePoint($3, $2), 4326), $4, $5::fonte_ocorrencia_tipo, $6, $7)
                    RETURNING id""",
                 especie_id,
                 lat,
@@ -574,5 +575,6 @@ class Database:
                 data_evento,
                 fonte,
                 base_registro,
+                confianca_ia,
             )
             return row["id"]

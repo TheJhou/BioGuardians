@@ -359,6 +359,9 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
                 <div className="occurrence-meta">
                   <p><strong>Data:</strong> {selectedOcorrencia.properties.data_evento || 'N/A'}</p>
                   <p><strong>Fonte:</strong> {selectedOcorrencia.properties.fonte}</p>
+                  {selectedOcorrencia.properties.confianca_ia != null && (
+                    <p><strong>Confiança da IA:</strong> {Math.round(selectedOcorrencia.properties.confianca_ia * 100)}%</p>
+                  )}
                   {selectedOcorrencia.properties.base_registro && (
                     <p><strong>Base:</strong> {selectedOcorrencia.properties.base_registro}</p>
                   )}

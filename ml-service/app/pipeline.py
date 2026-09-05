@@ -270,8 +270,9 @@ class ClassificationPipeline:
                     lat=lat,
                     lon=lon,
                     data_evento=data_evento,
-                    base_registro=f"Auto-classification ({result.method}, confianca: {result.confidence:.2f})",
+                    base_registro="Classificacao automatica por IA",
                     fonte="camera_trap" if image_item.source == "camera_trap" else "deteccao_ia",
+                    confianca_ia=result.confidence,
                 )
                 logger.info(
                     "Occurrence created: %s at (%.4f, %.4f) [%s]",
@@ -377,8 +378,9 @@ class ClassificationPipeline:
                         lat=float(det["lat"]),
                         lon=float(det["lon"]),
                         data_evento=det.get("timestamp") or date.today(),
-                        base_registro=f"Auto-classification ({result.method}, confianca: {result.confidence:.2f})",
+                        base_registro="Classificacao automatica por IA",
                         fonte="camera_trap",
+                        confianca_ia=result.confidence,
                     )
                     classified += 1
                 else:
