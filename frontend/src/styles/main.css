@@ -1016,74 +1016,65 @@ a, button { transition: all 0.2s ease; }
   .detail-card { padding: 16px; }
 }
 
-/* ---------- Paginated select (filter panel) ---------- */
-.paginated-select {
+/* ---------- Scrollable chips (filter panel) ---------- */
+.chip-scroll-wrapper {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 4px;
+}
+
+.chip-scroll-wrapper.disabled { opacity: 0.5; }
+
+.chip-scroll {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding: 2px 0 6px;
+  flex: 1;
+}
+
+.chip {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  border-radius: 999px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
   background: var(--white);
-  padding: 4px;
-}
-
-.paginated-select.disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.paginated-select-empty {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  padding: 8px;
-  text-align: center;
-}
-
-.paginated-item {
-  display: block;
-  width: 100%;
-  padding: 8px 10px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
   color: var(--text);
-  font-size: 0.85rem;
-  text-align: left;
+  font-size: 0.8rem;
   cursor: pointer;
-  transition: background 0.15s;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
 }
 
-.paginated-item:hover { background: var(--green-bg, #e8f5e9); }
-.paginated-item.selected {
+.chip:hover { border-color: var(--green-primary); color: var(--green-primary); }
+
+.chip.selected {
   background: var(--green-primary);
+  border-color: var(--green-primary);
   color: #fff;
   font-weight: 600;
 }
 
-.paginated-nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 6px;
-  border-top: 1px solid var(--border);
+.disabled-chip {
+  cursor: not-allowed;
+  color: var(--text-secondary);
 }
 
-.paginated-nav-btn {
+.chip-scroll-btn {
+  flex: 0 0 auto;
   background: none;
-  border: none;
-  font-size: 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  font-size: 0.9rem;
   color: var(--green-primary);
   cursor: pointer;
-  padding: 2px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
 }
 
-.paginated-nav-btn:disabled {
-  color: var(--text-secondary);
-  cursor: default;
-  opacity: 0.4;
-}
-
-.paginated-nav-info {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-}
+.chip-scroll-btn:hover { background: var(--green-primary); color: #fff; }

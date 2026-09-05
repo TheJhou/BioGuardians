@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import MapView from '../components/MapView.js';
-import PaginatedSelect from '../components/PaginatedSelect.js';
+import ScrollableChips from '../components/ScrollableChips.js';
 import { api } from '../api/client.js';
 import { ESTADO_OPTIONS, FONTE_LABELS, FONTE_OPTIONS, CATEGORY_OPTIONS, SPHERE_OPTIONS } from '../constants/index.js';
 import type { Especie } from '../types/index.js';
@@ -102,12 +102,11 @@ export default function MapPage() {
         {/* Estado — visual only for now */}
         <div className="filter-group">
           <label className="filter-label">Estado</label>
-          <PaginatedSelect
+          <ScrollableChips
             options={estadoOptions}
             selected={estado}
             onSelect={() => {}}
             placeholder="Todos"
-            pageSize={5}
             disabled
           />
         </div>
@@ -115,25 +114,23 @@ export default function MapPage() {
         {/* Fonte */}
         <div className="filter-group">
           <label className="filter-label">Fonte</label>
-          <PaginatedSelect
+          <ScrollableChips
             options={fonteOptions}
             selected={draft.fonte ?? null}
             onSelect={(v) => updateDraft({ fonte: v ?? undefined })}
             placeholder="Todas"
-            pageSize={5}
-          />
+            />
         </div>
 
         {/* Classificação (categoria de ameaça) */}
         <div className="filter-group">
           <label className="filter-label">Classificação</label>
-          <PaginatedSelect
+          <ScrollableChips
             options={categoriaOptions}
             selected={draft.categoria ?? null}
             onSelect={(v) => updateDraft({ categoria: v ?? undefined })}
             placeholder="Todas"
-            pageSize={5}
-          />
+            />
         </div>
 
         {/* Buscar espécie */}
