@@ -24,6 +24,7 @@ export function cacheInvalidateAll(prefixes: string[]): void {
 // Express middleware that caches GET responses by URL.
 // keyFn: builds cache key from request (default: req.originalUrl)
 // ttlFn: optional per-route TTL override (ms)
+// Also sends Cache-Control header so browsers/CDN can cache too.
 export function cacheMiddleware(
   keyFn: (req: Request) => string = (req) => `route:${req.originalUrl}`,
   ttlFn?: (req: Request) => number
@@ -32,6 +33,9 @@ export function cacheMiddleware(
     if (req.method !== 'GET') return next();
 
     const key = keyFn(req);
+    const ttl = ttlFn ? ttlFn(req) : env.cache.ttlMs;
+    res.set('Cache-Control', `public, max-age=${Math.floor(ttl / 1000)}`);
+
     const cached = cache.get(key);
     if (cached) {
       cacheHits.add(1, { route: req.path });
@@ -45,13 +49,8 @@ export function cacheMiddleware(
     const originalJson = res.json.bind(res);
     res.json = (body: unknown): Response => {
       if (res.statusCode === 200) {
-        const ttl = ttlFn ? ttlFn(req) : undefined;
         const record = body as Record<string, unknown>;
-        if (ttl !== undefined) {
-          cache.set(key, record, { ttl });
-        } else {
-          cache.set(key, record);
-        }
+        cache.set(key, record, { ttl });
       }
       return originalJson(body);
     };

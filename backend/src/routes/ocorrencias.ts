@@ -1,4 +1,4 @@
-import { Router } from 'express';
+﻿import { Router } from 'express';
 import { query } from '../db/pool.js';
 import { validateId } from '../middleware/validateId.js';
 import { cacheMiddleware, cacheInvalidateAll } from '../cache/cache.js';
@@ -9,7 +9,7 @@ const router = Router();
 
 // GET /api/ocorrencias?especie_id=42 — returns GeoJSON FeatureCollection
 // Supports bbox (minLng,minLat,maxLng,maxLat) to filter by visible map region.
-router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next) => {
+router.get('/', cacheMiddleware(undefined, () => 7 * 24 * 60 * 60 * 1000), async (req, res, next) => {
   try {
     const { especie_id, categoria, bioma, fonte, limit, bbox, incluir_inativos } = req.query;
 

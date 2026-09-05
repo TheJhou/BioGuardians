@@ -1,4 +1,4 @@
-import { Router } from 'express';
+﻿import { Router } from 'express';
 import { query } from '../db/pool.js';
 import { validateId } from '../middleware/validateId.js';
 import { cacheMiddleware, cacheInvalidateAll } from '../cache/cache.js';
@@ -8,7 +8,7 @@ const router = Router();
 
 // GET /api/areas — returns GeoJSON FeatureCollection, cached 30s
 // Supports bbox (minLng,minLat,maxLng,maxLat) and zoom for geometry simplification.
-router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next) => {
+router.get('/', cacheMiddleware(undefined, () => 7 * 24 * 60 * 60 * 1000), async (req, res, next) => {
   try {
     const { bioma, esfera, categoria, busca, bbox, zoom } = req.query;
 
