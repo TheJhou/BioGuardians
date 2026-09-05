@@ -23,9 +23,10 @@ router.get('/', async (req, res, next) => {
         searchConditions.push(`e.categoria_ameaca = $${searchIdx++}`);
         searchParams.push(categoria);
       }
-      if (status) {
+      // Default: only active species. Pass status=todos to include inactive.
+      if (status !== 'todos') {
         searchConditions.push(`e.status = $${searchIdx++}`);
-        searchParams.push(status);
+        searchParams.push(status || 'ativo');
       }
       if (bioma) {
         searchConditions.push(`EXISTS (SELECT 1 FROM especie_bioma eb WHERE eb.especie_id = e.id AND eb.bioma_id = $${searchIdx++})`);
@@ -65,9 +66,10 @@ router.get('/', async (req, res, next) => {
       conditions.push(`e.categoria_ameaca = $${idx++}`);
       params.push(categoria);
     }
-    if (status) {
+    // Default: only active species. Pass status=todos to include inactive.
+    if (status !== 'todos') {
       conditions.push(`e.status = $${idx++}`);
-      params.push(status);
+      params.push(status || 'ativo');
     }
     if (bioma) {
       conditions.push(`EXISTS (SELECT 1 FROM especie_bioma eb WHERE eb.especie_id = e.id AND eb.bioma_id = $${idx++})`);
