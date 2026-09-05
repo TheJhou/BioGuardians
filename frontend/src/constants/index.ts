@@ -9,6 +9,7 @@ export const CATEGORY_COLORS: Record<string, string> = {
   NT: '#689f38', // light green — Near Threatened
   LC: '#388e3c', // green — Least Concern
   DD: '#757575', // gray — Data Deficient
+  NE: '#90a4ae', // blue-gray — Not Evaluated / non-wildlife
 };
 
 // --- Threat category labels (Portuguese) ---
@@ -19,6 +20,7 @@ export const CATEGORY_LABELS: Record<string, string> = {
   NT: 'NT — Quase Ameaçada',
   LC: 'LC — Menos Preocupante',
   DD: 'DD — Dados Insuficientes',
+  NE: 'NE — Sem Risco',
 };
 
 // --- UC category colors ---
@@ -82,6 +84,7 @@ export const CATEGORY_OPTIONS = [
   { codigo: 'NT', nome: 'NT - Near Threatened' },
   { codigo: 'LC', nome: 'LC - Least Concern' },
   { codigo: 'DD', nome: 'DD - Data Deficient' },
+  { codigo: 'NE', nome: 'NE - Sem Risco' },
 ];
 
 // --- Status options ---

@@ -37,7 +37,7 @@ const pool = new Pool({
 });
 
 const DRY_RUN = process.argv.includes('--dry-run');
-const VALID = new Set(['CR', 'EN', 'VU', 'NT', 'LC', 'DD']);
+const VALID = new Set(['CR', 'EN', 'VU', 'NT', 'LC', 'DD', 'NE']);
 
 // Species that are not wildlife — detected by camera traps but should
 // not pollute the species catalog
@@ -114,13 +114,18 @@ async function main() {
     for (const sp of especies) {
       const nome = sp.nome_cientifico.toLowerCase().trim();
 
-      // 0. Non-wildlife — flag and skip category validation
+      // 0. Non-wildlife — flag as inativo + NE (Sem Risco)
       if (NON_WILDLIFE.has(nome)) {
-        if (sp.status !== 'inativo') {
-          console.log(`  [inativo] ${nome} — not wildlife (domestic/human)`);
+        if (sp.status !== 'inativo' || sp.categoria_ameaca !== 'NE') {
+          console.log(`  [inativo] ${nome} — not wildlife → NE (Sem Risco)`);
           if (!DRY_RUN) {
             await client.query(
-              "UPDATE especie SET status='inativo', atualizado_em=now() WHERE id=$1",
+              `UPDATE especie
+                  SET status='inativo',
+                      categoria_ameaca='NE'::categoria_ameaca_tipo,
+                      categoria_fonte='manual',
+                      atualizado_em=now()
+                WHERE id=$1`,
               [sp.id]
             );
           }

@@ -198,9 +198,10 @@ docker exec bioguardians-ml python -m app.cli status --job-id 29
 - `ocorrencia.fonte` inclui 'camera_trap' e 'deteccao_ia' (migrations 016, 018)
 - `especie.categoria_fonte` — procedência da categoria de ameaça: 'mma', 'iucn', 'ai', 'manual' (migration 020)
 - **A IA NÃO atribui categoria de ameaça** — novas espécies nascem como 'DD'/'ai'; `scripts/data/validate_categories.mjs` corrige depois via MMA/IUCN
+- Categorias válidas: CR, EN, VU, NT, LC, DD, **NE** (Sem Risco — não-fauna: humanos, domésticos; migrations 021/022)
 - `imagem_job` tem checkpoint único por `(source, source_image_id)` — idempotente
 - Dedup adicional: `image_hash` (SHA-256) e `deployment_id`+`timestamp` pulam registros idênticos
-- Migrações 016 (bulk), 017 (job filtros), 018 (fonte deteccao_ia), 019 (confianca_ia), 020 (categoria_fonte)
+- Migrações 016 (bulk), 017 (job filtros), 018 (fonte deteccao_ia), 019 (confianca_ia), 020 (categoria_fonte), 021/022 (categoria NE)
 
 ### Validação de categorias de ameaça
 - Script: `scripts/data/validate_categories.mjs` — roda com `--dry-run` pra ver o que mudaria
