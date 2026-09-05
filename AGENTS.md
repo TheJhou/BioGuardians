@@ -106,6 +106,44 @@ Wildlife Insights CSV → download autenticado (GraphQL) → cache local
 - `LOCAL_VLM_ENABLED=false` desativa o carregamento do modelo local (padrão atual: só OpenRouter)
 - `WI_CACHE_ONLY=true` impede download de novas imagens (processa só o cache)
 
+### Histórico de treinamentos (Qwen2-VL-2B + QLoRA)
+
+Todos os treinos usaram `Qwen/Qwen2-VL-2B-Instruct` como base, QLoRA 4-bit
+na RTX 4060 (8GB VRAM), dataset Wildlife Insights.
+
+#### v2 — melhor resultado em amostra pequena
+- LoRA r=16, alpha=32
+- Dataset: 3.313 imagens, 26 espécies
+- Resultado: **~70% em 20 imagens de teste**
+- Lição: dataset menor = classes mais fáceis; acurácia alta mas limitada
+
+#### v3 — confiança no target do modelo
+- LoRA r=48, alpha=?
+- Dataset: 3.313 imagens, 26 espécies
+- 3.535 steps, 5 epochs, eval loss ~5.31
+- 55,4M parâmetros treináveis (2,45% do total)
+- Resultado: **~65% em 20 imagens** — piorou vs v2
+- Lição: aumentar LoRA rank não melhorou; confiança embutida no treino
+  ficou não-calibrada (erros com conf=0.80-0.99)
+
+#### v4 — mais dados, mais espécies
+- LoRA r=16, alpha=32
+- Dataset: 9.348 imagens em cache, 68 espécies
+- Split: 7.964 treino / 1.384 validação
+- Batch=2, grad_accum=4, 5 epochs, 4.980 steps
+- 18,5M parâmetros treináveis (0,83% do total)
+- Resultado: **60% em 20 imagens, 62% em 50 imagens**
+- Lição: 68 espécies é muito mais difícil que 26; o modelo local
+  simplesmente não tem capacidade suficiente pra esse problema
+
+#### Por que desistimos do modelo local
+- Melhor cenário possível: ~70% em amostra pequena, ~62% em dataset real
+- Confiança retornada pelo modelo não era calibrada (baseada em contagem
+  de exemplos por espécie, não por imagem individual)
+- Erros frequentes com confiança alta — inutilizável em produção
+- OpenRouter/Claude Sonnet 4 deu ~99,9% de aproveitamento no primeiro batch
+- Artefatos mantidos em `/models/qwen2vl-finetuned-v*` para referência
+
 ### Fonte de dados — Wildlife Insights
 - Dataset CSV com metadados + URLs autenticadas para download de imagens
 - Autenticação: POST `/v1/auth/sign-in` → token → POST `/graphql-data-file` → URL GCS assinada
