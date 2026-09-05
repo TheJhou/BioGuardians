@@ -1016,65 +1016,73 @@ a, button { transition: all 0.2s ease; }
   .detail-card { padding: 16px; }
 }
 
-/* ---------- Scrollable chips (filter panel) ---------- */
-.chip-scroll-wrapper {
+/* ---------- Dropdown select (filter panel) ---------- */
+.dropdown-select {
+  position: relative;
+}
+
+.dropdown-select.disabled { opacity: 0.6; }
+
+.dropdown-trigger {
+  width: 100%;
   display: flex;
   align-items: center;
-  gap: 4px;
-}
-
-.chip-scroll-wrapper.disabled { opacity: 0.5; }
-
-.chip-scroll {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  scrollbar-width: thin;
-  padding: 2px 0 6px;
-  flex: 1;
-}
-
-.chip {
-  flex: 0 0 auto;
-  padding: 6px 12px;
-  border-radius: 999px;
+  justify-content: space-between;
+  padding: 10px 12px;
   border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   background: var(--white);
   color: var(--text);
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.15s, color 0.15s;
 }
 
-.chip:hover { border-color: var(--green-primary); color: var(--green-primary); }
+.dropdown-trigger:disabled { cursor: not-allowed; }
 
-.chip.selected {
+.dropdown-trigger-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dropdown-arrow {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  transition: transform 0.15s;
+}
+
+.dropdown-arrow.open { transform: rotate(180deg); }
+
+.dropdown-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  max-height: 190px; /* ~5 itens */
+  overflow-y: auto;
+  scrollbar-width: thin;
+  z-index: 20;
+}
+
+.dropdown-item {
+  padding: 9px 10px;
+  font-size: 0.85rem;
+  color: var(--text);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.dropdown-item:hover { background: var(--green-bg, #e8f5e9); }
+
+.dropdown-item.selected {
   background: var(--green-primary);
-  border-color: var(--green-primary);
   color: #fff;
   font-weight: 600;
 }
-
-.disabled-chip {
-  cursor: not-allowed;
-  color: var(--text-secondary);
-}
-
-.chip-scroll-btn {
-  flex: 0 0 auto;
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: 50%;
-  width: 26px;
-  height: 26px;
-  font-size: 0.9rem;
-  color: var(--green-primary);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-}
-
-.chip-scroll-btn:hover { background: var(--green-primary); color: #fff; }

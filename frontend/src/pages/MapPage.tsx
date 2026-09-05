@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import MapView from '../components/MapView.js';
-import ScrollableChips from '../components/ScrollableChips.js';
+import DropdownSelect from '../components/DropdownSelect.js';
 import { api } from '../api/client.js';
 import { ESTADO_OPTIONS, FONTE_LABELS, FONTE_OPTIONS, CATEGORY_OPTIONS, SPHERE_OPTIONS } from '../constants/index.js';
 import type { Especie } from '../types/index.js';
@@ -111,7 +111,7 @@ export default function MapPage() {
         {/* Estado — visual only for now */}
         <div className="filter-group">
           <label className="filter-label">Estado</label>
-          <ScrollableChips
+          <DropdownSelect
             options={estadoOptions}
             selected={estado}
             onSelect={() => {}}
@@ -123,7 +123,7 @@ export default function MapPage() {
         {/* Fonte */}
         <div className="filter-group">
           <label className="filter-label">Fonte</label>
-          <ScrollableChips
+          <DropdownSelect
             options={fonteOptions}
             selected={draft.fonte ?? null}
             onSelect={(v) => applyNow({ fonte: v ?? undefined })}
@@ -134,7 +134,7 @@ export default function MapPage() {
         {/* Classificação (categoria de ameaça) */}
         <div className="filter-group">
           <label className="filter-label">Classificação</label>
-          <ScrollableChips
+          <DropdownSelect
             options={categoriaOptions}
             selected={draft.categoria ?? null}
             onSelect={(v) => applyNow({ categoria: v ?? undefined })}
