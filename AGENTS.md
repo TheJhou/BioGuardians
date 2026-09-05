@@ -11,11 +11,11 @@
 
 ## Migrations
 - Sistema customizado em `db/migrate.sh` (sem ferramentas de terceiros)
-- Arquivos SQL em `db/migrations/` (numerados, aplicados em ordem)
+- **Arquivo único consolidado**: `db/migrations/001_initial.sql` — schema completo, 100% idempotente (`IF NOT EXISTS`, `ADD VALUE IF NOT EXISTS`, `DROP+CREATE` para triggers/matviews)
+- Roda com `-- @no-transaction` (ALTER TYPE ADD VALUE não pode dividir transação com o valor novo)
+- Migrations antigas preservadas em `db/migrations_archive/` (histórico)
 - Journal table: `schema_migrations` (filename + checksum SHA-256)
-- Cada migration roda em transação atômica
-- Idempotente: rodar de novo pula o já aplicado
-- Hash detecta adulteração de migrations já aplicadas
+- Idempotente: rodar de novo pula o já aplicado / só cria o que falta
 - Comandos: `sh db/migrate.sh`, `--status`, `--dry-run`
 
 ## Comandos úteis
