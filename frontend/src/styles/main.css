@@ -545,15 +545,29 @@ a, button { transition: all 0.2s ease; }
 }
 
 .species-search-item {
+  display: block;
+  width: 100%;
   padding: 10px 12px;
   cursor: pointer;
+  border: none;
   border-bottom: 1px solid var(--border);
+  background: transparent;
   font-size: 0.9rem;
+  text-align: left;
+  color: var(--text);
 }
 
 .species-search-item:last-child { border-bottom: none; }
 
 .species-search-item:hover { background: var(--green-light); }
+
+.species-search-loading,
+.species-search-end {
+  padding: 8px 12px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
 
 .species-search-scientific {
   display: block;
@@ -718,6 +732,9 @@ a, button { transition: all 0.2s ease; }
 
 .species-back { color: var(--text-secondary); text-decoration: none; font-size: 1rem; margin-bottom: 16px; display: inline-block; }
 .species-back:hover { color: var(--green-primary); }
+
+.species-search-map { position: relative; }
+.species-search-map input { width: 100%; }
 
 .species-search { display: flex; gap: 8px; margin-bottom: 16px; }
 .species-search input { flex: 1; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 1rem; }

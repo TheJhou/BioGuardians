@@ -14,6 +14,7 @@
 -- ---------- Extensões ----------
 CREATE EXTENSION IF NOT EXISTS postgis;
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS unaccent;
 
 -- ---------- Journal de migrations ----------
 CREATE TABLE IF NOT EXISTS schema_migrations (

@@ -13,10 +13,13 @@ router.get('/', async (req, res, next) => {
     const { categoria, bioma, estado, status, busca } = req.query;
     const { page, perPage, offset } = getPaginationParams(req.query);
 
-    // Full-text search takes priority when 'busca' is provided.
+    // Accent/case-insensitive search across nome_cientifico + nome_popular.
     if (busca && typeof busca === 'string') {
-      const searchConditions: string[] = ["e.tsv_busca @@ plainto_tsquery('portuguese', $1)"];
-      const searchParams: unknown[] = [busca];
+      const searchConditions: string[] = [
+        `(unaccent(lower(e.nome_cientifico)) LIKE unaccent(lower($1))
+          OR unaccent(lower(COALESCE(e.nome_popular, ''))) LIKE unaccent(lower($1)))`
+      ];
+      const searchParams: unknown[] = [`%${busca}%`];
       let searchIdx = 2;
 
       if (categoria) {
@@ -42,7 +45,7 @@ router.get('/', async (req, res, next) => {
                 COUNT(*) OVER() AS full_count
          FROM especie e
          WHERE ${searchConditions.join(' AND ')}
-         ORDER BY ts_rank(e.tsv_busca, plainto_tsquery('portuguese', $1)) DESC
+         ORDER BY e.nome_popular NULLS LAST, e.nome_cientifico
          LIMIT $${searchIdx++} OFFSET $${searchIdx++}`,
         [...searchParams, perPage, offset]
       );
