@@ -297,6 +297,7 @@ export default function SpeciesPage() {
                             </span>
                             <span className="occurrence-list-meta">
                               {o.data_evento ? new Date(o.data_evento).toLocaleDateString('pt-BR') : 'Data não informada'} · {o.fonte}
+                              {o.confianca_ia != null && ` · Confiança da IA: ${Math.round(o.confianca_ia * 100)}%`}
                             </span>
                           </div>
                         </li>

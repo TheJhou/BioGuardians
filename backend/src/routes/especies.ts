@@ -241,6 +241,7 @@ router.get('/:id/ocorrencias', validateId, async (req, res, next) => {
 
     const { rows } = await query(
       `SELECT o.id, o.especie_id, o.lat, o.lon, o.data_evento, o.fonte, o.base_registro,
+              o.confianca_ia,
               e.nome_cientifico, e.nome_popular, e.imagem_url, e.categoria_ameaca
        FROM ocorrencia o
        JOIN especie e ON e.id = o.especie_id
