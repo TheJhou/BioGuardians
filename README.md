@@ -114,23 +114,31 @@ Após a carga, atualize as views materializadas do dashboard:
 psql -d $DB_NAME -U $DB_USER -c "SELECT refresh_dashboard();"
 ```
 
-## ML Service — Classificação de Camera Trap com VLM
+## ML Service — Classificação de Camera Trap com IA
 
-O `ml-service/` é um microserviço Python (FastAPI + Qwen2-VL-2B + PyTorch) que
-classifica fotos de camera trap usando um VLM (Vision-Language Model) fine-tuned
-localmente na GPU (NVIDIA RTX 4060 8GB VRAM).
+O `ml-service/` é um microserviço Python (FastAPI) que classifica fotos de
+camera trap usando **OpenRouter + Claude Sonnet 4** (API externa, paga por token).
 
 > **Roda localmente** na máquina com GPU — **não é deployado na VM de produção**.
 > O backend na VM não tem dependência do ML service em produção.
+
+### Jornada técnica
+
+1. **Satélite (CBERS-4A)** — descartado: resolução ~2m/pixel insuficiente para fauna
+2. **YOLO (detecção + crop)** — descartado: falsos positivos e crops ruins
+3. **VLM local (Qwen2-VL-2B + QLoRA)** — descartado pra produção: melhor versão
+   atingiu ~62-70% de acurácia, insuficiente
+4. **IA externa via API (atual)** — OpenRouter, ~100% de aproveitamento nas
+   imagens que a IA realmente processou; custo por imagem (créditos)
 
 ### Pipeline
 
 ```
 Wildlife Insights CSV → download autenticado (GraphQL) → cache local
-    → VLM classifica a imagem completa (sem YOLO, sem crop)
+    → OpenRouter/Claude classifica a imagem completa (8 em paralelo)
+    → dedup: mesmo image_id, hash SHA-256 ou deployment+timestamp → pula
     → se confiança >= 0.3: salva espécie + ocorrência no banco
-    → se confiança < 0.3: salva como rejeitada
-    → fallback: OpenRouter/Claude Sonnet 4 se o modelo local falhar
+    → se confiança < 0.3 ou sem espécie: salva como rejeitada
 ```
 
 ### Como usar (local com GPU)
@@ -143,23 +151,24 @@ docker compose run --rm migrate
 # 2. Buildar a imagem do ML service
 docker build -t bioguardians-ml ./ml-service
 
-# 3. Processar imagens do Wildlife Insights
+# 3. Processar imagens do Wildlife Insights (classifica via OpenRouter)
 docker run --rm --gpus all \
   -e DATABASE_URL=postgresql://user:pass@host.docker.internal:5432/bioguardians \
   -e WI_EMAIL=your_email -e WI_PASSWORD=your_password \
   -e OPENROUTER_API_KEY=your_key \
+  -e LOCAL_VLM_ENABLED=false \
   -v /path/to/wildlife-insights-data:/data/wi:ro \
   -v bioguardians_ml_images:/app/images \
   bioguardians-ml python -m app.cli ingest --source camera_trap --data-dir /data/wi --limit 50
 
-# 4. Preparar dataset para fine-tune (baixa ~9.680 imagens)
+# 4. Preparar dataset para fine-tune (baixa ~9.680 imagens) — experimentos
 docker run --rm --gpus all \
   -e WI_EMAIL=your_email -e WI_PASSWORD=your_password \
   -v /path/to/wildlife-insights-data:/data/wi:ro \
   -v /path/to/output:/data/dataset \
   bioguardians-ml python -m app.cli prepare-dataset --data-dir /data/wi --output-dir /data/dataset
 
-# 5. Fine-tunar Qwen2-VL-2B com QLoRA (~2-4h na RTX 4060)
+# 5. Fine-tunar Qwen2-VL-2B com QLoRA (~2-4h na RTX 4060) — experimentos
 docker run --rm --gpus all \
   -v /path/to/dataset:/data/dataset \
   -v /path/to/models:/models \
@@ -171,11 +180,14 @@ docker run --rm --gpus all \
 | Variável | Descrição | Default |
 |----------|-----------|---------|
 | `DATABASE_URL` | String de conexão PostgreSQL | (obrigatório) |
-| `OPENROUTER_API_KEY` | Chave OpenRouter (fallback VLM) | vazio |
-| `OPENROUTER_MODEL` | Modelo fallback | `anthropic/claude-sonnet-4` |
-| `YOLO_DEVICE` | Device VLM (`cuda` ou `cpu`) | `cuda` |
+| `OPENROUTER_API_KEY` | Chave OpenRouter (classificador principal) | vazio |
+| `OPENROUTER_MODEL` | Modelo | `anthropic/claude-sonnet-4` |
+| `LOCAL_VLM_ENABLED` | `false` = só OpenRouter | `true` |
+| `WI_CACHE_ONLY` | `true` = não baixa, só processa cache | `false` |
+| `YOLO_DEVICE` | Device VLM local (`cuda` ou `cpu`) | `cuda` |
 | `WI_EMAIL` / `WI_PASSWORD` | Credenciais Wildlife Insights | vazio |
 | `SPECIES_CONFIDENCE_THRESHOLD` | Threshold de aceitação | `0.3` |
+| `VLM_CONCURRENCY` | Chamadas OpenRouter em paralelo | `8` |
 | `IMAGE_STORAGE_DIR` | Cache de imagens | `/app/images` |
 
 ## Sistema de Migrations

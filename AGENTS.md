@@ -68,63 +68,79 @@
 - Cache LRU em memória com invalidação por rota
 - OpenTelemetry condicional (só ativa com `OTEL_EXPORTER_OTLP_ENDPOINT`)
 
-## ML Service (classificação de camera trap com VLM)
-- Microserviço Python em `ml-service/` (FastAPI + Qwen2-VL-2B + PyTorch)
+## ML Service (classificação de camera trap com IA externa)
+- Microserviço Python em `ml-service/` (FastAPI + PyTorch para treino local)
 - **Roda localmente** na máquina com GPU (RTX 4060 8GB VRAM) — NÃO é deployado na VM de produção
 - Porta 8001, container Docker `bioguardians-ml` (apenas em `docker-compose.yml` dev)
-- **Sem YOLO**: a imagem completa é enviada direto ao VLM (sem detecção/crop prévio)
-- **Sem satélite**: satélite foi descartado pela resolução insuficiente (CBERS-4A 2m não detecta fauna)
+
+### Jornada técnica (o que foi testado e por que mudou)
+1. **Satélite (CBERS-4A)** — descartado: resolução ~2m/pixel insuficiente para detectar fauna
+2. **YOLO (detecção + crop)** — descartado: muitos falsos positivos e crops ruins prejudicavam a classificação
+3. **VLM local fine-tuned (Qwen2-VL-2B + QLoRA)** — descartado como classificador de produção:
+   - v2: LoRA r=16, 3.313 imagens, 26 espécies → ~70% em 20 imgs
+   - v3: LoRA r=48 (com confiança no target) → ~65%
+   - v4: LoRA r=16, 9.348 imagens, 68 espécies → ~62% em 50 imgs
+   - Problema: acurácia baixa demais e confiança não calibrada (erros com conf=0.99)
+4. **IA externa via API (ATUAL)** — OpenRouter + Claude Sonnet 4, pago por token:
+   - Acurácia muito superior; no primeiro batch real, 99,9% das imagens respondidas foram classificadas
+   - Custo por imagem — exige cota de créditos na conta OpenRouter
 
 ### Pipeline atual
 ```
 Wildlife Insights CSV → download autenticado (GraphQL) → cache local
-    → VLM classifica a imagem completa
+    → OpenRouter/Claude Sonnet 4 classifica a imagem completa (VLM_CONCURRENCY em paralelo)
+    → dedup: mesmo image_id, mesmo hash SHA-256 ou mesmo deployment+timestamp → pula
     → se confiança >= 0.3: salva espécie + ocorrência no banco
     → se confiança < 0.3 ou sem espécie: salva como rejeitada
+    → ocorrência duplicada (mesma espécie + data + local) → não duplica
 ```
 
-### Modelo VLM (Qwen2-VL-2B + QLoRA)
-- **Modelo base**: Qwen2-VL-2B (vision-language model, 2B parâmetros)
-- **Fine-tune**: QLoRA (quantization 4-bit + LoRA adapters) — cabe em 8GB VRAM
-- **Treino local**: dataset Wildlife Insights (~9.680 imagens rotuladas, 72 espécies)
-- **Inferência local**: Qwen2-VL fine-tuned roda na GPU (custo $0/imagem)
-- **Fallback**: OpenRouter/Claude Sonnet 4 quando o modelo local não está disponível ou confiança é baixa
+### Resultado do primeiro processamento real (job 29)
+- ~19k imagens em cache; 9.450 elegíveis (resto: blank/humano/sem label)
+- **1.559 classificadas com sucesso** → 886 ocorrências, 49 espécies distintas (40 novas)
+- 7.155 falharam com `402` (cota OpenRouter esgotada) — ficaram como `rejected` no banco
+- Para reprocessar: `DELETE FROM deteccao WHERE job_id=29 AND status='rejected'; UPDATE imagem_job SET status='pending' WHERE job_id=29 AND status='completed';` e rodar o ingest de novo
+
+### Modelo VLM local (mantido apenas para experimentos)
+- Artefatos de treino (v3/v4) em `/models/qwen2vl-finetuned-v*` — fora do caminho de produção
+- `LOCAL_VLM_ENABLED=false` desativa o carregamento do modelo local (padrão atual: só OpenRouter)
+- `WI_CACHE_ONLY=true` impede download de novas imagens (processa só o cache)
 
 ### Fonte de dados — Wildlife Insights
 - Dataset CSV com metadados + URLs autenticadas para download de imagens
 - Autenticação: POST `/v1/auth/sign-in` → token → POST `/graphql-data-file` → URL GCS assinada
 - Filtros: blank, human, no_species são pulados; só imagens com espécie rotulada são processadas
-- Cache: imagens baixadas ficam em `/app/images` (volume Docker) para não rebaixar
-- Estatísticas do dataset: 34.190 imagens total, 9.680 treináveis, 46 espécies com ≥10 imagens
+- Cache: imagens baixadas ficam em volume Docker para não rebaixar
+- Estatísticas do dataset: 34.190 imagens total, ~19k baixadas, 9.680 treináveis, 68 espécies
 
 ### Arquivos principais
-- `app/pipeline.py` — orquestra download + classificação + persistência
-- `app/local_classifier.py` — VLM local (Qwen2-VL) + fallback OpenRouter
-- `app/sources/camera_trap.py` — source Wildlife Insights (CSV + download autenticado)
+- `app/pipeline.py` — orquestra classificação concorrente + dedup + persistência
+- `app/local_classifier.py` — classificador (local opcional + OpenRouter)
+- `app/sources/camera_trap.py` — source Wildlife Insights (CSV + download autenticado + cache-only)
 - `app/sources/local_dir.py` — source para pasta local (testes/debug)
 - `app/train/prepare_dataset.py` — baixa imagens e prepara dataset JSONL para fine-tune
 - `app/train/finetune.py` — fine-tune Qwen2-VL-2B com QLoRA
-- `app/config.py` — configurações (VLM device, OpenRouter, thresholds)
-- `app/db.py` — acesso ao PostgreSQL (asyncpg)
+- `app/config.py` — configurações (OpenRouter, thresholds, LOCAL_VLM_ENABLED)
+- `app/db.py` — acesso ao PostgreSQL (asyncpg), dedup por hash/evento
 - `app/main.py` — FastAPI app + worker loop
 - `app/cli.py` — CLI com comandos `ingest`, `classify`, `status`, `prepare-dataset`, `finetune`
 
 ### Comandos CLI
 ```bash
-# Processar imagens (classifica com VLM e salva no banco)
+# Processar imagens (classifica com OpenRouter e salva no banco)
 docker exec bioguardians-ml python -m app.cli ingest --source camera_trap --data-dir /data/wi --limit 50
 
 # Preparar dataset para fine-tune (baixa ~9.680 imagens)
 docker exec bioguardians-ml python -m app.cli prepare-dataset --data-dir /data/wi --output-dir /data/dataset
 
-# Fine-tunar Qwen2-VL-2B (requer GPU, ~2-4h na RTX 4060)
+# Fine-tunar Qwen2-VL-2B (requer GPU, ~2-4h na RTX 4060) — apenas experimentos
 docker exec bioguardians-ml python -m app.cli finetune --dataset-dir /data/dataset --output-dir /models/qwen2vl-finetuned
 
 # Reclassificar detecções pendentes de jobs antigos
 docker exec bioguardians-ml python -m app.cli classify --all
 
 # Status de um job
-docker exec bioguardians-ml python -m app.cli status --job-id 25
+docker exec bioguardians-ml python -m app.cli status --job-id 29
 ```
 
 ### Endpoints
@@ -138,17 +154,22 @@ docker exec bioguardians-ml python -m app.cli status --job-id 25
 ### Banco de dados
 - Tabelas: `deteccao_job`, `imagem_job`, `deteccao`, `especie`, `ocorrencia`
 - `deteccao.metodo_classificacao` = 'ai' (CHECK constraint só permite 'ai' ou 'heuristic')
-- `deteccao.modelo_ia` = 'qwen2vl-local' ou 'anthropic/claude-sonnet-4'
+- `deteccao.modelo_ia` = 'anthropic/claude-sonnet-4' (ou 'qwen2vl-local' em experimentos)
 - `deteccao.status` = 'classified' ou 'rejected'
+- `ocorrencia.confianca_ia` — confiança da IA em coluna numérica (migration 019), exibida como % no frontend
+- `ocorrencia.fonte` inclui 'camera_trap' e 'deteccao_ia' (migrations 016, 018)
 - `imagem_job` tem checkpoint único por `(source, source_image_id)` — idempotente
-- Migrações 016 (bulk) e 017 (job filtros) adicionaram processamento em massa
+- Dedup adicional: `image_hash` (SHA-256) e `deployment_id`+`timestamp` pulam registros idênticos
+- Migrações 016 (bulk), 017 (job filtros), 018 (fonte deteccao_ia), 019 (confianca_ia)
 
 ### Env vars
 - `DATABASE_URL` — string de conexão PostgreSQL
-- `OPENROUTER_API_KEY` — chave OpenRouter (fallback VLM)
-- `OPENROUTER_MODEL` — modelo fallback (default: `anthropic/claude-sonnet-4`)
-- `YOLO_DEVICE` — device VLM: `cuda` ou `cpu` (reaproveita o nome da var)
+- `OPENROUTER_API_KEY` — chave OpenRouter (classificador principal)
+- `OPENROUTER_MODEL` — modelo (default: `anthropic/claude-sonnet-4`)
+- `LOCAL_VLM_ENABLED` — `false` = só OpenRouter (padrão atual)
+- `YOLO_DEVICE` — device VLM local: `cuda` ou `cpu` (reaproveita o nome da var)
 - `WI_EMAIL` / `WI_PASSWORD` — credenciais Wildlife Insights
+- `WI_CACHE_ONLY` — `true` = não baixa imagens novas, processa só o cache
 - `SPECIES_CONFIDENCE_THRESHOLD` — threshold de aceitação (default: 0.3)
 - `IMAGE_STORAGE_DIR` — diretório de cache de imagens (default: `/app/images`)
 - `VLM_CONCURRENCY` — chamadas OpenRouter simultâneas (default: 8)
