@@ -130,11 +130,29 @@ export interface EspeciePorUc {
   categoria_ameaca: string;
 }
 
+export interface OcorrenciaPorBioma {
+  nome: string;
+  total: number;
+}
+
+export interface OcorrenciaPorAno {
+  ano: number;
+  total: number;
+}
+
+export interface UcPorCategoria {
+  categoria_uc: string;
+  total: number;
+}
+
 export interface DashboardData {
   stats: DashboardStats;
   ranking: RankingCategoria[];
   ucs_por_esfera: UcsPorEsfera[];
   especies_por_uc: EspeciePorUc[];
+  ocorrencias_por_bioma: OcorrenciaPorBioma[];
+  ocorrencias_por_ano: OcorrenciaPorAno[];
+  ucs_por_categoria: UcPorCategoria[];
 }
 
 // GeoJSON types

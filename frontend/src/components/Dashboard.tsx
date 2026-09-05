@@ -38,19 +38,6 @@ ChartJS.register(
   PointElement, LineElement, Title, Tooltip, Legend, Filler
 );
 
-// Adapter/mock layer for data not yet in the main dashboard endpoint.
-const MOCK_BIOMAS = [
-  { nome: 'Amazônia', total: 1842 },
-  { nome: 'Mata Atlântica', total: 1152 },
-  { nome: 'Cerrado', total: 672 },
-  { nome: 'Caatinga', total: 186 },
-  { nome: 'Pantanal', total: 78 },
-  { nome: 'Pampa', total: 38 },
-];
-
-const MOCK_ANOS = ['2018', '2019', '2020', '2021', '2022', '2023', '2024'];
-const MOCK_SERIE = [1200, 1450, 1800, 2100, 2600, 3100, 3968];
-
 export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -70,19 +57,19 @@ export default function Dashboard() {
   const stats = data.stats;
 
   const biomasData = {
-    labels: MOCK_BIOMAS.map((b) => b.nome),
+    labels: data.ocorrencias_por_bioma.map((b) => b.nome),
     datasets: [{
-      data: MOCK_BIOMAS.map((b) => b.total),
+      data: data.ocorrencias_por_bioma.map((b) => b.total),
       backgroundColor: ['#16A36A', '#073B2A', '#9AD84B', '#DDF5E9', '#66736D', '#E3E9E5'],
       borderWidth: 0,
     }],
   };
 
   const temporalData = {
-    labels: MOCK_ANOS,
+    labels: data.ocorrencias_por_ano.map((a) => String(a.ano)),
     datasets: [{
       label: 'Ocorrências',
-      data: MOCK_SERIE,
+      data: data.ocorrencias_por_ano.map((a) => a.total),
       borderColor: '#16A36A',
       backgroundColor: 'rgba(22, 163, 106, 0.1)',
       fill: true,
@@ -109,7 +96,10 @@ export default function Dashboard() {
     }],
   };
 
-  const ameacadas = stats.total_cr + stats.total_en + stats.total_vu;
+  const ameacadas = stats.total_cr + stats.total_en + stats.total_vu + stats.total_nt;
+  const ucsPorCategoria = data.ucs_por_categoria;
+  const ucIntegral = ucsPorCategoria.find((u) => u.categoria_uc === 'protecao_integral')?.total ?? 0;
+  const ucSustentavel = ucsPorCategoria.find((u) => u.categoria_uc === 'uso_sustentavel')?.total ?? 0;
 
   return (
     <div className="dashboard">
@@ -118,7 +108,7 @@ export default function Dashboard() {
         <StatCard value={stats.total_especies} label="Espécies registradas" />
         <StatCard value={stats.total_ocorrencias} label="Ocorrências registradas" />
         <StatCard value={stats.total_areas} label="Unidades de Conservação" />
-        <StatCard value={7} label="Biomas mapeados" />
+        <StatCard value={data.ocorrencias_por_bioma.length} label="Biomas mapeados" />
       </div>
 
       {/* Charts */}
@@ -164,11 +154,11 @@ export default function Dashboard() {
           <div className="mini-list">
             <div className="mini-item">
               <span className="mini-label">Proteção Integral</span>
-              <span className="mini-value">1.985</span>
+              <span className="mini-value">{ucIntegral.toLocaleString()}</span>
             </div>
             <div className="mini-item">
               <span className="mini-label">Uso Sustentável</span>
-              <span className="mini-value">1.377</span>
+              <span className="mini-value">{ucSustentavel.toLocaleString()}</span>
             </div>
           </div>
         </div>
