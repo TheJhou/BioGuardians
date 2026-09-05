@@ -1015,3 +1015,75 @@ a, button { transition: all 0.2s ease; }
   .species-tabs .tab { padding: 10px 12px; font-size: 0.9rem; }
   .detail-card { padding: 16px; }
 }
+
+/* ---------- Paginated select (filter panel) ---------- */
+.paginated-select {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  padding: 4px;
+}
+
+.paginated-select.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.paginated-select-empty {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  padding: 8px;
+  text-align: center;
+}
+
+.paginated-item {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.paginated-item:hover { background: var(--green-bg, #e8f5e9); }
+.paginated-item.selected {
+  background: var(--green-primary);
+  color: #fff;
+  font-weight: 600;
+}
+
+.paginated-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px;
+  border-top: 1px solid var(--border);
+}
+
+.paginated-nav-btn {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  color: var(--green-primary);
+  cursor: pointer;
+  padding: 2px 8px;
+}
+
+.paginated-nav-btn:disabled {
+  color: var(--text-secondary);
+  cursor: default;
+  opacity: 0.4;
+}
+
+.paginated-nav-info {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}

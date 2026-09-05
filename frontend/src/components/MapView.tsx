@@ -14,15 +14,13 @@ const MAPTILER_API_KEY = import.meta.env.VITE_MAPTILER_API_KEY || '';
 
 interface MapFilters {
   categoria?: string;
-  bioma?: number;
   esfera?: string;
-  busca?: string;
+  fonte?: string;
 }
 
 interface MapLayers {
   unidades: boolean;
   ocorrencias: boolean;
-  especies: boolean;
 }
 
 interface MapViewProps {
@@ -86,7 +84,7 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
   const mapRef = useRef<any>(null);
   const areaRequestId = useRef(0);
   const occurrenceRequestId = useRef(0);
-  const showOccurrenceData = layers.ocorrencias || layers.especies;
+  const showOccurrenceData = layers.ocorrencias;
 
   const handleMoveEnd = useCallback((evt: any) => {
     setViewport(getViewport(evt.target));
@@ -108,10 +106,7 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
     setError(null);
     try {
       const data = await api.getAreas({
-        bioma: filters.bioma,
         esfera: filters.esfera,
-        categoria: filters.categoria,
-        busca: filters.busca,
         bbox: debouncedViewport.bbox,
         zoom: debouncedViewport.zoom,
       });
@@ -135,7 +130,7 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
     } finally {
       if (requestId === areaRequestId.current) setLoadingAreas(false);
     }
-  }, [filters.bioma, filters.esfera, filters.categoria, filters.busca, debouncedViewport.bbox, debouncedViewport.zoom]);
+  }, [filters.esfera, debouncedViewport.bbox, debouncedViewport.zoom]);
 
   // Load occurrences (filtered by viewport + filters).
   const loadOcorrencias = useCallback(async () => {
@@ -145,8 +140,8 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
     try {
       const data = await api.getOcorrencias({
         especie_id: selectedEspecieId || undefined,
-        categoria: filters.categoria, // threat category of the species
-        bioma: filters.bioma,
+        categoria: filters.categoria,
+        fonte: filters.fonte,
         bbox: debouncedViewport.bbox,
         limit: 10000,
       });
@@ -169,7 +164,7 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
     } finally {
       if (requestId === occurrenceRequestId.current) setLoadingOccurrences(false);
     }
-  }, [selectedEspecieId, filters.categoria, filters.bioma, debouncedViewport.bbox]);
+  }, [selectedEspecieId, filters.categoria, filters.fonte, debouncedViewport.bbox]);
 
   useEffect(() => {
     if (!debouncedViewport.bbox || !layers.unidades) {
@@ -272,7 +267,7 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
         )}
 
         {/* Occurrence markers */}
-        {(layers.ocorrencias || layers.especies) && ocorrencias && (
+        {layers.ocorrencias && ocorrencias && (
           <Source id="ocorrencias" type="geojson" data={ocorrencias}>
             <Layer
               id="ocorrencias-circle"

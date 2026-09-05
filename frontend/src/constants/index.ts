@@ -109,3 +109,24 @@ export function getCategoryColor(category: string): string {
 export function getUcCategoryColor(category: string): string {
   return UC_CATEGORY_COLORS[category] || '#1565c0';
 }
+
+// --- Brazilian states (UF) options ---
+export const ESTADO_OPTIONS = [
+  'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA',
+  'MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN',
+  'RS','RO','RR','SC','SP','SE','TO'
+];
+
+// --- Occurrence source labels ---
+export const FONTE_LABELS: Record<string, string> = {
+  gbif: 'GBIF',
+  specieslink: 'speciesLink',
+  camera_trap: 'Camera Trap',
+  deteccao_ia: 'Deteccao por IA',
+  deteccao_satelite: 'Deteccao por Satelite',
+  carga_inicial: 'Carga Inicial',
+  manual: 'Manual',
+  icmbio: 'ICMBio',
+};
+
+export const FONTE_OPTIONS = Object.keys(FONTE_LABELS);
