@@ -221,21 +221,22 @@ class ClassificationPipeline:
         result: ClassificationResult,
     ) -> int:
         """Save a successful classification: species + detection + occurrence."""
-        # Find or create species (serialized to avoid duplicate inserts)
-        categoria = result.categoria_ameaca or "DD"
+        # Find or create species (serialized to avoid duplicate inserts).
+        # New species are created with categoria 'DD' / fonte 'ai' — the AI
+        # must not assign threat categories; validate_categories.mjs fixes
+        # them afterwards against MMA/IUCN.
         async with self._species_lock:
             especie_id = await self._db.find_or_create_species(
                 nome_cientifico=result.nome_cientifico,
                 nome_popular=result.nome_popular,
-                categoria_ameaca=categoria,
                 descricao=result.descricao,
             )
 
-        # Update species metadata
+        # Update species metadata (description/popular name only — the
+        # threat category is authoritative data, not an AI guess)
         await self._db.update_species_info(
             especie_id=especie_id,
             descricao=result.descricao,
-            categoria_ameaca=result.categoria_ameaca,
             nome_popular=result.nome_popular,
         )
 
@@ -357,11 +358,9 @@ class ClassificationPipeline:
                 )
 
                 if result.nome_cientifico and result.confidence >= self._settings.species_confidence_threshold:
-                    categoria = result.categoria_ameaca or "DD"
                     especie_id = await self._db.find_or_create_species(
                         nome_cientifico=result.nome_cientifico,
                         nome_popular=result.nome_popular,
-                        categoria_ameaca=categoria,
                         descricao=result.descricao,
                     )
                     await self._db.update_detection_classification(

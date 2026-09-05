@@ -196,9 +196,16 @@ docker exec bioguardians-ml python -m app.cli status --job-id 29
 - `deteccao.status` = 'classified' ou 'rejected'
 - `ocorrencia.confianca_ia` — confiança da IA em coluna numérica (migration 019), exibida como % no frontend
 - `ocorrencia.fonte` inclui 'camera_trap' e 'deteccao_ia' (migrations 016, 018)
+- `especie.categoria_fonte` — procedência da categoria de ameaça: 'mma', 'iucn', 'ai', 'manual' (migration 020)
+- **A IA NÃO atribui categoria de ameaça** — novas espécies nascem como 'DD'/'ai'; `scripts/data/validate_categories.mjs` corrige depois via MMA/IUCN
 - `imagem_job` tem checkpoint único por `(source, source_image_id)` — idempotente
 - Dedup adicional: `image_hash` (SHA-256) e `deployment_id`+`timestamp` pulam registros idênticos
-- Migrações 016 (bulk), 017 (job filtros), 018 (fonte deteccao_ia), 019 (confianca_ia)
+- Migrações 016 (bulk), 017 (job filtros), 018 (fonte deteccao_ia), 019 (confianca_ia), 020 (categoria_fonte)
+
+### Validação de categorias de ameaça
+- Script: `scripts/data/validate_categories.mjs` — roda com `--dry-run` pra ver o que mudaria
+- Hierarquia: **MMA** (lista oficial, `input/mma_especies.csv`) > **IUCN** (via GBIF API) > **AI** (mantém mas marca 'ai' = não confiável)
+- Também marca espécies não-fauna (humanos, animais domésticos) como `status='inativo'`
 
 ### Env vars
 - `DATABASE_URL` — string de conexão PostgreSQL

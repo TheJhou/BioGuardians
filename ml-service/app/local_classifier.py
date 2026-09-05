@@ -253,7 +253,6 @@ class OpenRouterFallback:
             '{"nome_cientifico": "genus species", '
             '"nome_popular": "nome popular em português", '
             '"descricao": "2-3 frases em português", '
-            '"categoria_ameaca": "CR ou EN ou VU ou NT ou LC ou DD", '
             '"confianca": 0.0 a 1.0}\n\n'
             f"Contexto: {context}. "
             "Even if uncertain, give your best guess. Only return null if "

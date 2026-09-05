@@ -434,10 +434,15 @@ class Database:
         self,
         nome_cientifico: str,
         nome_popular: Optional[str] = None,
-        categoria_ameaca: str = "DD",
         descricao: Optional[str] = None,
     ) -> int:
-        """Find a species by scientific name, or create it if it doesn't exist."""
+        """Find a species by scientific name, or create it if it doesn't exist.
+
+        New species are always created with categoria_ameaca='DD' and
+        categoria_fonte='ai' — the AI is not an authoritative source for
+        threat categories. scripts/data/validate_categories.mjs corrects
+        them against MMA/IUCN afterwards.
+        """
         nome_cientifico = nome_cientifico.lower().strip()
         async with self._pool.acquire() as conn:
             row = await conn.fetchrow(
@@ -465,12 +470,11 @@ class Database:
 
             inserted = await conn.fetchrow(
                 """INSERT INTO especie
-                     (nome_cientifico, nome_popular, categoria_ameaca, genero_id, descricao, status)
-                   VALUES ($1, $2, $3, $4, $5, 'ativo')
+                     (nome_cientifico, nome_popular, categoria_ameaca, categoria_fonte, genero_id, descricao, status)
+                   VALUES ($1, $2, 'DD', 'ai', $3, $4, 'ativo')
                    RETURNING id""",
                 nome_cientifico,
                 nome_popular,
-                categoria_ameaca,
                 genero_id,
                 descricao,
             )
