@@ -57,7 +57,11 @@ class LocalVLMClassifier:
         self._openrouter = OpenRouterFallback(settings)
 
     def load(self) -> None:
-        """Load the local fine-tuned model if available."""
+        """Load the local fine-tuned model if available and enabled."""
+        if not self._settings.local_vlm_enabled:
+            logger.info("Local VLM disabled (LOCAL_VLM_ENABLED=false) — OpenRouter only")
+            return
+
         model_path = os.environ.get("LOCAL_VLM_PATH", "models/qwen2vl-finetuned")
 
         if not os.path.exists(model_path):

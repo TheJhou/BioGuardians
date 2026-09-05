@@ -115,6 +115,8 @@ services:
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       OPENROUTER_MODEL: ${OPENROUTER_MODEL:-anthropic/claude-sonnet-4}
+      LOCAL_VLM_ENABLED: ${LOCAL_VLM_ENABLED:-true}
+      LOCAL_VLM_PATH: ${LOCAL_VLM_PATH:-models/qwen2vl-finetuned}
       YOLO_DEVICE: ${YOLO_DEVICE:-cuda}
       DB_POOL_MAX: ${DB_POOL_MAX:-20}
       HTTP_TIMEOUT: ${HTTP_TIMEOUT:-120}

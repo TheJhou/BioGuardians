@@ -66,8 +66,8 @@ with open(data_dir / "images.csv", "r", encoding="utf-8") as f:
             "timestamp": row.get("timestamp", "").strip(),
         })
 
-# Use same min-per-species=5 as prepare_dataset
-valid = {sp: recs for sp, recs in species_records.items() if len(recs) >= 5}
+# Use same min-per-species=3 as the latest full prepare run
+valid = {sp: recs for sp, recs in species_records.items() if len(recs) >= 3}
 print(f"Species total: {len(species_records)}, valid (>=5): {len(valid)}")
 print(f"Cached images usable: {sum(len(r) for r in valid.values())}")
 

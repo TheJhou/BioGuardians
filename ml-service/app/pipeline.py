@@ -41,6 +41,9 @@ class ClassificationPipeline:
         self._settings = settings
         self._db = db
         self._classifier = classifier
+        # Serializes species find-or-create — concurrent tasks could
+        # otherwise race and duplicate the same new species.
+        self._species_lock = asyncio.Lock()
 
     # ------------------------------------------------------------------
     # Main processing
@@ -56,6 +59,11 @@ class ClassificationPipeline:
         4. Save detection + species + occurrence to DB
         5. Update imagem_job status
 
+        Classification runs concurrently (vlm_concurrency) — useful when
+        the backend is OpenRouter (network-bound). With the local model
+        the calls serialize on the GPU anyway. Image iteration stays
+        sequential so sources keep control of their own rate limits.
+
         Args:
             job_id: deteccao_job ID
             source: ImageSource providing images
@@ -65,13 +73,14 @@ class ClassificationPipeline:
         """
         await self._db.update_job_status(job_id, "processando")
 
-        total_classified = 0
-        total_images = 0
-        total_rejected = 0
+        counters = {"images": 0, "classified": 0, "rejected": 0}
+        concurrency = max(1, self._settings.vlm_concurrency)
+        sem = asyncio.Semaphore(concurrency)
+        threshold = self._settings.species_confidence_threshold
 
-        try:
-            for image_item in source.iter_images():
-                total_images += 1
+        async def process_image(image_item: ImageItem) -> None:
+            async with sem:
+                counters["images"] += 1
 
                 # Checkpoint: register image, skip if already done
                 img_record = await self._db.upsert_image_job(job_id, image_item)
@@ -80,7 +89,7 @@ class ClassificationPipeline:
                         "Job %d: image %s already %s, skipping",
                         job_id, image_item.image_id, img_record.status,
                     )
-                    continue
+                    return
 
                 await self._db.update_image_status(img_record.id, "processing")
 
@@ -101,21 +110,21 @@ class ClassificationPipeline:
                     await self._db.update_image_status(
                         img_record.id, "failed", error=str(exc)
                     )
-                    continue
+                    return
 
                 # Save to database
-                if result.nome_cientifico and result.confidence >= self._settings.species_confidence_threshold:
-                    especie_id = await self._save_classification(
+                if result.nome_cientifico and result.confidence >= threshold:
+                    await self._save_classification(
                         job_id, img_record.id, image_item, result
                     )
-                    total_classified += 1
+                    counters["classified"] += 1
                     status = "classified"
                 else:
                     # Save as rejected detection (no species or low confidence)
                     await self._save_rejected(
                         job_id, img_record.id, image_item, result
                     )
-                    total_rejected += 1
+                    counters["rejected"] += 1
                     status = "completed"  # imagem_status enum has no "rejected"
 
                 await self._db.update_image_status(
@@ -130,14 +139,47 @@ class ClassificationPipeline:
                     result.confidence, result.method,
                 )
 
+        sentinel = object()
+        pending: set[asyncio.Task] = set()
+
+        def next_item(it):
+            try:
+                return next(it)
+            except StopIteration:
+                return sentinel
+
+        try:
+            it = iter(source.iter_images())
+            while True:
+                # Iterate in a thread — sources download lazily and would
+                # block the event loop (sync httpx) otherwise.
+                item = await asyncio.to_thread(next_item, it)
+                if item is sentinel:
+                    break
+                pending.add(asyncio.create_task(process_image(item)))
+                # Backpressure: don't let unprocessed tasks pile up
+                if len(pending) >= concurrency * 4:
+                    done, pending = await asyncio.wait(
+                        pending, return_when=asyncio.FIRST_COMPLETED
+                    )
+                    for t in done:
+                        if t.exception():
+                            raise t.exception()
+
+            if pending:
+                results = await asyncio.gather(*pending, return_exceptions=True)
+                for r in results:
+                    if isinstance(r, Exception):
+                        raise r
+
             await self._db.update_job_status(
-                job_id, "concluido", total_deteccoes=total_classified
+                job_id, "concluido", total_deteccoes=counters["classified"]
             )
             logger.info(
                 "Job %d: complete — %d images, %d classified, %d rejected",
-                job_id, total_images, total_classified, total_rejected,
+                job_id, counters["images"], counters["classified"], counters["rejected"],
             )
-            return total_classified
+            return counters["classified"]
 
         except Exception as exc:
             logger.error("Job %d failed: %s", job_id, exc, exc_info=True)
@@ -156,14 +198,15 @@ class ClassificationPipeline:
         result: ClassificationResult,
     ) -> int:
         """Save a successful classification: species + detection + occurrence."""
-        # Find or create species
+        # Find or create species (serialized to avoid duplicate inserts)
         categoria = result.categoria_ameaca or "DD"
-        especie_id = await self._db.find_or_create_species(
-            nome_cientifico=result.nome_cientifico,
-            nome_popular=result.nome_popular,
-            categoria_ameaca=categoria,
-            descricao=result.descricao,
-        )
+        async with self._species_lock:
+            especie_id = await self._db.find_or_create_species(
+                nome_cientifico=result.nome_cientifico,
+                nome_popular=result.nome_popular,
+                categoria_ameaca=categoria,
+                descricao=result.descricao,
+            )
 
         # Update species metadata
         await self._db.update_species_info(

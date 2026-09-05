@@ -27,6 +27,8 @@ class Settings:
     db_pool_max: int
     # VLM concurrency (simultaneous OpenRouter calls)
     vlm_concurrency: int
+    # Local VLM (Qwen2-VL fine-tuned) — disable to use OpenRouter only
+    local_vlm_enabled: bool
     # Image storage / cache
     image_storage_dir: str
 
@@ -50,5 +52,6 @@ def load_settings() -> Settings:
         port=int(os.environ.get("PORT", "8001")),
         db_pool_max=int(os.environ.get("DB_POOL_MAX", "20")),
         vlm_concurrency=int(os.environ.get("VLM_CONCURRENCY", "8")),
+        local_vlm_enabled=os.environ.get("LOCAL_VLM_ENABLED", "true").lower() in ("1", "true", "yes"),
         image_storage_dir=os.environ.get("IMAGE_STORAGE_DIR", "/app/images"),
     )
