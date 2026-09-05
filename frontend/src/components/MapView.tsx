@@ -189,13 +189,17 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
     void loadOcorrencias();
   }, [loadOcorrencias, showOccurrenceData, debouncedViewport.bbox]);
 
-  // Handle click on a protected area polygon or occurrence point.
+  // Handle click on an occurrence point or protected area polygon.
+  // Occurrence points take priority — they sit on top of area polygons.
   const handleClick = async (evt: any) => {
     const features: any[] = evt.features || [];
     const areaFeature = features.find((f) => f.layer.id === 'areas-fill');
     const ocorrenciaFeature = features.find((f) => f.layer.id === 'ocorrencias-circle');
 
-    if (areaFeature) {
+    if (ocorrenciaFeature) {
+      setSelectedOcorrencia(ocorrenciaFeature as unknown as GeoJSONFeature<OcorrenciaProperties>);
+      setSelectedAreaId(null);
+    } else if (areaFeature) {
       const areaId = areaFeature.properties.id as number;
       setSelectedAreaId(areaId);
       setSelectedOcorrencia(null);
@@ -205,9 +209,6 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
       } catch {
         setSelectedAreaSpecies([]);
       }
-    } else if (ocorrenciaFeature) {
-      setSelectedOcorrencia(ocorrenciaFeature as unknown as GeoJSONFeature<OcorrenciaProperties>);
-      setSelectedAreaId(null);
     }
   };
 
