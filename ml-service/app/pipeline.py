@@ -73,7 +73,7 @@ class ClassificationPipeline:
         """
         await self._db.update_job_status(job_id, "processando")
 
-        counters = {"images": 0, "classified": 0, "rejected": 0}
+        counters = {"images": 0, "classified": 0, "rejected": 0, "duplicates": 0}
         concurrency = max(1, self._settings.vlm_concurrency)
         sem = asyncio.Semaphore(concurrency)
         threshold = self._settings.species_confidence_threshold
@@ -89,6 +89,28 @@ class ClassificationPipeline:
                         "Job %d: image %s already %s, skipping",
                         job_id, image_item.image_id, img_record.status,
                     )
+                    return
+
+                # Dedup: same file content (hash) or same capture event
+                # (deployment + timestamp) already processed under another ID
+                dup = await self._db.find_processed_duplicate(
+                    image_hash=image_item.image_hash,
+                    deployment_id=image_item.deployment_id,
+                    timestamp=image_item.timestamp,
+                    exclude_id=img_record.id,
+                )
+                if dup:
+                    logger.info(
+                        "Job %d: image %s is a duplicate of imagem_job %d "
+                        "(job %d, status=%s), skipping",
+                        job_id, image_item.image_id,
+                        dup["id"], dup["job_id"], dup["status"],
+                    )
+                    await self._db.update_image_status(
+                        img_record.id, "completed", detection_count=0
+                    )
+                    await self._db.increment_job_progress(job_id)
+                    counters["duplicates"] += 1
                     return
 
                 await self._db.update_image_status(img_record.id, "processing")
@@ -176,8 +198,9 @@ class ClassificationPipeline:
                 job_id, "concluido", total_deteccoes=counters["classified"]
             )
             logger.info(
-                "Job %d: complete — %d images, %d classified, %d rejected",
-                job_id, counters["images"], counters["classified"], counters["rejected"],
+                "Job %d: complete — %d images, %d classified, %d rejected, %d duplicates",
+                job_id, counters["images"], counters["classified"],
+                counters["rejected"], counters["duplicates"],
             )
             return counters["classified"]
 
@@ -234,22 +257,31 @@ class ClassificationPipeline:
         )
         await self._db.save_detection(det_record)
 
-        # Create occurrence
+        # Create occurrence — skip if the same capture event was already
+        # recorded (same species, same place, same date)
         data_evento = image_item.timestamp.date() if image_item.timestamp else date.today()
-        await self._db.create_occurrence(
-            especie_id=especie_id,
-            lat=image_item.lat or 0,
-            lon=image_item.lon or 0,
-            data_evento=data_evento,
-            base_registro=f"Auto-classification ({result.method}, confianca: {result.confidence:.2f})",
-            fonte="camera_trap" if image_item.source == "camera_trap" else "deteccao_ia",
-        )
-        logger.info(
-            "Occurrence created: %s at (%.4f, %.4f) [%s]",
-            result.nome_cientifico,
-            image_item.lat or 0, image_item.lon or 0,
-            result.method,
-        )
+        lat = image_item.lat or 0
+        lon = image_item.lon or 0
+        async with self._species_lock:
+            exists = await self._db.occurrence_exists(especie_id, lat, lon, data_evento)
+            if not exists:
+                await self._db.create_occurrence(
+                    especie_id=especie_id,
+                    lat=lat,
+                    lon=lon,
+                    data_evento=data_evento,
+                    base_registro=f"Auto-classification ({result.method}, confianca: {result.confidence:.2f})",
+                    fonte="camera_trap" if image_item.source == "camera_trap" else "deteccao_ia",
+                )
+                logger.info(
+                    "Occurrence created: %s at (%.4f, %.4f) [%s]",
+                    result.nome_cientifico, lat, lon, result.method,
+                )
+            else:
+                logger.info(
+                    "Occurrence already exists for %s on %s at (%.4f, %.4f) — skipped",
+                    result.nome_cientifico, data_evento, lat, lon,
+                )
 
         return especie_id
 

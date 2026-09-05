@@ -224,6 +224,12 @@ class CameraTrapSource:
         if dest.exists() and dest.stat().st_size > 0:
             return dest
 
+        # Cache-only mode: never hit the WI API (used when processing a
+        # partially-downloaded dataset)
+        if os.environ.get("WI_CACHE_ONLY", "").lower() in ("1", "true", "yes"):
+            logger.debug("WI_CACHE_ONLY: %s not cached, skipping", image_id)
+            return None
+
         # Parse viewer URL
         params = self._parse_viewer_url(viewer_url)
         if not params:

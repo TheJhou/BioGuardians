@@ -271,6 +271,51 @@ class Database:
                 error,
             )
 
+    async def find_processed_duplicate(
+        self,
+        image_hash: Optional[str] = None,
+        deployment_id: Optional[str] = None,
+        timestamp: Optional[datetime] = None,
+        exclude_id: Optional[int] = None,
+    ) -> Optional[dict]:
+        """Find an already-processed imagem_job row that represents the
+        same physical record as the incoming image.
+
+        Two checks (OR):
+        - image_hash: identical file content, even if re-registered under
+          a different image_id or source.
+        - deployment_id + timestamp: same camera trap at the same instant —
+          catches the same photo registered twice with different IDs.
+        """
+        clauses = []
+        params: list = []
+
+        if image_hash:
+            params.append(image_hash)
+            clauses.append(f"image_hash = ${len(params)}")
+        if deployment_id and timestamp:
+            params.append(deployment_id)
+            params.append(timestamp)
+            clauses.append(
+                f"(deployment_id = ${len(params)-1} AND timestamp = ${len(params)})"
+            )
+
+        if not clauses:
+            return None
+
+        params.append(exclude_id or -1)
+        query = (
+            "SELECT id, job_id, source, source_image_id, status "
+            "FROM imagem_job "
+            f"WHERE ({' OR '.join(clauses)}) "
+            "  AND status IN ('classified', 'completed') "
+            f"  AND id <> ${len(params)} "
+            "ORDER BY id LIMIT 1"
+        )
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow(query, *params)
+            return dict(row) if row else None
+
     # ------------------------------------------------------------------
     # Detections (deteccao)
     # ------------------------------------------------------------------
@@ -473,6 +518,34 @@ class Database:
     # ------------------------------------------------------------------
     # Occurrences (ocorrencia)
     # ------------------------------------------------------------------
+
+    async def occurrence_exists(
+        self,
+        especie_id: int,
+        lat: float,
+        lon: float,
+        data_evento: date,
+    ) -> bool:
+        """Check whether an occurrence already exists for the same
+        species at the same location on the same date.
+
+        Prevents duplicate occurrence records when the same capture
+        event arrives as two different images (re-registered photo,
+        burst frame with same timestamp, different source, etc.).
+        """
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """SELECT 1 FROM ocorrencia
+                   WHERE especie_id = $1
+                     AND data_evento = $2
+                     AND lat = $3 AND lon = $4
+                   LIMIT 1""",
+                especie_id,
+                data_evento,
+                lat,
+                lon,
+            )
+            return row is not None
 
     async def create_occurrence(
         self,

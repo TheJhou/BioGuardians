@@ -9,6 +9,7 @@ The pipeline will still run detection; classification will rely on
 the VLM or heuristic fallback.
 """
 
+import hashlib
 import logging
 from pathlib import Path
 from typing import Iterator
@@ -48,4 +49,13 @@ class LocalDirectorySource:
                 image_id=path.stem,
                 path=str(path),
                 source="local_dir",
+                image_hash=_sha256(path),
             )
+
+
+def _sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(8192), b""):
+            h.update(chunk)
+    return h.hexdigest()
