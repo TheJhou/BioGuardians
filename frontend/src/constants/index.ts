@@ -12,15 +12,15 @@ export const CATEGORY_COLORS: Record<string, string> = {
   NE: '#90a4ae', // blue-gray — Not Evaluated / non-wildlife
 };
 
-// --- Threat category labels (Portuguese) ---
+// --- Threat category labels (Portuguese, public-friendly) ---
 export const CATEGORY_LABELS: Record<string, string> = {
   CR: 'CR — Criticamente em Perigo',
-  EN: 'EN — Em Perigo',
-  VU: 'VU — Vulnerável',
-  NT: 'NT — Quase Ameaçada',
-  LC: 'LC — Menos Preocupante',
-  DD: 'DD — Dados Insuficientes',
-  NE: 'NE — Sem Risco',
+  EN: 'EN — Entrando em Extinção',
+  VU: 'VU — Alto Risco de Entrar em Extinção',
+  NT: 'NT — Em Ameaça',
+  LC: 'LC — Sem Risco',
+  DD: 'DD — Sem Dados para Avaliar',
+  NE: 'NE — Não Avaliada',
 };
 
 // --- UC category colors ---
@@ -78,13 +78,13 @@ export const SPHERE_OPTIONS = [
 
 // --- Category options for filter dropdowns ---
 export const CATEGORY_OPTIONS = [
-  { codigo: 'CR', nome: 'CR - Critically Endangered' },
-  { codigo: 'EN', nome: 'EN - Endangered' },
-  { codigo: 'VU', nome: 'VU - Vulnerable' },
-  { codigo: 'NT', nome: 'NT - Near Threatened' },
-  { codigo: 'LC', nome: 'LC - Least Concern' },
-  { codigo: 'DD', nome: 'DD - Data Deficient' },
-  { codigo: 'NE', nome: 'NE - Sem Risco' },
+  { codigo: 'CR', nome: 'CR - Criticamente em Perigo' },
+  { codigo: 'EN', nome: 'EN - Entrando em Extinção' },
+  { codigo: 'VU', nome: 'VU - Alto Risco de Entrar em Extinção' },
+  { codigo: 'NT', nome: 'NT - Em Ameaça' },
+  { codigo: 'LC', nome: 'LC - Sem Risco' },
+  { codigo: 'DD', nome: 'DD - Sem Dados para Avaliar' },
+  { codigo: 'NE', nome: 'NE - Não Avaliada' },
 ];
 
 // --- Status options ---
