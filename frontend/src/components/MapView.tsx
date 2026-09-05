@@ -148,7 +148,7 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
         categoria: filters.categoria, // threat category of the species
         bioma: filters.bioma,
         bbox: debouncedViewport.bbox,
-        limit: 1000,
+        limit: 10000,
       });
       const colored = {
         ...data,

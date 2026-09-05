@@ -103,6 +103,9 @@ export interface DashboardStats {
   total_cr: number;
   total_en: number;
   total_vu: number;
+  total_nt: number;
+  total_lc: number;
+  total_dd: number;
   total_areas: number;
   area_total_ha: number | null;
   total_ocorrencias: number;

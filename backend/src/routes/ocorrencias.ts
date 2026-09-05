@@ -49,7 +49,7 @@ router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next)
     }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-    const limitClause = limit ? `LIMIT $${idx++}` : 'LIMIT 1000';
+    const limitClause = limit ? `LIMIT $${idx++}` : 'LIMIT 10000';
     if (limit) params.push(parseParam(limit));
 
     const { rows } = await query(
