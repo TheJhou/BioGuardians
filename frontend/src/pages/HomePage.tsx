@@ -5,10 +5,13 @@ import StatCard from '../components/ui/StatCard.js';
 import type { DashboardStats } from '../types/index.js';
 
 const dataSources = [
-  { name: 'MMA', full: 'Ministério do Meio Ambiente' },
-  { name: 'GBIF', full: 'Global Biodiversity Information Facility' },
+  { name: 'MMA', full: 'Ministério do Meio Ambiente — lista oficial de espécies ameaçadas' },
+  { name: 'GBIF', full: 'Global Biodiversity Information Facility — ocorrências' },
   { name: 'speciesLink', full: 'Repositório de dados da Rede SpeciesLink' },
   { name: 'CNUC', full: 'Cadastro Nacional de Unidades de Conservação' },
+  { name: 'Wildlife Insights', full: 'Imagens de camera trap com metadados' },
+  { name: 'IA (OpenRouter)', full: 'Classificação de espécies em imagens com Claude Sonnet 4' },
+  { name: 'iNaturalist', full: 'Fotos e enriquecimento taxonômico das espécies' },
 ];
 
 export default function HomePage() {
@@ -50,9 +53,9 @@ export default function HomePage() {
               <p className="hero-error">{error}</p>
             ) : (
               <>
-                <StatCard value={stats?.total_especies ?? 0} label="Espécies registradas" icon variant="info" />
-                <StatCard value={stats?.total_ocorrencias ?? 0} label="Ocorrências registradas" icon variant="info" />
-                <StatCard value={stats?.total_areas ?? 0} label="Unidades de Conservação cadastradas" icon variant="info" />
+                <StatCard value={stats?.total_especies ?? 0} label="Espécies registradas" variant="info" />
+                <StatCard value={stats?.total_ocorrencias ?? 0} label="Ocorrências registradas" variant="info" />
+                <StatCard value={stats?.total_areas ?? 0} label="Unidades de Conservação cadastradas" variant="info" />
               </>
             )}
           </div>
