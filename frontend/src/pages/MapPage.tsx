@@ -18,6 +18,7 @@ interface MapLayers {
 
 const defaultFilters: MapFilters = {};
 const defaultLayers: MapLayers = { unidades: true, ocorrencias: true };
+const layers = defaultLayers; // fixo — camadas sempre visíveis
 
 const fonteOptions = FONTE_OPTIONS.map((f) => ({ value: f, label: FONTE_LABELS[f] || f }));
 const categoriaOptions = CATEGORY_OPTIONS.map((c) => ({ value: c.codigo, label: c.nome }));
@@ -26,7 +27,6 @@ const estadoOptions = ESTADO_OPTIONS.map((uf) => ({ value: uf, label: uf }));
 export default function MapPage() {
   const [draft, setDraft] = useState<MapFilters>(defaultFilters);
   const [applied, setApplied] = useState<MapFilters>(defaultFilters);
-  const [layers, setLayers] = useState<MapLayers>(defaultLayers);
 
   // Estado — renderizado mas ainda não filtra (pendente definição)
   const [estado] = useState<string | null>(null);
@@ -45,7 +45,6 @@ export default function MapPage() {
   const handleClear = () => {
     setDraft(defaultFilters);
     setApplied(defaultFilters);
-    setLayers(defaultLayers);
     setSpeciesSearch('');
     setSpeciesResults([]);
     setSelectedEspecieId(null);
@@ -189,26 +188,7 @@ export default function MapPage() {
           </select>
         </div>
 
-        {/* Camadas */}
-        <div className="filter-group">
-          <label className="filter-label">Camadas</label>
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={layers.unidades}
-              onChange={(e) => setLayers({ ...layers, unidades: e.target.checked })}
-            />
-            Unidades de Conservação
-          </label>
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={layers.ocorrencias}
-              onChange={(e) => setLayers({ ...layers, ocorrencias: e.target.checked })}
-            />
-            Ocorrências
-          </label>
-        </div>
+        {/* Camadas removidas — UCs e ocorrências sempre visíveis */}
 
         <button className="filter-apply" onClick={handleApply}>
           Aplicar Filtros
