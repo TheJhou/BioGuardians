@@ -46,7 +46,9 @@ router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next)
     if (bbox) {
       const parts = String(bbox).split(',').map(Number);
       if (parts.length === 4 && parts.every(n => !isNaN(n))) {
-        conditions.push(`ST_Intersects(o.geom, ST_MakeEnvelope($${idx}, $${idx + 1}, $${idx + 2}, $${idx + 3}, 4326))`);
+        // && (bbox overlap) usa o índice GIST e é mais barato que ST_Intersects
+        // — equivalente para pontos contra um envelope retangular.
+        conditions.push(`o.geom && ST_MakeEnvelope($${idx}, $${idx + 1}, $${idx + 2}, $${idx + 3}, 4326)`);
         params.push(parts[0], parts[1], parts[2], parts[3]);
         idx += 4;
       }
@@ -83,7 +85,6 @@ router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next)
              FROM ocorrencia o
              JOIN especie e ON e.id = o.especie_id
              ${where}
-             ORDER BY o.data_evento DESC NULLS LAST
              ${limitClause}
            ) sub
          ), '[]'::json)

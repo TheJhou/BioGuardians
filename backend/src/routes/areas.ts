@@ -39,66 +39,40 @@ router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next)
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
     const limitClause = `LIMIT 500`;
 
-    // 1) Fetch area metadata (no geometry).
-    const { rows: metaRows } = await query(
-      `SELECT a.id, a.nome, a.categoria_uc, a.esfera, a.bioma_id, a.area_ha
+    // Tolerância de simplificação por zoom (graus).
+    const zoomLevel = zoom ? parseInt(String(zoom), 10) : 10;
+    const tolerance = zoomLevel > 12 ? 0.001 : zoomLevel > 8 ? 0.01 : 0.1;
+
+    // Uma única query: metadados + geometria simplificada. Evita abrir
+    // N conexões do pool com chunks paralelos.
+    const { rows: features } = await query(
+      `SELECT a.id AS feature_id,
+              ST_AsGeoJSON(ST_SimplifyPreserveTopology(a.geom, $${idx}), 5)::json AS geometry,
+              json_build_object(
+                'id', a.id,
+                'nome', a.nome,
+                'categoria_uc', a.categoria_uc,
+                'esfera', a.esfera,
+                'bioma_id', a.bioma_id,
+                'area_ha', a.area_ha
+              ) AS properties
        FROM area_protegida a
        LEFT JOIN bioma b ON b.id = a.bioma_id
        ${where}
        ORDER BY a.id
        ${limitClause}`,
-      params
+      [...params, tolerance]
     );
 
-    if (metaRows.length === 0) {
-      res.json({ type: 'FeatureCollection', features: [] });
-      return;
-    }
-
-    // 2) Select tolerance and fetch geometries in parallel chunks.
-    const zoomLevel = zoom ? parseInt(String(zoom), 10) : 10;
-    const tolerance = zoomLevel > 12 ? 0.001 : zoomLevel > 8 ? 0.01 : 0.1;
-    const chunkSize = 50;
-    const chunks: number[][] = [];
-    for (let i = 0; i < metaRows.length; i += chunkSize) {
-      chunks.push(metaRows.slice(i, i + chunkSize).map(r => r.id as number));
-    }
-
-    const geometryChunks = await Promise.all(chunks.map(async (ids) => {
-      const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
-      const { rows } = await query(
-        `SELECT a.id,
-                ST_AsGeoJSON(ST_SimplifyPreserveTopology(a.geom, $${ids.length + 1}), 5)::json AS geometry
-         FROM area_protegida a
-         WHERE a.id IN (${placeholders})
-         ORDER BY a.id`,
-        [...ids, tolerance]
-      );
-      return rows;
-    }));
-
-    const geomById = new Map<number, any>();
-    for (const chunk of geometryChunks) {
-      for (const row of chunk) {
-        geomById.set(row.id as number, row.geometry);
-      }
-    }
-
-    const features = metaRows.map(r => ({
-      type: 'Feature' as const,
-      id: r.id,
-      geometry: geomById.get(r.id as number) || null,
-      properties: {
-        id: r.id,
-        nome: r.nome,
-        categoria_uc: r.categoria_uc,
-        esfera: r.esfera,
-        bioma_id: r.bioma_id,
-        area_ha: r.area_ha,
-      },
-    }));
-
-    res.json({ type: 'FeatureCollection', features });
+    res.json({
+      type: 'FeatureCollection',
+      features: features.map((r: any) => ({
+        type: 'Feature',
+        id: r.feature_id,
+        geometry: r.geometry,
+        properties: r.properties,
+      })),
+    });
   } catch (err) { next(err); }
 });
 
