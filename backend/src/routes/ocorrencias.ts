@@ -24,8 +24,12 @@ router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next)
     }
 
     if (especie_id) {
-      conditions.push(`o.especie_id = $${idx++}`);
-      params.push(parseParam(especie_id));
+      // Aceita lista separada por vírgula (multi-seleção de espécies).
+      const ids = String(especie_id).split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0);
+      if (ids.length > 0) {
+        conditions.push(`o.especie_id = ANY($${idx++}::int[])`);
+        params.push(ids);
+      }
     }
     if (categoria) {
       conditions.push(`e.categoria_ameaca = $${idx++}`);

@@ -206,10 +206,13 @@ export const api = {
 
   // Ocorrencias
   async getOcorrencias(params?: {
-    especie_id?: number; categoria?: string; bioma?: number; fonte?: string; limit?: number; bbox?: string;
+    especie_id?: number | number[]; categoria?: string; bioma?: number; fonte?: string; limit?: number; bbox?: string;
   }): Promise<GeoJSONFeatureCollection<OcorrenciaProperties>> {
     const qs = new URLSearchParams();
-    if (params?.especie_id) qs.set('especie_id', String(params.especie_id));
+    if (params?.especie_id) {
+      const ids = Array.isArray(params.especie_id) ? params.especie_id.join(',') : String(params.especie_id);
+      if (ids) qs.set('especie_id', ids);
+    }
     if (params?.categoria) qs.set('categoria', params.categoria);
     if (params?.bioma) qs.set('bioma', String(params.bioma));
     if (params?.fonte) qs.set('fonte', params.fonte);

@@ -7,12 +7,11 @@ const VISIBLE_ITEMS = 5;
 
 interface SpeciesSearchProps {
   onSelect: (especie: Especie) => void;
-  selectedName?: string | null;
 }
 
 // Busca de espécies com scroll infinito — carrega a próxima página
 // da API quando o usuário chega no fim da lista.
-export default function SpeciesSearch({ onSelect, selectedName }: SpeciesSearchProps) {
+export default function SpeciesSearch({ onSelect }: SpeciesSearchProps) {
   const [search, setSearch] = useState('');
   const [results, setResults] = useState<Especie[]>([]);
   const [page, setPage] = useState(1);
@@ -76,9 +75,10 @@ export default function SpeciesSearch({ onSelect, selectedName }: SpeciesSearchP
 
   const handleSelect = (especie: Especie) => {
     onSelect(especie);
-    setSearch(especie.nome_popular || especie.nome_cientifico);
+    setSearch('');
     setOpen(false);
     setResults([]);
+    setHasMore(false);
   };
 
   return (
@@ -117,11 +117,6 @@ export default function SpeciesSearch({ onSelect, selectedName }: SpeciesSearchP
         </div>
       )}
 
-      {selectedName && (
-        <div className="species-selected">
-          Filtrando por: <strong>{selectedName}</strong>
-        </div>
-      )}
     </div>
   );
 }

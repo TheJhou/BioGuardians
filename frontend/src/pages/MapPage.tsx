@@ -1,17 +1,23 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import MapView from '../components/MapView.js';
 import DropdownSelect from '../components/DropdownSelect.js';
 import SpeciesSearch from '../components/SpeciesSearch.js';
 import { ESTADO_OPTIONS, FONTE_LABELS, FONTE_OPTIONS, CATEGORY_OPTIONS } from '../constants/index.js';
+import type { Especie } from '../types/index.js';
 
 interface MapFilters {
-  categoria?: string;   // threat category (CR/EN/VU...) — filtra ocorrências
-  fonte?: string;       // filtra ocorrências
+  categoria?: string;
+  fonte?: string;
 }
 
 interface MapLayers {
   unidades: boolean;
   ocorrencias: boolean;
+}
+
+interface SelectedEspecie {
+  id: number;
+  nome: string;
 }
 
 const defaultFilters: MapFilters = {};
@@ -29,8 +35,9 @@ export default function MapPage() {
   // Estado — renderizado mas ainda não filtra (pendente definição)
   const [estado] = useState<string | null>(null);
 
-  const [selectedEspecieId, setSelectedEspecieId] = useState<number | null>(null);
-  const [selectedEspecieName, setSelectedEspecieName] = useState<string | null>(null);
+  // Multi-seleção de espécies
+  const [selectedEspecies, setSelectedEspecies] = useState<SelectedEspecie[]>([]);
+  const [searchResetKey, setSearchResetKey] = useState(0);
 
   const handleApply = () => {
     setApplied(draft);
@@ -40,8 +47,8 @@ export default function MapPage() {
     setDraft(defaultFilters);
     setApplied(defaultFilters);
     setLayers(defaultLayers);
-    setSelectedEspecieId(null);
-    setSelectedEspecieName(null);
+    setSelectedEspecies([]);
+    setSearchResetKey((k) => k + 1);
   };
 
   // Chips aplicam na hora — sem depender do botão "Aplicar Filtros"
@@ -51,6 +58,17 @@ export default function MapPage() {
       setApplied(next);
       return next;
     });
+  };
+
+  const addEspecie = (especie: Especie) => {
+    setSelectedEspecies((prev) => {
+      if (prev.some((e) => e.id === especie.id)) return prev;
+      return [...prev, { id: especie.id, nome: especie.nome_popular || especie.nome_cientifico }];
+    });
+  };
+
+  const removeEspecie = (id: number) => {
+    setSelectedEspecies((prev) => prev.filter((e) => e.id !== id));
   };
 
   return (
@@ -95,19 +113,30 @@ export default function MapPage() {
           />
         </div>
 
-        {/* Buscar espécie — scroll infinito via API */}
+        {/* Buscar espécie — multi-seleção com chips removíveis */}
         <div className="filter-group">
           <label className="filter-label">Buscar espécie</label>
           <SpeciesSearch
-            onSelect={(s) => {
-              setSelectedEspecieId(s.id);
-              setSelectedEspecieName(s.nome_popular || s.nome_cientifico);
-            }}
-            selectedName={selectedEspecieName}
+            key={searchResetKey}
+            onSelect={addEspecie}
           />
+          {selectedEspecies.length > 0 && (
+            <div className="selected-species-chips">
+              {selectedEspecies.map((e) => (
+                <span key={e.id} className="species-chip">
+                  {e.nome}
+                  <button
+                    className="species-chip-remove"
+                    onClick={() => removeEspecie(e.id)}
+                    aria-label={`Remover ${e.nome}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
-
-        {/* Esfera removida */}
 
         {/* Camadas */}
         <div className="filter-group">
@@ -118,7 +147,7 @@ export default function MapPage() {
               checked={layers.unidades}
               onChange={(e) => setLayers({ ...layers, unidades: e.target.checked })}
             />
-            Unidades de Conserva��o
+            Unidades de Conservação
           </label>
           <label className="checkbox-label">
             <input
@@ -126,9 +155,10 @@ export default function MapPage() {
               checked={layers.ocorrencias}
               onChange={(e) => setLayers({ ...layers, ocorrencias: e.target.checked })}
             />
-            Ocorr�ncias
+            Ocorrências
           </label>
         </div>
+
         <button className="filter-apply" onClick={handleApply}>
           Aplicar Filtros
         </button>
@@ -160,7 +190,7 @@ export default function MapPage() {
         <MapView
           filters={applied}
           layers={layers}
-          selectedEspecieId={selectedEspecieId}
+          selectedEspecieIds={selectedEspecies.map((e) => e.id)}
         />
       </div>
     </div>

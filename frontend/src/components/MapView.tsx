@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+﻿import { useState, useEffect, useCallback, useRef } from 'react';
 import { Map, Source, Layer, Popup, NavigationControl } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { api } from '../api/client.js';
@@ -26,7 +26,7 @@ interface MapLayers {
 interface MapViewProps {
   filters: MapFilters;
   layers: MapLayers;
-  selectedEspecieId?: number | null;
+  selectedEspecieIds?: number[];
 }
 
 // Debounce hook: delays calling a function until after wait ms of inactivity.
@@ -62,7 +62,7 @@ function getViewport(map: any) {
   };
 }
 
-export default function MapView({ filters, layers, selectedEspecieId }: MapViewProps) {
+export default function MapView({ filters, layers, selectedEspecieIds }: MapViewProps) {
   const [areas, setAreas] = useState<GeoJSONFeatureCollection | null>(null);
   const [ocorrencias, setOcorrencias] = useState<GeoJSONFeatureCollection<OcorrenciaProperties> | null>(null);
   const [selectedAreaId, setSelectedAreaId] = useState<number | null>(null);
@@ -139,7 +139,7 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
     setError(null);
     try {
       const data = await api.getOcorrencias({
-        especie_id: selectedEspecieId || undefined,
+        especie_id: selectedEspecieIds && selectedEspecieIds.length > 0 ? selectedEspecieIds : undefined,
         categoria: filters.categoria,
         fonte: filters.fonte,
         bbox: debouncedViewport.bbox,
@@ -164,7 +164,7 @@ export default function MapView({ filters, layers, selectedEspecieId }: MapViewP
     } finally {
       if (requestId === occurrenceRequestId.current) setLoadingOccurrences(false);
     }
-  }, [selectedEspecieId, filters.categoria, filters.fonte, debouncedViewport.bbox]);
+  }, [selectedEspecieIds, filters.categoria, filters.fonte, debouncedViewport.bbox]);
 
   useEffect(() => {
     if (!debouncedViewport.bbox || !layers.unidades) {
