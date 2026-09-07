@@ -1,13 +1,26 @@
 import { Router } from 'express';
 import { query } from '../db/pool.js';
 import { validateId } from '../middleware/validateId.js';
-import { cacheMiddleware, cacheInvalidateAll } from '../cache/cache.js';
+import { cacheMiddleware, cacheInvalidateAll, getTileCache, setTileCache } from '../cache/cache.js';
 import { env } from '../config/env.js';
 import { parseParam, getParam } from '../utils/params.js';
 
 const router = Router();
 
-// GET /api/ocorrencias?especie_id=42 — returns GeoJSON FeatureCollection
+function isValidTile(z: number, x: number, y: number): boolean {
+  if (Number.isNaN(z) || Number.isNaN(x) || Number.isNaN(y)) return false;
+  if (z < 0 || z > 20) return false;
+  const max = 1 << z;
+  return x >= 0 && x < max && y >= 0 && y < max;
+}
+
+function sendTile(res: any, buffer: Buffer): void {
+  res.set('Content-Type', 'application/vnd.mapbox-vector-tile');
+  res.set('Cache-Control', 'public, max-age=604800');
+  res.send(buffer);
+}
+
+// GET /api/ocorrencias?especie_id=42 ï¿½ returns GeoJSON FeatureCollection
 // Supports bbox (minLng,minLat,maxLng,maxLat) to filter by visible map region.
 router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next) => {
   try {
@@ -24,7 +37,7 @@ router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next)
     }
 
     if (especie_id) {
-      // Aceita lista separada por vírgula (multi-seleção de espécies).
+      // Aceita lista separada por vï¿½rgula (multi-seleï¿½ï¿½o de espï¿½cies).
       const ids = String(especie_id).split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0);
       if (ids.length > 0) {
         conditions.push(`o.especie_id = ANY($${idx++}::int[])`);
@@ -46,8 +59,8 @@ router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next)
     if (bbox) {
       const parts = String(bbox).split(',').map(Number);
       if (parts.length === 4 && parts.every(n => !isNaN(n))) {
-        // && (bbox overlap) usa o índice GIST e é mais barato que ST_Intersects
-        // — equivalente para pontos contra um envelope retangular.
+        // && (bbox overlap) usa o ï¿½ndice GIST e ï¿½ mais barato que ST_Intersects
+        // ï¿½ equivalente para pontos contra um envelope retangular.
         conditions.push(`o.geom && ST_MakeEnvelope($${idx}, $${idx + 1}, $${idx + 2}, $${idx + 3}, 4326)`);
         params.push(parts[0], parts[1], parts[2], parts[3]);
         idx += 4;
@@ -96,7 +109,87 @@ router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next)
   } catch (err) { next(err); }
 });
 
-// POST /api/ocorrencias — lat/lon provided, trigger syncs geom
+// GET /api/ocorrencias/tiles/:z/:x/:y.mvt â€” vector tiles for occurrences (MVT).
+router.get('/tiles/:z/:x/:y.mvt', async (req, res, next) => {
+  try {
+    const z = parseInt(req.params.z, 10);
+    const x = parseInt(req.params.x, 10);
+    const y = parseInt(req.params.y, 10);
+    if (!isValidTile(z, x, y)) {
+      res.status(400).json({ error: 'Invalid tile coordinates' });
+      return;
+    }
+
+    const { especie_id, categoria, bioma, fonte, incluir_inativos } = req.query;
+    const key = `route:${req.originalUrl}`;
+    const cached = getTileCache(key);
+    if (cached) {
+      sendTile(res, cached);
+      return;
+    }
+
+    const conditions: string[] = ['o.geom && ST_Transform(bounds.b, 4326)'];
+    const params: unknown[] = [z, x, y];
+    let idx = 4;
+
+    if (incluir_inativos !== 'true') {
+      conditions.push(`e.status = 'ativo'`);
+    }
+
+    if (especie_id) {
+      const ids = String(especie_id).split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0);
+      if (ids.length > 0) {
+        conditions.push(`o.especie_id = ANY($${idx++}::int[])`);
+        params.push(ids);
+      }
+    }
+    if (categoria) {
+      conditions.push(`e.categoria_ameaca = $${idx++}`);
+      params.push(categoria);
+    }
+    if (bioma) {
+      conditions.push(`EXISTS (SELECT 1 FROM especie_bioma eb WHERE eb.especie_id = o.especie_id AND eb.bioma_id = $${idx++})`);
+      params.push(parseParam(bioma));
+    }
+    if (fonte) {
+      conditions.push(`o.fonte = $${idx++}`);
+      params.push(fonte);
+    }
+
+    const where = conditions.join(' AND ');
+
+    const { rows } = await query(
+      `SELECT COALESCE(encode(ST_AsMVT(mvt, 'ocorrencia', 4096, 'geom'), 'base64'), '') AS mvt
+       FROM (
+         SELECT
+           ST_AsMVTGeom(ST_Transform(o.geom, 3857), bounds.b, 4096, 64, true) AS geom,
+           o.id,
+           o.especie_id,
+           o.data_evento::text,
+           o.fonte::text,
+           o.base_registro,
+           o.confianca_ia::float,
+           o.lat::float,
+           o.lon::float,
+           e.nome_cientifico,
+           e.nome_popular,
+           e.imagem_url,
+           e.categoria_ameaca::text
+         FROM ocorrencia o
+         JOIN especie e ON e.id = o.especie_id
+         CROSS JOIN (SELECT ST_TileEnvelope($1::int, $2::int, $3::int) AS b) bounds
+         WHERE ${where}
+       ) mvt`,
+      params
+    );
+
+    const buffer = rows[0].mvt ? Buffer.from(rows[0].mvt, 'base64') : Buffer.alloc(0);
+    setTileCache(key, buffer);
+    sendTile(res, buffer);
+  } catch (err) { next(err); }
+});
+
+// POST /api/ocorrencias ï¿½ lat/lon provided, trigger syncs geom
 router.post('/', async (req, res, next) => {
   try {
     const { especie_id, lat, lon, data_evento, fonte, base_registro } = req.body;
@@ -134,7 +227,7 @@ router.delete('/:id', validateId, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET /api/ocorrencias/gbif?especie=panthera+onca — proxy to GBIF API, cached 5min
+// GET /api/ocorrencias/gbif?especie=panthera+onca ï¿½ proxy to GBIF API, cached 5min
 router.get('/gbif', cacheMiddleware(
   (req) => `gbif:${req.query.especie}`,
   () => 300_000

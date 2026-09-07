@@ -1,13 +1,12 @@
-﻿import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Map, Source, Layer, Popup, NavigationControl } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { api } from '../api/client.js';
 import ImageWithSkeleton from './ImageWithSkeleton.js';
-import { MAP_DEFAULTS, getCategoryColor, getUcCategoryColor } from '../constants/index.js';
-import { CATEGORY_LABELS } from '../constants/index.js';
+import { MAP_DEFAULTS, CATEGORY_LABELS, CATEGORY_COLORS, UC_CATEGORY_COLORS } from '../constants/index.js';
 import type {
-  GeoJSONFeatureCollection, OcorrenciaProperties,
-  EspecieEmArea, GeoJSONFeature, GeoJSONPoint, GeoJSONPolygon,
+  OcorrenciaProperties,
+  EspecieEmArea,
 } from '../types/index.js';
 
 const MAPTILER_API_KEY = import.meta.env.VITE_MAPTILER_API_KEY || '';
@@ -29,175 +28,56 @@ interface MapViewProps {
   selectedEspecieIds?: number[];
 }
 
-// Debounce hook: delays calling a function until after wait ms of inactivity.
-function useDebounce<T>(value: T, delay: number): T {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const handler = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(handler);
-  }, [value, delay]);
-  return debounced;
-}
-
-// Convert lat/lng center object to react-map-gl initial view.
 const INITIAL_VIEW = {
   longitude: MAP_DEFAULTS.center.lng,
   latitude: MAP_DEFAULTS.center.lat,
   zoom: MAP_DEFAULTS.zoom,
 };
 
-const DEFAULT_BBOX = `${MAP_DEFAULTS.center.lng - 20},${MAP_DEFAULTS.center.lat - 20},${MAP_DEFAULTS.center.lng + 20},${MAP_DEFAULTS.center.lat + 20}`;
+const occurrenceColorMatch = buildMatchExpression('categoria_ameaca', CATEGORY_COLORS, '#757575');
+const ucColorMatch = buildMatchExpression('categoria_uc', UC_CATEGORY_COLORS, '#1565c0');
 
-function getViewport(map: any) {
-  const bounds = map.getBounds();
-  const sw = bounds.getSouthWest();
-  const ne = bounds.getNorthEast();
-  const center = map.getCenter();
-  const coordinate = (value: number) => value.toFixed(5);
-  return {
-    bbox: `${coordinate(sw.lng)},${coordinate(sw.lat)},${coordinate(ne.lng)},${coordinate(ne.lat)}`,
-    zoom: Number(map.getZoom().toFixed(2)),
-    longitude: center.lng,
-    latitude: center.lat,
-  };
+function buildMatchExpression(inputProperty: string, pairs: Record<string, string>, fallback: string): any[] {
+  const stops = Object.entries(pairs).flatMap(([k, v]) => [k, v]);
+  return ['match', ['get', inputProperty], ...stops, fallback];
 }
 
 export default function MapView({ filters, layers, selectedEspecieIds }: MapViewProps) {
-  const [areas, setAreas] = useState<GeoJSONFeatureCollection | null>(null);
-  const [ocorrencias, setOcorrencias] = useState<GeoJSONFeatureCollection<OcorrenciaProperties> | null>(null);
   const [selectedAreaId, setSelectedAreaId] = useState<number | null>(null);
   const [selectedAreaSpecies, setSelectedAreaSpecies] = useState<EspecieEmArea[]>([]);
-  const [selectedOcorrencia, setSelectedOcorrencia] = useState<GeoJSONFeature<OcorrenciaProperties> | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadingAreas, setLoadingAreas] = useState(false);
-  const [loadingOccurrences, setLoadingOccurrences] = useState(false);
+  const [selectedOcorrencia, setSelectedOcorrencia] = useState<OcorrenciaProperties | null>(null);
+  const [popupLngLat, setPopupLngLat] = useState<{ lng: number; lat: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Viewport state (bbox + zoom) updated when map stops moving.
-  const [viewport, setViewport] = useState({
-    bbox: DEFAULT_BBOX,
-    zoom: MAP_DEFAULTS.zoom,
-    longitude: INITIAL_VIEW.longitude,
-    latitude: INITIAL_VIEW.latitude,
-  });
-  const debouncedViewport = useDebounce(viewport, 500);
-  const mapRef = useRef<any>(null);
-  const areaRequestId = useRef(0);
-  const occurrenceRequestId = useRef(0);
-  const showOccurrenceData = layers.ocorrencias;
+  const areaTilesUrl = useMemo(
+    () => api.getAreaTilesUrl({ esfera: filters.esfera, categoria: filters.categoria }),
+    [filters.esfera, filters.categoria]
+  );
 
-  const handleMoveEnd = useCallback((evt: any) => {
-    setViewport(getViewport(evt.target));
-  }, []);
+  const ocorrenciasTilesUrl = useMemo(
+    () => api.getOcorrenciasTilesUrl({
+      especie_id: selectedEspecieIds,
+      categoria: filters.categoria,
+      fonte: filters.fonte,
+    }),
+    [selectedEspecieIds, filters.categoria, filters.fonte]
+  );
 
-  const handleLoad = useCallback((evt: any) => {
-    setLoading(false);
-    const map = evt.target;
-    setTimeout(() => {
-      if (map.resize) map.resize();
-    }, 150);
-    setViewport(getViewport(map));
-  }, []);
-
-  // Load areas (filtered by viewport + filters).
-  const loadAreas = useCallback(async () => {
-    const requestId = ++areaRequestId.current;
-    setLoadingAreas(true);
-    setError(null);
-    try {
-      const data = await api.getAreas({
-        esfera: filters.esfera,
-        bbox: debouncedViewport.bbox,
-        zoom: debouncedViewport.zoom,
-      });
-      // Enrich features with color for the map layer.
-      const colored = {
-        ...data,
-        features: data.features.map((feature) => {
-          const props = feature.properties as { categoria_uc?: string };
-          return {
-            ...feature,
-            properties: {
-              ...props,
-              color: getUcCategoryColor(props.categoria_uc ?? ''),
-            },
-          };
-        }),
-      };
-      if (requestId === areaRequestId.current) setAreas(colored as GeoJSONFeatureCollection);
-    } catch (err) {
-      if (requestId === areaRequestId.current) setError(err instanceof Error ? err.message : 'Failed to load areas');
-    } finally {
-      if (requestId === areaRequestId.current) setLoadingAreas(false);
-    }
-  }, [filters.esfera, debouncedViewport.bbox, debouncedViewport.zoom]);
-
-  // Load occurrences (filtered by viewport + filters).
-  const loadOcorrencias = useCallback(async () => {
-    const requestId = ++occurrenceRequestId.current;
-    setLoadingOccurrences(true);
-    setError(null);
-    try {
-      const data = await api.getOcorrencias({
-        especie_id: selectedEspecieIds && selectedEspecieIds.length > 0 ? selectedEspecieIds : undefined,
-        categoria: filters.categoria,
-        fonte: filters.fonte,
-        bbox: debouncedViewport.bbox,
-        limit: 10000,
-      });
-      const colored = {
-        ...data,
-        features: data.features.map((feature) => {
-          const props = feature.properties as OcorrenciaProperties;
-          return {
-            ...feature,
-            properties: {
-              ...props,
-              color: getCategoryColor(props.categoria_ameaca),
-            },
-          };
-        }),
-      };
-      if (requestId === occurrenceRequestId.current) setOcorrencias(colored as GeoJSONFeatureCollection<OcorrenciaProperties>);
-    } catch (err) {
-      if (requestId === occurrenceRequestId.current) setError(err instanceof Error ? err.message : 'Failed to load occurrences');
-    } finally {
-      if (requestId === occurrenceRequestId.current) setLoadingOccurrences(false);
-    }
-  }, [selectedEspecieIds, filters.categoria, filters.fonte, debouncedViewport.bbox]);
-
-  useEffect(() => {
-    if (!debouncedViewport.bbox || !layers.unidades) {
-      areaRequestId.current += 1;
-      setLoadingAreas(false);
-      return;
-    }
-    void loadAreas();
-  }, [loadAreas, layers.unidades, debouncedViewport.bbox]);
-
-  useEffect(() => {
-    if (!debouncedViewport.bbox || !showOccurrenceData) {
-      occurrenceRequestId.current += 1;
-      setLoadingOccurrences(false);
-      return;
-    }
-    void loadOcorrencias();
-  }, [loadOcorrencias, showOccurrenceData, debouncedViewport.bbox]);
-
-  // Handle click on an occurrence point or protected area polygon.
-  // Occurrence points take priority — they sit on top of area polygons.
-  const handleClick = async (evt: any) => {
+  const handleClick = useCallback(async (evt: any) => {
     const features: any[] = evt.features || [];
     const areaFeature = features.find((f) => f.layer.id === 'areas-fill');
     const ocorrenciaFeature = features.find((f) => f.layer.id === 'ocorrencias-circle');
+    const lngLat = evt.lngLat;
 
-    if (ocorrenciaFeature) {
-      setSelectedOcorrencia(ocorrenciaFeature as unknown as GeoJSONFeature<OcorrenciaProperties>);
+    if (ocorrenciaFeature && ocorrenciaFeature.properties) {
+      setSelectedOcorrencia(ocorrenciaFeature.properties as OcorrenciaProperties);
       setSelectedAreaId(null);
-    } else if (areaFeature) {
+      setPopupLngLat(lngLat);
+    } else if (areaFeature && areaFeature.properties) {
       const areaId = areaFeature.properties.id as number;
       setSelectedAreaId(areaId);
       setSelectedOcorrencia(null);
+      setPopupLngLat(lngLat);
       try {
         const species = await api.getEspeciesEmArea(areaId);
         setSelectedAreaSpecies(species);
@@ -205,75 +85,68 @@ export default function MapView({ filters, layers, selectedEspecieIds }: MapView
         setSelectedAreaSpecies([]);
       }
     }
-  };
+  }, []);
 
-  // Compute popup position for selected area (centroid of polygon).
-  const areaPopupPosition = (() => {
-    if (!selectedAreaId || !areas) return null;
-    const area = areas.features.find((f) => f.id === selectedAreaId);
-    if (!area || area.geometry.type !== 'Polygon') return null;
-    const coords = (area.geometry as GeoJSONPolygon).coordinates[0];
-    const avgLng = coords.reduce((s, [lng]) => s + lng, 0) / coords.length;
-    const avgLat = coords.reduce((s, [, lat]) => s + lat, 0) / coords.length;
-    return { longitude: avgLng, latitude: avgLat };
-  })();
-
-  const occurrencePopupPosition = (() => {
-    if (!selectedOcorrencia || selectedOcorrencia.geometry.type !== 'Point') return null;
-    const [lng, lat] = (selectedOcorrencia.geometry as GeoJSONPoint).coordinates;
-    return { longitude: lng, latitude: lat };
-  })();
+  const interactiveLayerIds = [
+    ...(layers.unidades ? ['areas-fill'] : []),
+    ...(layers.ocorrencias ? ['ocorrencias-circle'] : []),
+  ];
 
   return (
     <div className="map-container" style={{ width: '100%', height: '100%' }}>
       {error && <div className="map-overlay map-error-inline">Erro: {error}</div>}
-      {(loading || loadingAreas || loadingOccurrences) && !error && <div className="map-overlay">Carregando mapa...</div>}
+
       <Map
-        ref={mapRef}
         initialViewState={INITIAL_VIEW}
         style={{ width: '100%', height: '100%' }}
         mapStyle={`https://api.maptiler.com/maps/streets/style.json?key=${MAPTILER_API_KEY}`}
-        onLoad={handleLoad}
-        onMoveEnd={handleMoveEnd}
         onClick={handleClick}
         onError={(evt) => setError(String(evt.error) || 'Falha ao carregar o mapa. Verifique a chave do MapTiler.')}
-        interactiveLayerIds={[
-          ...(layers.unidades ? ['areas-fill'] : []),
-          ...(layers.ocorrencias ? ['ocorrencias-circle'] : []),
-        ]}
+        interactiveLayerIds={interactiveLayerIds}
       >
         <NavigationControl position="top-right" />
 
-        {/* Protected area polygons */}
-        {layers.unidades && areas && (
-          <Source id="areas" type="geojson" data={areas}>
+        {/* Protected area polygons (vector tiles) */}
+        {layers.unidades && (
+          <Source
+            key={areaTilesUrl}
+            id="areas"
+            type="vector"
+            tiles={[areaTilesUrl]}
+            minzoom={0}
+            maxzoom={14}
+          >
             <Layer
               id="areas-fill"
               type="fill"
-              paint={{
-                'fill-color': ['get', 'color'],
-                'fill-opacity': 0.3,
-              }}
+              source-layer="uc"
+              paint={{ 'fill-color': ucColorMatch as any, 'fill-opacity': 0.3 }}
             />
             <Layer
               id="areas-line"
               type="line"
-              paint={{
-                'line-color': ['get', 'color'],
-                'line-width': 2,
-              }}
+              source-layer="uc"
+              paint={{ 'line-color': ucColorMatch as any, 'line-width': 2 }}
             />
           </Source>
         )}
 
-        {/* Occurrence markers */}
-        {layers.ocorrencias && ocorrencias && (
-          <Source id="ocorrencias" type="geojson" data={ocorrencias}>
+        {/* Occurrence markers (vector tiles) */}
+        {layers.ocorrencias && (
+          <Source
+            key={ocorrenciasTilesUrl}
+            id="ocorrencias"
+            type="vector"
+            tiles={[ocorrenciasTilesUrl]}
+            minzoom={0}
+            maxzoom={14}
+          >
             <Layer
               id="ocorrencias-circle"
               type="circle"
+              source-layer="ocorrencia"
               paint={{
-                'circle-color': ['get', 'color'],
+                'circle-color': occurrenceColorMatch as any,
                 'circle-radius': 6,
                 'circle-stroke-color': '#fff',
                 'circle-stroke-width': 1,
@@ -283,15 +156,14 @@ export default function MapView({ filters, layers, selectedEspecieIds }: MapView
         )}
 
         {/* Popup for selected area */}
-        {areaPopupPosition && (
+        {popupLngLat && selectedAreaId && (
           <Popup
-            longitude={areaPopupPosition.longitude}
-            latitude={areaPopupPosition.latitude}
+            longitude={popupLngLat.lng}
+            latitude={popupLngLat.lat}
             anchor="top"
             offset={16}
-            dynamicPosition
             maxWidth="320px"
-            onClose={() => setSelectedAreaId(null)}
+            onClose={() => { setSelectedAreaId(null); setPopupLngLat(null); }}
             closeButton
           >
             <div className="info-window">
@@ -316,23 +188,22 @@ export default function MapView({ filters, layers, selectedEspecieIds }: MapView
         )}
 
         {/* Popup for selected occurrence */}
-        {occurrencePopupPosition && selectedOcorrencia && (
+        {popupLngLat && selectedOcorrencia && (
           <Popup
-            longitude={occurrencePopupPosition.longitude}
-            latitude={occurrencePopupPosition.latitude}
+            longitude={popupLngLat.lng}
+            latitude={popupLngLat.lat}
             anchor="bottom"
             offset={16}
-            dynamicPosition
             maxWidth="360px"
-            onClose={() => setSelectedOcorrencia(null)}
+            onClose={() => { setSelectedOcorrencia(null); setPopupLngLat(null); }}
             closeButton
           >
             <div className="occurrence-popup">
               <div className="occurrence-image">
-                {selectedOcorrencia.properties.imagem_url ? (
+                {selectedOcorrencia.imagem_url ? (
                   <ImageWithSkeleton
-                    src={selectedOcorrencia.properties.imagem_url}
-                    alt={selectedOcorrencia.properties.nome_cientifico}
+                    src={selectedOcorrencia.imagem_url || undefined}
+                    alt={selectedOcorrencia.nome_cientifico}
                     className="occurrence-detail-img"
                     skeletonClassName="occurrence-image-skeleton"
                     onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
@@ -347,23 +218,23 @@ export default function MapView({ filters, layers, selectedEspecieIds }: MapView
                 )}
               </div>
               <div className="occurrence-body">
-                <h4>{selectedOcorrencia.properties.nome_popular || selectedOcorrencia.properties.nome_cientifico}</h4>
-                <p className="occurrence-scientific">{selectedOcorrencia.properties.nome_cientifico}</p>
-                <span className={`cat-badge cat-${selectedOcorrencia.properties.categoria_ameaca.toLowerCase()}`}>
-                  {CATEGORY_LABELS[selectedOcorrencia.properties.categoria_ameaca] || selectedOcorrencia.properties.categoria_ameaca}
+                <h4>{selectedOcorrencia.nome_popular || selectedOcorrencia.nome_cientifico}</h4>
+                <p className="occurrence-scientific">{selectedOcorrencia.nome_cientifico}</p>
+                <span className={`cat-badge cat-${selectedOcorrencia.categoria_ameaca.toLowerCase()}`}>
+                  {CATEGORY_LABELS[selectedOcorrencia.categoria_ameaca] || selectedOcorrencia.categoria_ameaca}
                 </span>
                 <div className="occurrence-meta">
-                  <p><strong>Data:</strong> {selectedOcorrencia.properties.data_evento || 'N/A'}</p>
-                  <p><strong>Fonte:</strong> {selectedOcorrencia.properties.fonte}</p>
-                  {selectedOcorrencia.properties.confianca_ia != null && (
-                    <p><strong>Confiança da IA:</strong> {Math.round(selectedOcorrencia.properties.confianca_ia * 100)}%</p>
+                  <p><strong>Data:</strong> {selectedOcorrencia.data_evento || 'N/A'}</p>
+                  <p><strong>Fonte:</strong> {selectedOcorrencia.fonte}</p>
+                  {selectedOcorrencia.confianca_ia != null && (
+                    <p><strong>Confian�a da IA:</strong> {Math.round(selectedOcorrencia.confianca_ia * 100)}%</p>
                   )}
-                  {selectedOcorrencia.properties.base_registro && (
-                    <p><strong>Base:</strong> {selectedOcorrencia.properties.base_registro}</p>
+                  {selectedOcorrencia.base_registro && (
+                    <p><strong>Base:</strong> {selectedOcorrencia.base_registro}</p>
                   )}
                   <p className="occurrence-coords">
-                    {selectedOcorrencia.properties.lat.toFixed(4)},{' '}
-                    {selectedOcorrencia.properties.lon.toFixed(4)}
+                    {selectedOcorrencia.lat.toFixed(4)},{' '}
+                    {selectedOcorrencia.lon.toFixed(4)}
                   </p>
                 </div>
               </div>

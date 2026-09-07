@@ -4,7 +4,7 @@ import type {
   EspecieEmArea, AreaProtegeEspecie, PaginatedResponse,
 } from '../types/index.js';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 const pendingRequests = new Map<string, Promise<unknown>>();
 
@@ -28,6 +28,14 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
   }
 
   return response.json() as Promise<T>;
+}
+
+function buildQs(params: Record<string, string | number | undefined>): string {
+  const qs = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== '') qs.set(key, String(value));
+  }
+  return qs.toString();
 }
 
 // --- Reference data ---
@@ -125,6 +133,15 @@ export const api = {
     return fetchDeduplicated<GeoJSONFeatureCollection>(path);
   },
 
+  getAreaTilesUrl(params?: { esfera?: string; categoria?: string; bioma?: number }): string {
+    const query = buildQs({
+      esfera: params?.esfera,
+      categoria: params?.categoria,
+      bioma: params?.bioma,
+    });
+    return `${API_URL}/areas/tiles/{z}/{x}/{y}.mvt${query ? `?${query}` : ''}`;
+  },
+
   async getArea(id: number): Promise<GeoJSONFeatureCollection> {
     return fetchApi<GeoJSONFeatureCollection>(`/areas/${id}`);
   },
@@ -169,6 +186,16 @@ export const api = {
     const query = qs.toString();
     const path = `/ocorrencias${query ? `?${query}` : ''}`;
     return fetchDeduplicated<GeoJSONFeatureCollection<OcorrenciaProperties>>(path);
+  },
+
+  getOcorrenciasTilesUrl(params?: { especie_id?: number[]; categoria?: string; fonte?: string; bioma?: number }): string {
+    const query = buildQs({
+      especie_id: params?.especie_id?.join(','),
+      categoria: params?.categoria,
+      fonte: params?.fonte,
+      bioma: params?.bioma,
+    });
+    return `${API_URL}/ocorrencias/tiles/{z}/{x}/{y}.mvt${query ? `?${query}` : ''}`;
   },
 
   async createOcorrencia(data: {

@@ -1,12 +1,25 @@
 import { Router } from 'express';
 import { query } from '../db/pool.js';
 import { validateId } from '../middleware/validateId.js';
-import { cacheMiddleware, cacheInvalidateAll } from '../cache/cache.js';
+import { cacheMiddleware, cacheInvalidateAll, getTileCache, setTileCache } from '../cache/cache.js';
 import { parseParam, getParam } from '../utils/params.js';
 
 const router = Router();
 
-// GET /api/areas — returns GeoJSON FeatureCollection, cached 30s
+function isValidTile(z: number, x: number, y: number): boolean {
+  if (Number.isNaN(z) || Number.isNaN(x) || Number.isNaN(y)) return false;
+  if (z < 0 || z > 20) return false;
+  const max = 1 << z;
+  return x >= 0 && x < max && y >= 0 && y < max;
+}
+
+function sendTile(res: any, buffer: Buffer): void {
+  res.set('Content-Type', 'application/vnd.mapbox-vector-tile');
+  res.set('Cache-Control', 'public, max-age=604800');
+  res.send(buffer);
+}
+
+// GET /api/areas ï¿½ returns GeoJSON FeatureCollection, cached 30s
 // Supports bbox (minLng,minLat,maxLng,maxLat) and zoom for geometry simplification.
 router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next) => {
   try {
@@ -39,12 +52,12 @@ router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next)
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
     const limitClause = `LIMIT 500`;
 
-    // Tolerância de simplificação por zoom (graus).
+    // Tolerï¿½ncia de simplificaï¿½ï¿½o por zoom (graus).
     const zoomLevel = zoom ? parseInt(String(zoom), 10) : 10;
     const tolerance = zoomLevel > 12 ? 0.001 : zoomLevel > 8 ? 0.01 : 0.1;
 
-    // Uma única query: metadados + geometria simplificada. Evita abrir
-    // N conexões do pool com chunks paralelos.
+    // Uma ï¿½nica query: metadados + geometria simplificada. Evita abrir
+    // N conexï¿½es do pool com chunks paralelos.
     const { rows: features } = await query(
       `SELECT a.id AS feature_id,
               ST_AsGeoJSON(ST_SimplifyPreserveTopology(a.geom, $${idx}), 5)::json AS geometry,
@@ -76,7 +89,60 @@ router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next)
   } catch (err) { next(err); }
 });
 
-// GET /api/areas/:id — single area as GeoJSON Feature
+// GET /api/areas/tiles/:z/:x/:y.mvt â€” vector tiles for UCs (MVT).
+router.get('/tiles/:z/:x/:y.mvt', async (req, res, next) => {
+  try {
+    const z = parseInt(req.params.z, 10);
+    const x = parseInt(req.params.x, 10);
+    const y = parseInt(req.params.y, 10);
+    if (!isValidTile(z, x, y)) {
+      res.status(400).json({ error: 'Invalid tile coordinates' });
+      return;
+    }
+
+    const { esfera, categoria, bioma } = req.query;
+    const key = `route:${req.originalUrl}`;
+    const cached = getTileCache(key);
+    if (cached) {
+      sendTile(res, cached);
+      return;
+    }
+
+    const conditions: string[] = ['a.geom && ST_Transform(bounds.b, 4326)'];
+    const params: unknown[] = [z, x, y];
+    let idx = 4;
+
+    if (esfera) { conditions.push(`a.esfera = $${idx++}`); params.push(esfera); }
+    if (categoria) { conditions.push(`a.categoria_uc = $${idx++}`); params.push(categoria); }
+    if (bioma) { conditions.push(`a.bioma_id = $${idx++}`); params.push(parseParam(bioma)); }
+
+    const where = conditions.join(' AND ');
+
+    const { rows } = await query(
+      `SELECT COALESCE(encode(ST_AsMVT(mvt, 'uc', 4096, 'geom'), 'base64'), '') AS mvt
+       FROM (
+         SELECT
+           ST_AsMVTGeom(ST_Transform(a.geom, 3857), bounds.b, 4096, 256, true) AS geom,
+           a.id,
+           a.nome,
+           a.categoria_uc::text,
+           a.esfera::text,
+           a.bioma_id,
+           a.area_ha::float
+         FROM area_protegida a
+         CROSS JOIN (SELECT ST_TileEnvelope($1::int, $2::int, $3::int) AS b) bounds
+         WHERE ${where}
+       ) mvt`,
+      params
+    );
+
+    const buffer = rows[0].mvt ? Buffer.from(rows[0].mvt, 'base64') : Buffer.alloc(0);
+    setTileCache(key, buffer);
+    sendTile(res, buffer);
+  } catch (err) { next(err); }
+});
+
+// GET /api/areas/:id ï¿½ single area as GeoJSON Feature
 router.get('/:id', validateId, async (req, res, next) => {
   try {
     const id = parseParam(req.params.id)!;
@@ -109,7 +175,7 @@ router.get('/:id', validateId, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET /api/areas/:id/especies — spatial query: species inside this area
+// GET /api/areas/:id/especies ï¿½ spatial query: species inside this area
 router.get('/:id/especies', validateId, async (req, res, next) => {
   try {
     const id = parseParam(req.params.id)!;
@@ -118,7 +184,7 @@ router.get('/:id/especies', validateId, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// POST /api/areas — accepts GeoJSON, converts to geometry
+// POST /api/areas ï¿½ accepts GeoJSON, converts to geometry
 router.post('/', async (req, res, next) => {
   try {
     const { nome, categoria_uc, esfera, bioma_id, area_ha, geojson } = req.body;
