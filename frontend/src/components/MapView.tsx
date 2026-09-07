@@ -50,8 +50,8 @@ export default function MapView({ filters, layers, selectedEspecieIds }: MapView
   const [error, setError] = useState<string | null>(null);
 
   const areaTilesUrl = useMemo(
-    () => api.getAreaTilesUrl({ esfera: filters.esfera, categoria: filters.categoria }),
-    [filters.esfera, filters.categoria]
+    () => api.getAreaTilesUrl({ esfera: filters.esfera }),
+    [filters.esfera]
   );
 
   const ocorrenciasTilesUrl = useMemo(
