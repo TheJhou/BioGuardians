@@ -34,7 +34,6 @@ export function cacheMiddleware(
 
     const key = keyFn(req);
     const ttl = ttlFn ? ttlFn(req) : env.cache.ttlMs;
-    res.set('Cache-Control', `public, max-age=${Math.floor(ttl / 1000)}`);
 
     const cached = cache.get(key);
     if (cached) {

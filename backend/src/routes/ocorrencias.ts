@@ -1,4 +1,4 @@
-ï»¿import { Router } from 'express';
+import { Router } from 'express';
 import { query } from '../db/pool.js';
 import { validateId } from '../middleware/validateId.js';
 import { cacheMiddleware, cacheInvalidateAll } from '../cache/cache.js';
@@ -7,9 +7,9 @@ import { parseParam, getParam } from '../utils/params.js';
 
 const router = Router();
 
-// GET /api/ocorrencias?especie_id=42 â€” returns GeoJSON FeatureCollection
+// GET /api/ocorrencias?especie_id=42 — returns GeoJSON FeatureCollection
 // Supports bbox (minLng,minLat,maxLng,maxLat) to filter by visible map region.
-router.get('/', cacheMiddleware(undefined, () => 7 * 24 * 60 * 60 * 1000), async (req, res, next) => {
+router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next) => {
   try {
     const { especie_id, categoria, bioma, fonte, limit, bbox, incluir_inativos } = req.query;
 
@@ -24,7 +24,7 @@ router.get('/', cacheMiddleware(undefined, () => 7 * 24 * 60 * 60 * 1000), async
     }
 
     if (especie_id) {
-      // Aceita lista separada por vÃ­rgula (multi-seleÃ§Ã£o de espÃ©cies).
+      // Aceita lista separada por vírgula (multi-seleção de espécies).
       const ids = String(especie_id).split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0);
       if (ids.length > 0) {
         conditions.push(`o.especie_id = ANY($${idx++}::int[])`);
@@ -46,8 +46,8 @@ router.get('/', cacheMiddleware(undefined, () => 7 * 24 * 60 * 60 * 1000), async
     if (bbox) {
       const parts = String(bbox).split(',').map(Number);
       if (parts.length === 4 && parts.every(n => !isNaN(n))) {
-        // && (bbox overlap) usa o Ã­ndice GIST e Ã© mais barato que ST_Intersects
-        // â€” equivalente para pontos contra um envelope retangular.
+        // && (bbox overlap) usa o índice GIST e é mais barato que ST_Intersects
+        // — equivalente para pontos contra um envelope retangular.
         conditions.push(`o.geom && ST_MakeEnvelope($${idx}, $${idx + 1}, $${idx + 2}, $${idx + 3}, 4326)`);
         params.push(parts[0], parts[1], parts[2], parts[3]);
         idx += 4;
@@ -96,7 +96,7 @@ router.get('/', cacheMiddleware(undefined, () => 7 * 24 * 60 * 60 * 1000), async
   } catch (err) { next(err); }
 });
 
-// POST /api/ocorrencias â€” lat/lon provided, trigger syncs geom
+// POST /api/ocorrencias — lat/lon provided, trigger syncs geom
 router.post('/', async (req, res, next) => {
   try {
     const { especie_id, lat, lon, data_evento, fonte, base_registro } = req.body;
@@ -134,7 +134,7 @@ router.delete('/:id', validateId, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET /api/ocorrencias/gbif?especie=panthera+onca â€” proxy to GBIF API, cached 5min
+// GET /api/ocorrencias/gbif?especie=panthera+onca — proxy to GBIF API, cached 5min
 router.get('/gbif', cacheMiddleware(
   (req) => `gbif:${req.query.especie}`,
   () => 300_000

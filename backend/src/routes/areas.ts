@@ -1,4 +1,4 @@
-ï»¿import { Router } from 'express';
+import { Router } from 'express';
 import { query } from '../db/pool.js';
 import { validateId } from '../middleware/validateId.js';
 import { cacheMiddleware, cacheInvalidateAll } from '../cache/cache.js';
@@ -6,9 +6,9 @@ import { parseParam, getParam } from '../utils/params.js';
 
 const router = Router();
 
-// GET /api/areas â€” returns GeoJSON FeatureCollection, cached 30s
+// GET /api/areas — returns GeoJSON FeatureCollection, cached 30s
 // Supports bbox (minLng,minLat,maxLng,maxLat) and zoom for geometry simplification.
-router.get('/', cacheMiddleware(undefined, () => 7 * 24 * 60 * 60 * 1000), async (req, res, next) => {
+router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next) => {
   try {
     const { bioma, esfera, categoria, busca, bbox, zoom } = req.query;
 
@@ -39,12 +39,12 @@ router.get('/', cacheMiddleware(undefined, () => 7 * 24 * 60 * 60 * 1000), async
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
     const limitClause = `LIMIT 500`;
 
-    // TolerÃ¢ncia de simplificaÃ§Ã£o por zoom (graus).
+    // Tolerância de simplificação por zoom (graus).
     const zoomLevel = zoom ? parseInt(String(zoom), 10) : 10;
     const tolerance = zoomLevel > 12 ? 0.001 : zoomLevel > 8 ? 0.01 : 0.1;
 
-    // Uma Ãºnica query: metadados + geometria simplificada. Evita abrir
-    // N conexÃµes do pool com chunks paralelos.
+    // Uma única query: metadados + geometria simplificada. Evita abrir
+    // N conexões do pool com chunks paralelos.
     const { rows: features } = await query(
       `SELECT a.id AS feature_id,
               ST_AsGeoJSON(ST_SimplifyPreserveTopology(a.geom, $${idx}), 5)::json AS geometry,
@@ -76,7 +76,7 @@ router.get('/', cacheMiddleware(undefined, () => 7 * 24 * 60 * 60 * 1000), async
   } catch (err) { next(err); }
 });
 
-// GET /api/areas/:id â€” single area as GeoJSON Feature
+// GET /api/areas/:id — single area as GeoJSON Feature
 router.get('/:id', validateId, async (req, res, next) => {
   try {
     const id = parseParam(req.params.id)!;
@@ -109,7 +109,7 @@ router.get('/:id', validateId, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET /api/areas/:id/especies â€” spatial query: species inside this area
+// GET /api/areas/:id/especies — spatial query: species inside this area
 router.get('/:id/especies', validateId, async (req, res, next) => {
   try {
     const id = parseParam(req.params.id)!;
@@ -118,7 +118,7 @@ router.get('/:id/especies', validateId, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// POST /api/areas â€” accepts GeoJSON, converts to geometry
+// POST /api/areas — accepts GeoJSON, converts to geometry
 router.post('/', async (req, res, next) => {
   try {
     const { nome, categoria_uc, esfera, bioma_id, area_ha, geojson } = req.body;

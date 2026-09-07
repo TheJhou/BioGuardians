@@ -6,47 +6,7 @@ import type {
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
-// Simple in-memory cache to avoid refetching the same data.
-const responseCache = new Map<string, { data: unknown; ts: number }>();
 const pendingRequests = new Map<string, Promise<unknown>>();
-const CACHE_TTL = 30_000; // 30s
-const CACHE_MAX_ENTRIES = 100;
-
-function getCached<T>(key: string): T | null {
-  const entry = responseCache.get(key);
-  if (!entry) return null;
-  if (Date.now() - entry.ts >= CACHE_TTL) {
-    responseCache.delete(key);
-    return null;
-  }
-  responseCache.delete(key);
-  responseCache.set(key, entry);
-  return entry.data as T;
-}
-
-function setCached(key: string, data: unknown): void {
-  if (responseCache.size >= CACHE_MAX_ENTRIES) {
-    const oldestKey = responseCache.keys().next().value;
-    if (oldestKey) responseCache.delete(oldestKey);
-  }
-  responseCache.delete(key);
-  responseCache.set(key, { data, ts: Date.now() });
-}
-
-function fetchCached<T>(key: string, path: string): Promise<T> {
-  const cached = getCached<T>(key);
-  if (cached) return Promise.resolve(cached);
-  const pending = pendingRequests.get(key) as Promise<T> | undefined;
-  if (pending) return pending;
-  const request = fetchApi<T>(path)
-    .then((data) => {
-      setCached(key, data);
-      return data;
-    })
-    .finally(() => pendingRequests.delete(key));
-  pendingRequests.set(key, request);
-  return request;
-}
 
 function fetchDeduplicated<T>(path: string): Promise<T> {
   const pending = pendingRequests.get(path) as Promise<T> | undefined;
@@ -70,33 +30,21 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-// --- Reference data (cached client-side) ---
+// --- Reference data ---
 export const api = {
   // Biomas
   async getBiomas(): Promise<Bioma[]> {
-    const cached = getCached<Bioma[]>('biomas');
-    if (cached) return cached;
-    const data = await fetchApi<Bioma[]>('/biomas');
-    setCached('biomas', data);
-    return data;
+    return fetchApi<Bioma[]>('/biomas');
   },
 
   // Estados
   async getEstados(): Promise<Estado[]> {
-    const cached = getCached<Estado[]>('estados');
-    if (cached) return cached;
-    const data = await fetchApi<Estado[]>('/estados');
-    setCached('estados', data);
-    return data;
+    return fetchApi<Estado[]>('/estados');
   },
 
   // Categorias
   async getCategorias(): Promise<Categoria[]> {
-    const cached = getCached<Categoria[]>('categorias');
-    if (cached) return cached;
-    const data = await fetchApi<Categoria[]>('/categorias');
-    setCached('categorias', data);
-    return data;
+    return fetchApi<Categoria[]>('/categorias');
   },
 
   // Taxonomia
@@ -244,11 +192,10 @@ export const api = {
 
   // Dashboard
   async getDashboard(): Promise<DashboardData> {
-    return fetchCached<DashboardData>('dashboard', '/dashboard');
+    return fetchApi<DashboardData>('/dashboard');
   },
 
   async refreshDashboard(): Promise<{ message: string }> {
-    responseCache.delete('dashboard');
     return fetchApi<{ message: string }>('/dashboard/refresh', { method: 'POST' });
   },
 };
