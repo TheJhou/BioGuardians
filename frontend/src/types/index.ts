@@ -130,7 +130,7 @@ export interface EspeciePorUc {
   categoria_ameaca: string;
 }
 
-export interface OcorrenciaPorBioma {
+export interface BiomaCount {
   nome: string;
   total: number;
 }
@@ -150,7 +150,7 @@ export interface DashboardData {
   ranking: RankingCategoria[];
   ucs_por_esfera: UcsPorEsfera[];
   especies_por_uc: EspeciePorUc[];
-  ocorrencias_por_bioma: OcorrenciaPorBioma[];
+  especies_por_bioma: BiomaCount[];
   ocorrencias_por_ano: OcorrenciaPorAno[];
   ucs_por_categoria: UcPorCategoria[];
 }

@@ -57,9 +57,9 @@ export default function Dashboard() {
   const stats = data.stats;
 
   const biomasData = {
-    labels: data.ocorrencias_por_bioma.map((b) => b.nome),
+    labels: data.especies_por_bioma.map((b) => b.nome),
     datasets: [{
-      data: data.ocorrencias_por_bioma.map((b) => b.total),
+      data: data.especies_por_bioma.map((b) => b.total),
       backgroundColor: ['#16A36A', '#073B2A', '#9AD84B', '#DDF5E9', '#66736D', '#E3E9E5'],
       borderWidth: 0,
     }],
@@ -108,13 +108,13 @@ export default function Dashboard() {
         <StatCard value={stats.total_especies} label="Espécies registradas" />
         <StatCard value={stats.total_ocorrencias} label="Ocorrências registradas" />
         <StatCard value={stats.total_areas} label="Unidades de Conservação" />
-        <StatCard value={data.ocorrencias_por_bioma.length} label="Biomas mapeados" />
+        <StatCard value={data.especies_por_bioma.length} label="Biomas mapeados" />
       </div>
 
       {/* Charts */}
       <div className="dashboard-grid two">
         <div className="dashboard-card large">
-          <h3 className="card-title">Ocorrências por Bioma</h3>
+          <h3 className="card-title">Espécies por Bioma</h3>
           <div className="chart-doughnut">
             <Doughnut data={biomasData} plugins={[doughnutTotalPlugin]} options={{
               responsive: true,

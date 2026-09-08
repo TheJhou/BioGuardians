@@ -8,19 +8,17 @@ const router = Router();
 // Cached for 60s. Uses Promise.all to fetch all views concurrently.
 router.get('/', cacheMiddleware(undefined, () => 60_000), async (_req, res, next) => {
   try {
-    const [stats, ranking, ucsEsfera, especiesUc, occBioma, occAno, ucsCategoria] = await Promise.all([
+    const [stats, ranking, ucsEsfera, especiesUc, especiesBioma, occAno, ucsCategoria] = await Promise.all([
       query('SELECT * FROM dashboard_stats'),
       query('SELECT * FROM ranking_especies_categoria'),
       query('SELECT * FROM ucs_por_esfera'),
       query('SELECT * FROM especies_por_uc ORDER BY area_nome, nome_cientifico'),
-      // Ocorrências por bioma via vínculo espécie↔bioma (uma ocorrência conta
-      // em cada bioma associado à espécie).
+      // Espécies por bioma (via vínculo especie↔bioma).
       query(
-        `SELECT b.nome, COUNT(*)::int AS total
-         FROM ocorrencia o
-         JOIN especie e ON e.id = o.especie_id AND e.status = 'ativo'
-         JOIN especie_bioma eb ON eb.especie_id = o.especie_id
-         JOIN bioma b ON b.id = eb.bioma_id
+        `SELECT b.nome, COUNT(DISTINCT e.id)::int AS total
+         FROM bioma b
+         JOIN especie_bioma eb ON eb.bioma_id = b.id
+         JOIN especie e ON e.id = eb.especie_id AND e.status = 'ativo'
          GROUP BY b.nome
          ORDER BY total DESC`
       ),
@@ -46,7 +44,7 @@ router.get('/', cacheMiddleware(undefined, () => 60_000), async (_req, res, next
       ranking: ranking.rows,
       ucs_por_esfera: ucsEsfera.rows,
       especies_por_uc: especiesUc.rows,
-      ocorrencias_por_bioma: occBioma.rows,
+      especies_por_bioma: especiesBioma.rows,
       ocorrencias_por_ano: occAno.rows,
       ucs_por_categoria: ucsCategoria.rows,
     });
