@@ -42,6 +42,9 @@ router.get('/', async (req, res, next) => {
 
       const { rows } = await query(
         `SELECT e.id, e.nome_cientifico, e.nome_popular, e.categoria_ameaca, e.imagem_url,
+                (SELECT AVG(o.confianca_ia)::float
+                 FROM ocorrencia o
+                 WHERE o.especie_id = e.id AND o.confianca_ia IS NOT NULL) AS confianca_ia,
                 COUNT(*) OVER() AS full_count
          FROM especie e
          WHERE ${searchConditions.join(' AND ')}
@@ -89,6 +92,9 @@ router.get('/', async (req, res, next) => {
 
     const { rows } = await query(
       `SELECT e.id, e.nome_cientifico, e.nome_popular, e.categoria_ameaca, e.imagem_url,
+              (SELECT AVG(o.confianca_ia)::float
+               FROM ocorrencia o
+               WHERE o.especie_id = e.id AND o.confianca_ia IS NOT NULL) AS confianca_ia,
               COUNT(*) OVER() AS full_count
        FROM especie e
        ${where}
@@ -115,7 +121,10 @@ router.get('/:id', validateId, async (req, res, next) => {
     const { rows: espRows } = await query(
       `SELECT e.id, e.nome_cientifico, e.nome_popular, e.categoria_ameaca,
               e.descricao, e.imagem_url, e.status, e.criado_em, e.atualizado_em,
-              g.id AS genero_id, g.nome AS genero_nome
+              g.id AS genero_id, g.nome AS genero_nome,
+              (SELECT AVG(o.confianca_ia)::float
+               FROM ocorrencia o
+               WHERE o.especie_id = e.id AND o.confianca_ia IS NOT NULL) AS confianca_ia
        FROM especie e
        JOIN taxon g ON g.id = e.genero_id
        WHERE e.id = $1`,

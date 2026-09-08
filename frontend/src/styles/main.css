@@ -893,6 +893,22 @@ a, button { transition: all 0.2s ease; }
   color: var(--text-secondary);
 }
 
+.species-confidence {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  background: var(--green-primary);
+  color: #fff;
+  font-weight: 600;
+}
+
+.species-confidence-inline {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  display: block;
+  margin-top: 4px;
+}
+
 .species-tabs { display: flex; gap: 8px; border-bottom: 2px solid var(--border); margin-bottom: 28px; }
 .species-tabs .tab {
   background: none;

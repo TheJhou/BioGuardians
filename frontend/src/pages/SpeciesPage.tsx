@@ -208,6 +208,9 @@ export default function SpeciesPage() {
                   <span className="species-scientific">{s.nome_cientifico}</span>
                 )}
                 <span className={`cat-badge cat-${s.categoria_ameaca.toLowerCase()}`}>{CATEGORY_LABELS[s.categoria_ameaca] || s.categoria_ameaca}</span>
+                {s.confianca_ia != null && (
+                  <span className="species-confidence-inline">Confiança IA: {Math.round(s.confianca_ia * 100)}%</span>
+                )}
               </div>
             </div>
           ))}
@@ -245,6 +248,9 @@ export default function SpeciesPage() {
                 <div className="species-badges">
                   <span className={`cat-badge cat-${selected.categoria_ameaca.toLowerCase()}`}>{CATEGORY_LABELS[selected.categoria_ameaca] || selected.categoria_ameaca}</span>
                   <span className="species-source" title="MMA — Ministério do Meio Ambiente">MMA — Ministério do Meio Ambiente</span>
+                  {selected.confianca_ia != null && (
+                    <span className="species-confidence">IA: {Math.round(selected.confianca_ia * 100)}%</span>
+                  )}
                 </div>
               </div>
             </div>

@@ -46,6 +46,7 @@ export interface Especie {
   imagem_url?: string | null;
   genero_id?: number;
   genero_nome?: string;
+  confianca_ia?: number | null;
   biomas?: Bioma[];
   estados?: Estado[];
 }
