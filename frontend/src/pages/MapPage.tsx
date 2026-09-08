@@ -1,9 +1,12 @@
-﻿import { useState } from 'react';
+﻿import { useState, useEffect } from 'react';
 import MapView from '../components/MapView.js';
+import OccurrencePanel from '../components/OccurrencePanel.js';
+import AreaPanel from '../components/AreaPanel.js';
 import DropdownSelect from '../components/DropdownSelect.js';
 import SpeciesSearch from '../components/SpeciesSearch.js';
 import { ESTADO_OPTIONS, FONTE_LABELS, FONTE_OPTIONS, CATEGORY_OPTIONS } from '../constants/index.js';
-import type { Especie } from '../types/index.js';
+import { api } from '../api/client.js';
+import type { Especie, OcorrenciaProperties, EspecieEmArea } from '../types/index.js';
 
 interface MapFilters {
   categoria?: string;
@@ -39,6 +42,21 @@ export default function MapPage() {
   const [selectedEspecies, setSelectedEspecies] = useState<SelectedEspecie[]>([]);
   const [searchResetKey, setSearchResetKey] = useState(0);
 
+  // Painéis inferiores
+  const [selectedOcorrencia, setSelectedOcorrencia] = useState<OcorrenciaProperties | null>(null);
+  const [selectedArea, setSelectedArea] = useState<{ id: number; nome: string } | null>(null);
+  const [selectedAreaSpecies, setSelectedAreaSpecies] = useState<EspecieEmArea[]>([]);
+
+  useEffect(() => {
+    if (!selectedArea) {
+      setSelectedAreaSpecies([]);
+      return;
+    }
+    api.getEspeciesEmArea(selectedArea.id)
+      .then(setSelectedAreaSpecies)
+      .catch(() => setSelectedAreaSpecies([]));
+  }, [selectedArea]);
+
   const handleApply = () => {
     setApplied(draft);
   };
@@ -48,6 +66,8 @@ export default function MapPage() {
     setApplied(defaultFilters);
     setLayers(defaultLayers);
     setSelectedEspecies([]);
+    setSelectedOcorrencia(null);
+    setSelectedArea(null);
     setSearchResetKey((k) => k + 1);
   };
 
@@ -69,6 +89,16 @@ export default function MapPage() {
 
   const removeEspecie = (id: number) => {
     setSelectedEspecies((prev) => prev.filter((e) => e.id !== id));
+  };
+
+  const handleSelectOcorrencia = (ocorrencia: OcorrenciaProperties) => {
+    setSelectedArea(null);
+    setSelectedOcorrencia(ocorrencia);
+  };
+
+  const handleSelectArea = (area: { id: number; nome: string }) => {
+    setSelectedOcorrencia(null);
+    setSelectedArea(area);
   };
 
   return (
@@ -191,7 +221,28 @@ export default function MapPage() {
           filters={applied}
           layers={layers}
           selectedEspecieIds={selectedEspecies.map((e) => e.id)}
+          onSelectOcorrencia={handleSelectOcorrencia}
+          onSelectArea={handleSelectArea}
         />
+
+        {selectedOcorrencia && (
+          <OccurrencePanel
+            ocorrencia={selectedOcorrencia}
+            onClose={() => setSelectedOcorrencia(null)}
+          />
+        )}
+
+        {selectedArea && (
+          <AreaPanel
+            areaId={selectedArea.id}
+            areaName={selectedArea.nome}
+            species={selectedAreaSpecies}
+            onClose={() => {
+              setSelectedArea(null);
+              setSelectedAreaSpecies([]);
+            }}
+          />
+        )}
       </div>
     </div>
   );
