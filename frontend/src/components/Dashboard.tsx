@@ -165,21 +165,10 @@ export default function Dashboard() {
 
         <div className="dashboard-card">
           <h3 className="card-title">Espécies Ameaçadas</h3>
-          <div className="threat-chart">
-            <Doughnut data={{
-              labels: ['Ameaçadas', 'Outras'],
-              datasets: [{
-                data: [ameacadas, Math.max(0, stats.total_especies - ameacadas)],
-                backgroundColor: ['#16A36A', '#E3E9E5'],
-                borderWidth: 0,
-              }],
-            }} options={{ responsive: true, cutout: '75%', plugins: { legend: { display: false } } }} />
-            <div className="threat-center">
-              <span className="big">{ameacadas}</span>
-              <span>espécies</span>
-            </div>
+          <div className="threat-number">
+            <span className="big">{ameacadas}</span>
+            <span className="threat-subtitle">CR / EN / VU / NT</span>
           </div>
-          <p className="threat-pct">{((ameacadas / (stats.total_especies || 1)) * 100).toFixed(0)}% do total</p>
         </div>
       </div>
     </div>
