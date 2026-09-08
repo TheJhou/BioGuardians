@@ -9,7 +9,7 @@ const router = Router();
 router.get('/', cacheMiddleware(undefined, () => 60_000), async (_req, res, next) => {
   try {
     const [stats, ranking, ucsEsfera, especiesUc, especiesBioma, occAno, ucsCategoria] = await Promise.all([
-      query('SELECT * FROM dashboard_stats'),
+      query('SELECT total_especies::int, total_cr::int, total_en::int, total_vu::int, total_nt::int, total_lc::int, total_dd::int, total_areas::int, area_total_ha::float, total_ocorrencias::int FROM dashboard_stats'),
       query('SELECT * FROM ranking_especies_categoria'),
       query('SELECT * FROM ucs_por_esfera'),
       query('SELECT * FROM especies_por_uc ORDER BY area_nome, nome_cientifico'),
