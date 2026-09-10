@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 
 const navItems = [
   { to: '/home', label: 'Home' },
@@ -11,9 +11,20 @@ const navItems = [
 
 export default function Header() {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const navigate = useNavigate();
+
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    if (query.trim()) {
+      navigate(`/especies?busca=${encodeURIComponent(query.trim())}`);
+      setQuery('');
+      setOpen(false);
+    }
+  }
 
   return (
-    <header className="app-header">
+    <header className="app-header app-header--dark">
       <div className="header-brand">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
           <path d="M12 2C7.5 4 4 8 4 13c0 4.5 3.5 8 8 8s8-3.5 8-8c0-5-3.5-9-8-11z" fill="#16A36A"/>
@@ -30,6 +41,23 @@ export default function Header() {
         ))}
       </nav>
 
+      <form className="header-search" onSubmit={handleSearch} role="search">
+        <input
+          type="search"
+          className="header-search-input"
+          placeholder="Buscar espécies, áreas..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          aria-label="Buscar"
+        />
+      </form>
+
+      <div className="header-right">
+        <button className="header-btn" type="button" onClick={() => navigate('/dashboard')}>
+          Acessar dados
+        </button>
+      </div>
+
       <button
         className="header-menu-toggle"
         aria-label={open ? 'Fechar menu' : 'Abrir menu'}
@@ -43,6 +71,16 @@ export default function Header() {
 
       {open && (
         <nav className="header-nav-mobile" aria-label="Navegação mobile">
+          <form className="header-search header-search--mobile" onSubmit={handleSearch} role="search">
+            <input
+              type="search"
+              className="header-search-input"
+              placeholder="Buscar espécies, áreas..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              aria-label="Buscar"
+            />
+          </form>
           {navItems.map((item) => (
             <NavLink
               key={item.to}
@@ -54,6 +92,13 @@ export default function Header() {
               {item.label}
             </NavLink>
           ))}
+          <button
+            className="header-btn header-btn--mobile"
+            type="button"
+            onClick={() => { navigate('/dashboard'); setOpen(false); }}
+          >
+            Acessar dados
+          </button>
         </nav>
       )}
     </header>
