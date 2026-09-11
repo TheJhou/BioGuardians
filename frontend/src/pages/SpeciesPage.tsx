@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { api } from '../api/client.js';
-import ImageWithSkeleton from '../components/ImageWithSkeleton.js';
+import { LazyImage } from '../lib/lazy-image';
+import { useScrollReveal } from '../lib/scroll-reveal';
 import { CATEGORY_LABELS } from '../constants/index.js';
 import StatCard from '../components/ui/StatCard.js';
 import type { Especie, OcorrenciaProperties, PaginatedResponse } from '../types/index.js';
@@ -32,6 +33,7 @@ export default function SpeciesPage() {
   const listRef = useRef<HTMLDivElement | null>(null);
   const detailRef = useRef<HTMLElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const revealRef = useScrollReveal<HTMLDivElement>({ offset: 16, stagger: 15, duration: 180, instantOnLoad: false }, [items.length > 0]);
   const pageRef = useRef(1);
   const isFetchingRef = useRef(false);
 
@@ -184,16 +186,17 @@ export default function SpeciesPage() {
           <button onClick={handleSearch} className="filter-apply">Buscar</button>
         </div>
 
-        <div className="species-list" ref={listRef} onScroll={handleScroll}>
+        <div className="species-list" ref={(el) => { listRef.current = el; revealRef.current = el; }} onScroll={handleScroll}>
           {items.map((s) => (
             <div
               key={s.id}
               className={`species-item ${selected?.id === s.id ? 'active' : ''}`}
               onClick={() => selectSpecies(s)}
+              data-reveal
             >
               <div className="species-avatar">
                 {s.imagem_url ? (
-                  <ImageWithSkeleton
+                  <LazyImage
                     src={s.imagem_url}
                     alt={s.nome_cientifico}
                     skeletonClassName="species-avatar-skeleton"
@@ -232,7 +235,7 @@ export default function SpeciesPage() {
             <div className="species-detail-header">
               <div className="species-image">
                 {selected.imagem_url ? (
-                  <ImageWithSkeleton
+                  <LazyImage
                     src={selected.imagem_url}
                     alt={selected.nome_cientifico}
                     className="species-detail-img"
@@ -296,7 +299,7 @@ export default function SpeciesPage() {
                         <li key={i} className="occurrence-list-item">
                           <div className="occurrence-list-image">
                             {o.imagem_url ? (
-                              <img src={o.imagem_url} alt={o.nome_cientifico} />
+                              <LazyImage src={o.imagem_url} alt={o.nome_cientifico} skeletonClassName="occurrence-image-skeleton" />
                             ) : (
                               <div className="occurrence-list-placeholder" />
                             )}

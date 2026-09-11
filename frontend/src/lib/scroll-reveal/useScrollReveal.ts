@@ -11,6 +11,14 @@ export interface ScrollRevealOptions {
   rootMargin?: string;
   /** Distância (px) do translateY na animação. Default: 60 */
   offset?: number;
+  /** Duração da transição em ms. Default: 300 */
+  duration?: number;
+  /**
+   * Se true (default), elementos visíveis no primeiro batch aparecem sem
+   * animar (entrada de página). Se false, o primeiro batch anima também —
+   * útil para listas que só populam quando dados chegam via API.
+   */
+  instantOnLoad?: boolean;
 }
 
 /** Remove a flag de exibição instantânea após dois frames, liberando animações futuras. */
@@ -35,6 +43,7 @@ function clearInstantFlags(root: HTMLElement) {
  */
 export function useScrollReveal<T extends HTMLElement = HTMLDivElement>(
   options: ScrollRevealOptions = {},
+  deps: unknown[] = [],
 ) {
   const {
     stagger = 50,
@@ -42,6 +51,8 @@ export function useScrollReveal<T extends HTMLElement = HTMLDivElement>(
     threshold = 0.1,
     rootMargin = '0px 0px -20px 0px',
     offset = 60,
+    duration = 300,
+    instantOnLoad = true,
   } = options;
 
   const ref = useRef<T>(null);
@@ -50,12 +61,19 @@ export function useScrollReveal<T extends HTMLElement = HTMLDivElement>(
     const root = ref.current;
     if (!root) return;
 
-    const els = root.querySelectorAll<HTMLElement>('[data-reveal]');
-    els.forEach((el, i) => {
+    const seen = new Set<HTMLElement>();
+    let count = 0;
+    const prepare = (el: HTMLElement) => {
+      if (seen.has(el)) return;
+      seen.add(el);
       el.classList.add('sr-reveal');
       el.style.setProperty('--sr-offset', `${offset}px`);
-      el.style.transitionDelay = `${(i % groupSize) * stagger}ms`;
-    });
+      el.style.setProperty('--sr-duration', `${duration}ms`);
+      el.style.transitionDelay = `${(count++ % groupSize) * stagger}ms`;
+    };
+
+    const els = root.querySelectorAll<HTMLElement>('[data-reveal]');
+    els.forEach(prepare);
 
     let initial = true;
 
@@ -66,7 +84,7 @@ export function useScrollReveal<T extends HTMLElement = HTMLDivElement>(
         const el = entry.target as HTMLElement;
 
         if (entry.isIntersecting) {
-          if (initial) el.classList.add('sr-instant');
+          if (initial && instantOnLoad) el.classList.add('sr-instant');
           el.classList.add('sr-visible');
           el.classList.remove('sr-from-top');
         } else {
@@ -83,8 +101,29 @@ export function useScrollReveal<T extends HTMLElement = HTMLDivElement>(
     }, { threshold, rootMargin });
 
     els.forEach((el) => obs.observe(el));
-    return () => obs.disconnect();
-  }, [stagger, groupSize, threshold, rootMargin, offset]);
+
+    // Observa [data-reveal] adicionados depois (listas dinâmicas / infinite scroll)
+    const watchNode = (node: Node) => {
+      if (!(node instanceof HTMLElement)) return;
+      const fresh: HTMLElement[] = [];
+      if (node.matches('[data-reveal]')) fresh.push(node);
+      node.querySelectorAll('[data-reveal]').forEach((el) => fresh.push(el as HTMLElement));
+      fresh.forEach((el) => {
+        prepare(el);
+        obs.observe(el);
+      });
+    };
+
+    const mo = new MutationObserver((mutations) => {
+      mutations.forEach((m) => m.addedNodes.forEach(watchNode));
+    });
+    mo.observe(root, { childList: true, subtree: true });
+
+    return () => {
+      obs.disconnect();
+      mo.disconnect();
+    };
+  }, [stagger, groupSize, threshold, rootMargin, offset, duration, instantOnLoad, ...deps]);
 
   return ref;
 }

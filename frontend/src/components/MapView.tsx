@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef, memo } from 'react';
 import { Map, Source, Layer, NavigationControl } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { api } from '../api/client.js';
@@ -40,7 +40,7 @@ function buildMatchExpression(inputProperty: string, pairs: Record<string, strin
   return ['match', ['get', inputProperty], ...stops, fallback];
 }
 
-export default function MapView({
+function MapView({
   filters,
   layers,
   selectedEspecieIds,
@@ -65,6 +65,9 @@ export default function MapView({
     [selectedEspecieIds, filters.categoria, filters.fonte]
   );
 
+  const areaTiles = useMemo(() => [areaTilesUrl], [areaTilesUrl]);
+  const ocorrenciaTiles = useMemo(() => [ocorrenciasTilesUrl], [ocorrenciasTilesUrl]);
+
   const handleClick = useCallback((evt: any) => {
     const features: any[] = evt.features || [];
     const areaFeature = features.find((f) => f.layer.id === 'areas-fill');
@@ -88,10 +91,10 @@ export default function MapView({
     setMapReady(true);
   }, []);
 
-  const interactiveLayerIds = [
+  const interactiveLayerIds = useMemo(() => [
     ...(layers.unidades ? ['areas-fill'] : []),
     ...(layers.ocorrencias ? ['ocorrencias-circle'] : []),
-  ];
+  ], [layers.unidades, layers.ocorrencias]);
 
   return (
     <div className="map-container" style={{ width: '100%', height: '100%' }}>
@@ -120,7 +123,7 @@ export default function MapView({
             key={areaTilesUrl}
             id="areas"
             type="vector"
-            tiles={[areaTilesUrl]}
+            tiles={areaTiles}
             minzoom={0}
             maxzoom={14}
           >
@@ -145,7 +148,7 @@ export default function MapView({
             key={ocorrenciasTilesUrl}
             id="ocorrencias"
             type="vector"
-            tiles={[ocorrenciasTilesUrl]}
+            tiles={ocorrenciaTiles}
             minzoom={0}
             maxzoom={14}
           >
@@ -167,3 +170,5 @@ export default function MapView({
     </div>
   );
 }
+
+export default memo(MapView);

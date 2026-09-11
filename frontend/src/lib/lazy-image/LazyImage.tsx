@@ -1,20 +1,30 @@
-import { useState } from 'react';
+import { useState, type CSSProperties, type SyntheticEvent } from 'react';
 
-interface ImageWithSkeletonProps {
+interface LazyImageProps {
   src: string | undefined;
   alt: string;
   className?: string;
   skeletonClassName?: string;
-  onError?: (e: React.SyntheticEvent<HTMLImageElement>) => void;
+  style?: CSSProperties;
+  /** 'lazy' (default) adia o download até a imagem se aproximar da viewport. 'eager' para imagens acima da dobra. */
+  loading?: 'lazy' | 'eager';
+  onError?: (e: SyntheticEvent<HTMLImageElement>) => void;
 }
 
-export default function ImageWithSkeleton({
+/**
+ * Imagem com lazy loading nativo, decode assíncrono e skeleton de placeholder
+ * enquanto carrega. `loading="lazy"` é o padrão — use `eager` apenas para
+ * imagens visíveis logo na primeira dobra da página.
+ */
+export default function LazyImage({
   src,
   alt,
   className = '',
   skeletonClassName = '',
+  loading = 'lazy',
   onError,
-}: ImageWithSkeletonProps) {
+  style,
+}: LazyImageProps) {
   const [loaded, setLoaded] = useState(false);
 
   if (!src) {
@@ -34,12 +44,14 @@ export default function ImageWithSkeleton({
         src={src}
         alt={alt}
         className={className}
+        loading={loading}
+        decoding="async"
         onLoad={() => setLoaded(true)}
         onError={(e) => {
           setLoaded(true);
           onError?.(e);
         }}
-        style={{ opacity: loaded ? 1 : 0, transition: 'opacity 0.2s ease' }}
+        style={{ ...style, opacity: loaded ? (style?.opacity ?? 1) : 0, transition: 'opacity 0.2s ease' }}
       />
     </div>
   );
