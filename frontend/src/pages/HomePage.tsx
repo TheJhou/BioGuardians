@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client.js';
+import Header from '../components/layout/Header.js';
 import type { DashboardStats } from '../types/index.js';
 
 const platformCards = [
@@ -49,6 +50,7 @@ export default function HomePage() {
 
   return (
     <div className="home-page">
+      <Header />
       {/* ===== Seção 1 — Hero + Features + Stats ===== */}
       <section className="home-section home-section--hero">
         <div className="hero-content">
@@ -128,7 +130,7 @@ export default function HomePage() {
         {/* --- Explore a plataforma --- */}
         <div className="section-block">
           <span className="section-eyebrow">Explore a plataforma</span>
-          <h2 className="section-heading">Tudo sobre a biodiversidade, em um só lugar.</h2>
+          <h2 className="section-heading">Tudo sobre a biodiversidade,<br />em um só lugar.</h2>
           <p className="section-subtitle">
             Acesse mapas interativos, conheça espécies, explore áreas de conservação
             e gere insights a partir de dados confiáveis.
