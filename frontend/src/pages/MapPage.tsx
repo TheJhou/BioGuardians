@@ -5,6 +5,7 @@ import OccurrencePanel from '../components/OccurrencePanel.js';
 import AreaPanel from '../components/AreaPanel.js';
 import DropdownSelect from '../components/DropdownSelect.js';
 import SpeciesSearch from '../components/SpeciesSearch.js';
+import GlowButton from '../components/GlowButton.js';
 import CosmicToggle from '../components/CosmicToggle.js';
 import { FONTE_LABELS, FONTE_OPTIONS, CATEGORY_OPTIONS } from '../constants/index.js';
 import { api } from '../api/client.js';
@@ -203,9 +204,9 @@ export default function MapPage() {
             </div>
           </div>
 
-          <button className="map-clear-btn" onClick={handleClear}>
+          <GlowButton className="map-clear-btn" onClick={handleClear}>
             Limpar
-          </button>
+          </GlowButton>
 
           <MapLegend />
         </aside>

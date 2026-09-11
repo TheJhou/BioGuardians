@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef, memo } from 'react';
+import { useState, useCallback, useMemo, memo } from 'react';
 import { Map, Source, Layer, NavigationControl } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { api } from '../api/client.js';
@@ -48,8 +48,6 @@ function MapView({
   onSelectArea,
 }: MapViewProps) {
   const [error, setError] = useState<string | null>(null);
-  const [mapReady, setMapReady] = useState(false);
-  const idleRef = useRef(false);
 
   const areaTilesUrl = useMemo(
     () => api.getAreaTilesUrl({ esfera: filters.esfera }),
@@ -85,12 +83,6 @@ function MapView({
     }
   }, [onSelectOcorrencia, onSelectArea]);
 
-  const handleIdle = useCallback(() => {
-    if (idleRef.current) return;
-    idleRef.current = true;
-    setMapReady(true);
-  }, []);
-
   const interactiveLayerIds = useMemo(() => [
     ...(layers.unidades ? ['areas-fill'] : []),
     ...(layers.ocorrencias ? ['ocorrencias-circle'] : []),
@@ -99,20 +91,15 @@ function MapView({
   return (
     <div className="map-container" style={{ width: '100%', height: '100%' }}>
       {error && <div className="map-overlay map-error-inline">Erro: {error}</div>}
-      {!error && !mapReady && (
-        <div className="map-overlay map-skeleton">
-          <div className="map-skeleton-ring" />
-          <span>Carregando camadas do mapa...</span>
-        </div>
-      )}
 
       <Map
         initialViewState={INITIAL_VIEW}
         style={{ width: '100%', height: '100%' }}
-        mapStyle={`https://api.maptiler.com/maps/streets/style.json?key=${MAPTILER_API_KEY}`}
+        mapStyle={`https://api.maptiler.com/maps/hybrid/style.json?key=${MAPTILER_API_KEY}`}
+        fadeDuration={0}
+        maxTileCacheSize={1000}
         onClick={handleClick}
         onError={(evt) => setError(String(evt.error?.message ?? evt.error) || 'Falha ao carregar o mapa. Verifique a chave do MapTiler.')}
-        onIdle={handleIdle}
         interactiveLayerIds={interactiveLayerIds}
       >
         <NavigationControl position="top-right" />

@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useSearchParams, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { LazyImage } from '../lib/lazy-image';
 import { useScrollReveal } from '../lib/scroll-reveal';
 import { CATEGORY_LABELS } from '../constants/index.js';
 import StatCard from '../components/ui/StatCard.js';
+import GlowSearch from '../components/GlowSearch.js';
 import type { Especie, OcorrenciaProperties, PaginatedResponse } from '../types/index.js';
 
 const TABS = ['Sobre', 'Ocorrências', 'Unidades de Conservação'] as const;
@@ -12,7 +13,6 @@ const PER_PAGE = 15;
 
 export default function SpeciesPage() {
   const { id } = useParams<{ id?: string }>();
-  const [searchParams, setSearchParams] = useSearchParams();
 
   const [items, setItems] = useState<Especie[]>([]);
   const [selected, setSelected] = useState<Especie | null>(null);
@@ -21,15 +21,17 @@ export default function SpeciesPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [total, setTotal] = useState(0);
-  const [search, setSearch] = useState(searchParams.get('busca') || '');
+  const [search, setSearch] = useState('');
   const [ocorrencias, setOcorrencias] = useState<OcorrenciaProperties[]>([]);
   const [loadingOcorrencias, setLoadingOcorrencias] = useState(false);
   const [hasMoreOcorrencias, setHasMoreOcorrencias] = useState(true);
   const [totalOcorrencias, setTotalOcorrencias] = useState(0);
   const ocorrenciaPageRef = useRef(1);
   const isFetchingOcorrenciasRef = useRef(false);
+  const scrollOnSelectRef = useRef(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const buscaRef = useRef<string | undefined>(undefined);
 
-  const busca = searchParams.get('busca') || undefined;
   const listRef = useRef<HTMLDivElement | null>(null);
   const detailRef = useRef<HTMLElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -37,7 +39,7 @@ export default function SpeciesPage() {
   const pageRef = useRef(1);
   const isFetchingRef = useRef(false);
 
-  const load = useCallback(async (pageToLoad: number, append: boolean) => {
+  const load = useCallback(async (pageToLoad: number, append: boolean, busca?: string) => {
     if (isFetchingRef.current) return;
     isFetchingRef.current = true;
 
@@ -70,14 +72,14 @@ export default function SpeciesPage() {
       setLoadingMore(false);
       isFetchingRef.current = false;
     }
-  }, [busca, id]);
+  }, [id]);
 
   useEffect(() => {
     pageRef.current = 1;
     setItems([]);
     setHasMore(true);
-    load(1, false);
-  }, [busca, load]);
+    load(1, false, buscaRef.current);
+  }, [load]);
 
   const loadRef = useRef(load);
   loadRef.current = load;
@@ -92,7 +94,7 @@ export default function SpeciesPage() {
         const [entry] = entries;
         if (entry.isIntersecting && !isFetchingRef.current) {
           const nextPage = pageRef.current + 1;
-          loadRef.current(nextPage, true);
+          loadRef.current(nextPage, true, buscaRef.current);
         }
       },
       { root: list, rootMargin: '80px', threshold: 0.1 }
@@ -108,16 +110,25 @@ export default function SpeciesPage() {
     const nearBottom = list.scrollTop + list.clientHeight >= list.scrollHeight - 120;
     if (nearBottom) {
       const nextPage = pageRef.current + 1;
-      loadRef.current(nextPage, true);
+      loadRef.current(nextPage, true, buscaRef.current);
     }
   };
 
-  const handleSearch = () => {
-    if (search) setSearchParams({ busca: search });
-    else setSearchParams({});
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      const term = value.trim() || undefined;
+      buscaRef.current = term;
+      pageRef.current = 1;
+      setItems([]);
+      setHasMore(true);
+      load(1, false, term);
+    }, 350);
   };
 
   const selectSpecies = async (s: Especie) => {
+    scrollOnSelectRef.current = true;
     try {
       const detail = await api.getEspecie(s.id);
       setSelected(detail);
@@ -127,9 +138,15 @@ export default function SpeciesPage() {
   };
 
   useEffect(() => {
+    if (!scrollOnSelectRef.current) return;
+    scrollOnSelectRef.current = false;
     if (!selected || !detailRef.current || window.innerWidth > 768) return;
     detailRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [selected]);
+
+  useEffect(() => {
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, []);
 
   const loadOcorrencias = useCallback(async (pageToLoad: number, append: boolean) => {
     if (!selected || isFetchingOcorrenciasRef.current) return;
@@ -174,16 +191,12 @@ export default function SpeciesPage() {
   return (
     <div className="species-page">
       <aside className="species-list-panel">
-        <Link to="/especies" className="species-back">← Espécies</Link>
         <div className="species-search">
-          <input
-            type="text"
+          <GlowSearch
             placeholder="Buscar espécie..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            onChange={handleSearchChange}
           />
-          <button onClick={handleSearch} className="filter-apply">Buscar</button>
         </div>
 
         <div className="species-list" ref={(el) => { listRef.current = el; revealRef.current = el; }} onScroll={handleScroll}>

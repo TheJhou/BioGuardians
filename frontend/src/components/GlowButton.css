@@ -1,0 +1,19 @@
+.gbtn { width: 100%; }
+
+.gbtn .gfx-dark-bg { height: 36px; filter: blur(3px); opacity: 0; }
+.gbtn .gfx-glow    { height: 70px; filter: blur(24px); opacity: 0.4; }
+.gbtn .gfx-white   { height: 33px; filter: blur(2px); }
+.gbtn .gfx-border  { height: 31px; filter: blur(0.5px); }
+
+.gbtn-btn {
+  position: relative;
+  z-index: 1;
+  background: var(--green-darker);
+  border: none;
+  border-radius: 8px;
+  color: var(--text-on-dark);
+  padding: 7px 12px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  width: 100%;
+}

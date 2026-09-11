@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import GlowSearch from './GlowSearch';
 import { api } from '../api/client.js';
 import type { Especie } from '../types/index.js';
 
@@ -83,13 +84,11 @@ export default function SpeciesSearch({ onSelect }: SpeciesSearchProps) {
 
   return (
     <div className="species-search-map" ref={wrapRef}>
-      <input
-        type="text"
-        className="filter-input"
-        placeholder="Ex: onça, arara, jacaré..."
+      <GlowSearch
         value={search}
-        onChange={(e) => handleInput(e.target.value)}
+        onChange={handleInput}
         onFocus={() => { if (results.length > 0) setOpen(true); }}
+        placeholder="Ex: onça, arara, jacaré..."
       />
       {loading && results.length === 0 && <span className="species-search-hint">Buscando...</span>}
 
