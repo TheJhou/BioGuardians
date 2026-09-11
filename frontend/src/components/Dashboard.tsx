@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import iconPage from '../images/icon-page.png';
 import { Doughnut, Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -257,7 +258,7 @@ useEffect(() => {
         <div className="dashboard-sidebar-copy">
           <p>Conhecimento hoje.<br /><strong>Conservação sempre.</strong></p>
           <div className="dashboard-sidebar-brand">
-            <span className="dashboard-sidebar-brand-mark">◐</span>
+            <img className="dashboard-sidebar-brand-mark" src={iconPage} alt="" width="24" height="24" />
             <span>BioGuardians</span>
           </div>
         </div>
@@ -404,7 +405,7 @@ useEffect(() => {
         </div>
 
         <footer className="dashboard-footer">
-          <span>◐ BioGuardians · Dados abertos. Natureza viva.</span>
+          <span><img className="dashboard-footer-logo" src={iconPage} alt="" width="16" height="16" /> BioGuardians · Dados abertos. Natureza viva.</span>
           <span>Ciência · Conservação · Tecnologia · Brasil</span>
         </footer>
       </div>

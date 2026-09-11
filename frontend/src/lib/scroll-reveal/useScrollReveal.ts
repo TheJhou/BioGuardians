@@ -80,11 +80,19 @@ export function useScrollReveal<T extends HTMLElement = HTMLDivElement>(
     const obs = new IntersectionObserver((entries) => {
       const rootTop = root.getBoundingClientRect().top;
 
+      // Muitos itens entrando no mesmo callback = scroll rápido —
+      // encurta delay/duração pra lista acompanhar o ritmo.
+      const fastBatch = entries.filter((e) => e.isIntersecting).length > groupSize;
+
       entries.forEach((entry) => {
         const el = entry.target as HTMLElement;
 
         if (entry.isIntersecting) {
           if (initial && instantOnLoad) el.classList.add('sr-instant');
+          if (fastBatch) {
+            el.style.transitionDelay = '0ms';
+            el.style.setProperty('--sr-duration', `${Math.min(duration, 120)}ms`);
+          }
           el.classList.add('sr-visible');
           el.classList.remove('sr-from-top');
         } else {
