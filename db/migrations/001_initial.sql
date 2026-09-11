@@ -235,9 +235,6 @@ CREATE TABLE IF NOT EXISTS log_auditoria (
     dados_novos      JSONB
 );
 
--- registro_id precisa aceitar PKs BIGINT (imagem_job, log_auditoria)
-ALTER TABLE log_auditoria ALTER COLUMN registro_id TYPE BIGINT;
-
 -- ---------- ML: jobs, detecções, checkpoint de imagens ----------
 CREATE TABLE IF NOT EXISTS deteccao_job (
     id                   INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -328,9 +325,6 @@ ALTER TABLE deteccao ADD COLUMN IF NOT EXISTS metodo_classificacao VARCHAR(20) N
 ALTER TABLE deteccao ADD COLUMN IF NOT EXISTS modelo_ia VARCHAR(100);
 ALTER TABLE deteccao ADD COLUMN IF NOT EXISTS confianca_ia NUMERIC(5,4);
 ALTER TABLE deteccao ADD COLUMN IF NOT EXISTS status deteccao_status NOT NULL DEFAULT 'detected';
--- Coluna espacial + backfill (consultas geográficas em detecções)
-ALTER TABLE deteccao ADD COLUMN IF NOT EXISTS geom geometry(POINT, 4326);
-UPDATE deteccao SET geom = ST_SetSRID(ST_MakePoint(lon, lat), 4326) WHERE geom IS NULL;
 
 CREATE TABLE IF NOT EXISTS modelo_ml (
     id        INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -377,7 +371,6 @@ CREATE INDEX IF NOT EXISTS idx_deteccao_job             ON deteccao(job_id);
 CREATE INDEX IF NOT EXISTS idx_deteccao_job_status      ON deteccao_job(status, criado_em DESC);
 CREATE INDEX IF NOT EXISTS idx_deteccao_job_source      ON deteccao_job(source, status, criado_em DESC);
 CREATE INDEX IF NOT EXISTS idx_deteccao_especie         ON deteccao(especie_id) WHERE especie_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_deteccao_geom            ON deteccao USING GIST (geom);
 CREATE INDEX IF NOT EXISTS idx_deteccao_metodo          ON deteccao(metodo_classificacao);
 CREATE INDEX IF NOT EXISTS idx_deteccao_status          ON deteccao(status);
 CREATE INDEX IF NOT EXISTS idx_deteccao_image_job       ON deteccao(image_job_id) WHERE image_job_id IS NOT NULL;
@@ -453,27 +446,12 @@ CREATE OR REPLACE FUNCTION refresh_dashboard()
     $$;
 
 -- ---------- Funções de trigger ----------
--- Sincronização bidirecional lat/lon <-> geom.
--- Se o UPDATE mexeu só em geom, deriva lat/lon; caso contrário reconstrói geom.
--- Usada por ocorrencia e deteccao.
-CREATE OR REPLACE FUNCTION trg_sincroniza_geom_latlon()
+CREATE OR REPLACE FUNCTION trg_ocorrencia_sincroniza_geom()
     RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
-    IF TG_OP = 'UPDATE'
-       AND NEW.geom IS DISTINCT FROM OLD.geom
-       AND NEW.lat IS NOT DISTINCT FROM OLD.lat
-       AND NEW.lon IS NOT DISTINCT FROM OLD.lon
-    THEN
-        NEW.lon := ST_X(NEW.geom);
-        NEW.lat := ST_Y(NEW.geom);
-    ELSE
-        NEW.geom := ST_SetSRID(ST_MakePoint(NEW.lon, NEW.lat), 4326);
-    END IF;
+    NEW.geom := ST_SetSRID(ST_MakePoint(NEW.lon, NEW.lat), 4326);
     RETURN NEW;
 END; $$;
-
--- Remove a função antiga (CASCADE derruba o trigger que depende dela — recriado abaixo)
-DROP FUNCTION IF EXISTS trg_ocorrencia_sincroniza_geom() CASCADE;
 
 CREATE OR REPLACE FUNCTION trg_area_valida_geom()
     RETURNS TRIGGER LANGUAGE plpgsql AS $$
@@ -498,7 +476,7 @@ CREATE OR REPLACE FUNCTION trg_auditar()
     RETURNS TRIGGER LANGUAGE plpgsql AS $$
 DECLARE
     v_op  operacao_auditoria_tipo;
-    v_id  BIGINT;
+    v_id  INTEGER;
     v_old JSONB;
     v_new JSONB;
 BEGIN
@@ -538,13 +516,8 @@ END; $$;
 -- ---------- Triggers (DROP + CREATE = idempotente) ----------
 DROP TRIGGER IF EXISTS trg_ocorrencia_geom ON ocorrencia;
 CREATE TRIGGER trg_ocorrencia_geom
-    BEFORE INSERT OR UPDATE OF lat, lon, geom ON ocorrencia
-    FOR EACH ROW EXECUTE FUNCTION trg_sincroniza_geom_latlon();
-
-DROP TRIGGER IF EXISTS trg_deteccao_geom ON deteccao;
-CREATE TRIGGER trg_deteccao_geom
-    BEFORE INSERT OR UPDATE OF lat, lon, geom ON deteccao
-    FOR EACH ROW EXECUTE FUNCTION trg_sincroniza_geom_latlon();
+    BEFORE INSERT OR UPDATE OF lat, lon ON ocorrencia
+    FOR EACH ROW EXECUTE FUNCTION trg_ocorrencia_sincroniza_geom();
 
 DROP TRIGGER IF EXISTS trg_area_protegida_geom ON area_protegida;
 CREATE TRIGGER trg_area_protegida_geom
@@ -596,38 +569,18 @@ DROP MATERIALIZED VIEW IF EXISTS dashboard_stats;
 CREATE MATERIALIZED VIEW dashboard_stats AS
 SELECT
     1 AS id,
-    s.total_especies,
-    s.total_cr,
-    s.total_en,
-    s.total_vu,
-    s.total_nt,
-    s.total_lc,
-    s.total_dd,
-    a.total_areas,
-    a.area_total_ha,
-    oc.total_ocorrencias
-FROM (
-    -- scan único em especie via agregação condicional
-    SELECT COUNT(*)                                              AS total_especies,
-           COUNT(*) FILTER (WHERE categoria_ameaca = 'CR')       AS total_cr,
-           COUNT(*) FILTER (WHERE categoria_ameaca = 'EN')       AS total_en,
-           COUNT(*) FILTER (WHERE categoria_ameaca = 'VU')       AS total_vu,
-           COUNT(*) FILTER (WHERE categoria_ameaca = 'NT')       AS total_nt,
-           COUNT(*) FILTER (WHERE categoria_ameaca = 'LC')       AS total_lc,
-           COUNT(*) FILTER (WHERE categoria_ameaca = 'DD')       AS total_dd
-    FROM especie
-    WHERE status = 'ativo'
-) s
-CROSS JOIN (
-    SELECT COUNT(*) AS total_areas, COALESCE(SUM(area_ha), 0) AS area_total_ha
-    FROM area_protegida
-) a
-CROSS JOIN (
-    SELECT COUNT(*) AS total_ocorrencias
-    FROM ocorrencia o
-    JOIN especie e ON e.id = o.especie_id
-    WHERE e.status = 'ativo'
-) oc;
+    (SELECT COUNT(*) FROM especie WHERE status = 'ativo')                              AS total_especies,
+    (SELECT COUNT(*) FROM especie WHERE status = 'ativo' AND categoria_ameaca = 'CR')  AS total_cr,
+    (SELECT COUNT(*) FROM especie WHERE status = 'ativo' AND categoria_ameaca = 'EN')  AS total_en,
+    (SELECT COUNT(*) FROM especie WHERE status = 'ativo' AND categoria_ameaca = 'VU')  AS total_vu,
+    (SELECT COUNT(*) FROM especie WHERE status = 'ativo' AND categoria_ameaca = 'NT')  AS total_nt,
+    (SELECT COUNT(*) FROM especie WHERE status = 'ativo' AND categoria_ameaca = 'LC')  AS total_lc,
+    (SELECT COUNT(*) FROM especie WHERE status = 'ativo' AND categoria_ameaca = 'DD')  AS total_dd,
+    (SELECT COUNT(*) FROM area_protegida)                                              AS total_areas,
+    (SELECT COALESCE(SUM(area_ha), 0) FROM area_protegida)                             AS area_total_ha,
+    (SELECT COUNT(*) FROM ocorrencia o
+      JOIN especie e ON e.id = o.especie_id
+     WHERE e.status = 'ativo')                                                         AS total_ocorrencias;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_dashboard_stats_unico ON dashboard_stats(id);
 
