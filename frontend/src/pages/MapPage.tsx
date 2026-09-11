@@ -30,10 +30,37 @@ const fonteOptions = FONTE_OPTIONS.map((f) => ({ value: f, label: FONTE_LABELS[f
 const categoriaOptions = CATEGORY_OPTIONS.map((c) => ({ value: c.codigo, label: c.nome }));
 const estadoOptions = ESTADO_OPTIONS.map((uf) => ({ value: uf, label: uf }));
 
+function MapLegend() {
+  return (
+    <div className="map-legend">
+      <h4>Legenda</h4>
+      <div className="legend-section">
+        <span className="legend-section-title">Unidades de Conservação</span>
+        <div className="legend-item"><span className="legend-dot dot-uc-fed"></span> Federal</div>
+        <div className="legend-item"><span className="legend-dot dot-uc-est"></span> Estadual</div>
+        <div className="legend-item"><span className="legend-dot dot-uc-mun"></span> Municipal</div>
+        <div className="legend-item"><span className="legend-dot dot-uc-part"></span> Particular</div>
+      </div>
+      <div className="legend-section">
+        <span className="legend-section-title">Ocorrências por Categoria</span>
+        <div className="legend-item"><span className="legend-dot" style={{ background: '#d32f2f' }}></span> CR — Criticamente em Perigo</div>
+        <div className="legend-item"><span className="legend-dot" style={{ background: '#f57c00' }}></span> EN — Entrando em Extinção</div>
+        <div className="legend-item"><span className="legend-dot" style={{ background: '#fbc02d' }}></span> VU — Alto Risco</div>
+        <div className="legend-item"><span className="legend-dot" style={{ background: '#689f38' }}></span> NT — Em Ameaça</div>
+        <div className="legend-item"><span className="legend-dot" style={{ background: '#388e3c' }}></span> LC — Sem Risco</div>
+        <div className="legend-item"><span className="legend-dot" style={{ background: '#757575' }}></span> DD — Sem Dados</div>
+        <div className="legend-item"><span className="legend-dot" style={{ background: '#90a4ae' }}></span> NE — Não Avaliada</div>
+      </div>
+    </div>
+  );
+}
+
 export default function MapPage() {
   const [draft, setDraft] = useState<MapFilters>(defaultFilters);
   const [applied, setApplied] = useState<MapFilters>(defaultFilters);
   const [layers, setLayers] = useState<MapLayers>(defaultLayers);
+  const [showFilters, setShowFilters] = useState(false);
+  const [showLegend, setShowLegend] = useState(false);
 
   // Estado — renderizado mas ainda não filtra (pendente definição)
   const [estado] = useState<string | null>(null);
@@ -103,7 +130,7 @@ export default function MapPage() {
 
   return (
     <div className="map-page">
-      <aside className="map-sidebar">
+      <aside className={`map-sidebar ${showFilters ? 'map-sidebar--open' : ''}`}>
         <h3 className="sidebar-title">Filtros</h3>
         <button className="map-clear-btn" onClick={handleClear}>
           Limpar
@@ -193,28 +220,29 @@ export default function MapPage() {
           Aplicar Filtros
         </button>
 
-        {/* Legenda */}
-        <div className="map-legend">
-          <h4>Legenda</h4>
-          <div className="legend-section">
-            <span className="legend-section-title">Unidades de Conservação</span>
-            <div className="legend-item"><span className="legend-dot dot-uc-fed"></span> Federal</div>
-            <div className="legend-item"><span className="legend-dot dot-uc-est"></span> Estadual</div>
-            <div className="legend-item"><span className="legend-dot dot-uc-mun"></span> Municipal</div>
-            <div className="legend-item"><span className="legend-dot dot-uc-part"></span> Particular</div>
-          </div>
-          <div className="legend-section">
-            <span className="legend-section-title">Ocorrências por Categoria</span>
-            <div className="legend-item"><span className="legend-dot" style={{ background: '#d32f2f' }}></span> CR — Criticamente em Perigo</div>
-            <div className="legend-item"><span className="legend-dot" style={{ background: '#f57c00' }}></span> EN — Entrando em Extinção</div>
-            <div className="legend-item"><span className="legend-dot" style={{ background: '#fbc02d' }}></span> VU — Alto Risco</div>
-            <div className="legend-item"><span className="legend-dot" style={{ background: '#689f38' }}></span> NT — Em Ameaça</div>
-            <div className="legend-item"><span className="legend-dot" style={{ background: '#388e3c' }}></span> LC — Sem Risco</div>
-            <div className="legend-item"><span className="legend-dot" style={{ background: '#757575' }}></span> DD — Sem Dados</div>
-            <div className="legend-item"><span className="legend-dot" style={{ background: '#90a4ae' }}></span> NE — Não Avaliada</div>
-          </div>
-        </div>
+        <MapLegend />
       </aside>
+
+      <div className="map-filters-bar">
+        <button
+          className={`map-filters-toggle ${showFilters ? 'active' : ''}`}
+          type="button"
+          onClick={() => { setShowFilters((s) => !s); setShowLegend(false); }}
+        >
+          {showFilters ? 'Sair' : 'Ver filtros'}
+        </button>
+        <button
+          className={`map-legend-toggle ${showLegend ? 'active' : ''}`}
+          type="button"
+          onClick={() => { setShowLegend((s) => !s); setShowFilters(false); }}
+        >
+          {showLegend ? 'Sair' : 'Ver legenda'}
+        </button>
+      </div>
+
+      <div className={`map-legend-panel ${showLegend ? 'map-legend-panel--open' : ''}`}>
+        <MapLegend />
+      </div>
 
       <div className="map-wrapper">
         <MapView
