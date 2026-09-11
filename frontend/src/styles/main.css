@@ -3014,7 +3014,10 @@ a, button { transition: all 0.2s ease; }
     background-position: top center;
     background-repeat: no-repeat;
   }
-  .home-section { padding: 32px 16px; min-height: auto; }
+  .home-section { padding: 32px 16px; min-height: auto; align-items: center; text-align: center; }
+  .home-section--content { align-items: center; text-align: center; }
+  .section-block { align-items: center; text-align: center; }
+  .section-eyebrow { margin-left: auto; margin-right: auto; }
   .hero-content { align-items: center; text-align: center; }
   .hero-title { font-size: 1.6rem; }
   .hero-text { font-size: 0.9rem; }
