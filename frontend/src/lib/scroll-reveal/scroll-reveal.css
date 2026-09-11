@@ -1,0 +1,24 @@
+/* ---- Scroll reveal (elementos entram ao rolar) ---- */
+/* Importar este arquivo uma vez no projeto (ex: main.css ou index.tsx). */
+
+[data-reveal].sr-reveal {
+  opacity: 0;
+  transform: translateY(var(--sr-offset, 60px)) scale(0.96);
+  transition: opacity 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Saiu pelo topo da viewport — volta descendo */
+[data-reveal].sr-reveal.sr-from-top {
+  transform: translateY(calc(-1 * var(--sr-offset, 60px))) scale(0.96);
+}
+
+[data-reveal].sr-reveal.sr-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* Já visível ao carregar a página — aparece sem animar */
+[data-reveal].sr-instant {
+  transition: none;
+}
