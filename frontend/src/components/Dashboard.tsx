@@ -97,9 +97,8 @@ export default function Dashboard() {
   };
 
   const ameacadas = stats.total_cr + stats.total_en + stats.total_vu + stats.total_nt;
-  const ucsPorCategoria = data.ucs_por_categoria;
-  const ucIntegral = ucsPorCategoria.find((u) => u.categoria_uc === 'protecao_integral')?.total ?? 0;
-  const ucSustentavel = ucsPorCategoria.find((u) => u.categoria_uc === 'uso_sustentavel')?.total ?? 0;
+  const ucIntegral = data.ucs_por_categoria.find((u) => u.categoria_uc === 'protecao_integral')?.total ?? 0;
+  const ucSustentavel = data.ucs_por_categoria.find((u) => u.categoria_uc === 'uso_sustentavel')?.total ?? 0;
 
   return (
     <div className="dashboard">

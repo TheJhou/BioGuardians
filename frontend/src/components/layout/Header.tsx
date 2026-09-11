@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 
 const navItems = [
@@ -69,16 +69,7 @@ function ReportsIcon() {
 }
 
 export default function Header() {
-  const [query, setQuery] = useState('');
   const navigate = useNavigate();
-
-  function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    if (query.trim()) {
-      navigate(`/especies?busca=${encodeURIComponent(query.trim())}`);
-      setQuery('');
-    }
-  }
 
   return (
     <>
@@ -98,17 +89,6 @@ export default function Header() {
             </NavLink>
           ))}
         </nav>
-
-        <form className="header-search" onSubmit={handleSearch} role="search">
-          <input
-            type="search"
-            className="header-search-input"
-            placeholder="Buscar espécies, áreas..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            aria-label="Buscar"
-          />
-        </form>
 
         <div className="header-right">
           <button className="header-btn" type="button" onClick={() => navigate('/dashboard')}>
