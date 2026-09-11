@@ -52,9 +52,14 @@ router.get('/', cacheMiddleware(undefined, () => 60_000), async (_req, res, next
 });
 
 // POST /api/dashboard/refresh — refreshes all materialized views, invalidates cache
+// CONCURRENTLY não pode rodar dentro de função (transaction) — cada query() é
+// uma transação implícita separada, então os 4 refreshs não bloqueiam leituras.
 router.post('/refresh', async (_req, res, next) => {
   try {
-    await query('SELECT refresh_dashboard()');
+    await query('REFRESH MATERIALIZED VIEW CONCURRENTLY dashboard_stats');
+    await query('REFRESH MATERIALIZED VIEW CONCURRENTLY especies_por_uc');
+    await query('REFRESH MATERIALIZED VIEW CONCURRENTLY ranking_especies_categoria');
+    await query('REFRESH MATERIALIZED VIEW CONCURRENTLY ucs_por_esfera');
     cacheInvalidateAll(['route:/api/dashboard']);
     res.json({ message: 'Dashboard refreshed' });
   } catch (err) { next(err); }
