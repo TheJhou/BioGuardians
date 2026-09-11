@@ -116,7 +116,7 @@ export default function HomePage() {
               </div>
               <div className="stats-section">
                 <div className="icon-placeholder icon-placeholder--sm" data-label="ícone" />
-                <span className="stats-value">4</span>
+                <span className="stats-value">{sourceCards.length}</span>
                 <span className="stats-label">Fontes oficiais</span>
               </div>
             </div>

@@ -419,7 +419,7 @@ a, button { transition: all 0.2s ease; }
 
 .home-page {
   width: 100%;
-  max-width: 1900px;
+  max-width: 1950px;
   min-height: 100vh;
   height: 100vh;
   margin: 0 auto;
@@ -439,6 +439,8 @@ a, button { transition: all 0.2s ease; }
   background: transparent;
   border-bottom: 1px solid transparent;
 }
+
+.home-page .header-search { display: none; }
 
 /* ---- Seções ---- */
 .home-section {
@@ -1553,6 +1555,11 @@ a, button { transition: all 0.2s ease; }
 @media (max-width: 1024px) {
   .page-main { padding: 20px; }
   .page-main:has(.home-page) { padding: 0; }
+  .app-header { padding: 0 16px; gap: 12px; position: relative; }
+  .header-nav { display: none; }
+  .header-search { display: none; }
+  .header-right { display: none; }
+  .bottom-nav { display: flex; }
   .home-section { padding: 40px 24px; }
   .hero-content { align-items: center; text-align: center; }
   .hero-tag { margin: 0 auto; }
@@ -1577,12 +1584,16 @@ a, button { transition: all 0.2s ease; }
   .bottom-nav { display: flex; }
   .page-main { padding: 20px 16px 88px 16px; }
   .page-main:has(.home-page) { padding: 0 0 64px 0; }
+  .species-back { display: none; }
   .app-layout:has(.home-page) {
-    min-height: 140vh;
+    min-height: 100vh;
   }
   .home-page {
-    background-size: 100% auto;
-    background-position: bottom center;
+    height: 100vh;
+    min-height: 100vh;
+    overflow-y: auto;
+    background-size: cover;
+    background-position: top center;
     background-repeat: no-repeat;
   }
   .home-section { padding: 32px 16px; min-height: auto; }
@@ -1624,7 +1635,7 @@ a, button { transition: all 0.2s ease; }
   .map-filters-toggle:hover,
   .map-legend-toggle:hover { background: var(--green-dark); }
   .map-legend-panel {
-    order: 2;
+    order: 3;
     display: none;
     width: 100%;
     max-height: 55vh;
@@ -1658,7 +1669,7 @@ a, button { transition: all 0.2s ease; }
   .map-sidebar .map-legend { display: none; }
   .map-sidebar .filter-group { margin-bottom: 0; }
   .map-sidebar .filter-group:nth-child(n) { grid-column: auto; }
-  .map-wrapper { order: 3; flex: 1; min-height: 0; height: auto; position: relative; }
+  .map-wrapper { order: 4; flex: 1; min-height: 0; height: auto; position: relative; }
   .map-container { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 100%; }
   .species-detail-grid { grid-template-columns: 1fr; }
 

@@ -30,6 +30,7 @@ export default function SpeciesPage() {
 
   const busca = searchParams.get('busca') || undefined;
   const listRef = useRef<HTMLDivElement | null>(null);
+  const detailRef = useRef<HTMLElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const pageRef = useRef(1);
   const isFetchingRef = useRef(false);
@@ -122,6 +123,11 @@ export default function SpeciesPage() {
       setSelected(s);
     }
   };
+
+  useEffect(() => {
+    if (!selected || !detailRef.current || window.innerWidth > 768) return;
+    detailRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [selected]);
 
   const loadOcorrencias = useCallback(async (pageToLoad: number, append: boolean) => {
     if (!selected || isFetchingOcorrenciasRef.current) return;
@@ -220,7 +226,7 @@ export default function SpeciesPage() {
         </div>
       </aside>
 
-      <main className="species-detail">
+      <main className="species-detail" ref={detailRef}>
         {selected ? (
           <>
             <div className="species-detail-header">
