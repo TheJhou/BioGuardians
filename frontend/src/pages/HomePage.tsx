@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { useScrollReveal } from '../lib/scroll-reveal';
+import { LazyImage } from '../lib/lazy-image';
 import Header from '../components/layout/Header.js';
 import LeafIcon from '../components/icons/LeafIcon.js';
 import GraficoIcon from '../components/icons/GraficoIcon.js';
@@ -164,7 +165,7 @@ export default function HomePage() {
               </div>
               <div className="platform-card-image">
                 {card.image ? (
-                  <img src={card.image} alt={card.title} className="platform-card-img" />
+                  <LazyImage src={card.image} alt={card.title} className="platform-card-img" style={{ opacity: 0.72 }} />
                 ) : (
                   <div className="image-placeholder" data-label="imagem" />
                 )}

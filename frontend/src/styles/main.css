@@ -754,7 +754,6 @@ a, button { transition: all 0.2s ease; }
   min-height: 180px;
   object-fit: cover;
   display: block;
-  opacity: 0.72;
 }
 
 .image-placeholder {
@@ -1646,6 +1645,7 @@ a, button { transition: all 0.2s ease; }
   transition: all 0.2s ease;
 }
 .species-item:hover { background: var(--green-light); transform: translateX(4px); }
+.species-item[data-reveal].sr-visible:hover { transform: translateX(4px); }
 .species-item.active { background: var(--green-light); border-color: var(--green-primary); }
 
 .species-avatar {

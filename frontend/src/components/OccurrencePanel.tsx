@@ -1,4 +1,4 @@
-import ImageWithSkeleton from './ImageWithSkeleton.js';
+import { LazyImage } from '../lib/lazy-image';
 import { CATEGORY_LABELS } from '../constants/index.js';
 import type { OcorrenciaProperties } from '../types/index.js';
 
@@ -16,7 +16,7 @@ export default function OccurrencePanel({ ocorrencia, onClose }: OccurrencePanel
       <div className="bottom-panel-content">
         <div className="bottom-panel-media">
           {ocorrencia.imagem_url ? (
-            <ImageWithSkeleton
+            <LazyImage
               src={ocorrencia.imagem_url || undefined}
               alt={ocorrencia.nome_cientifico}
               className="bottom-panel-img"
