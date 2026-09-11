@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+﻿import { useState, useEffect, useCallback, useMemo } from 'react';
 import Header from '../components/layout/Header.js';
 import MapView from '../components/MapView.js';
 import OccurrencePanel from '../components/OccurrencePanel.js';
@@ -112,15 +112,20 @@ export default function MapPage() {
     setSelectedEspecies((prev) => prev.filter((e) => e.id !== id));
   };
 
-  const handleSelectOcorrencia = (ocorrencia: OcorrenciaProperties) => {
+  const handleSelectOcorrencia = useCallback((ocorrencia: OcorrenciaProperties) => {
     setSelectedArea(null);
     setSelectedOcorrencia(ocorrencia);
-  };
+  }, []);
 
-  const handleSelectArea = (area: { id: number; nome: string }) => {
+  const handleSelectArea = useCallback((area: { id: number; nome: string }) => {
     setSelectedOcorrencia(null);
     setSelectedArea(area);
-  };
+  }, []);
+
+  const selectedEspecieIds = useMemo(
+    () => selectedEspecies.map((e) => e.id),
+    [selectedEspecies]
+  );
 
   return (
     <div className="map-page">
@@ -230,7 +235,7 @@ export default function MapPage() {
           <MapView
             filters={applied}
             layers={layers}
-            selectedEspecieIds={selectedEspecies.map((e) => e.id)}
+            selectedEspecieIds={selectedEspecieIds}
             onSelectOcorrencia={handleSelectOcorrencia}
             onSelectArea={handleSelectArea}
           />
