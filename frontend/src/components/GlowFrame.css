@@ -1,0 +1,17 @@
+.gframe { display: inline-flex; }
+
+.gframe .gfx-dark-bg { height: 48px; filter: blur(3px); }
+.gframe .gfx-glow    { height: 100px; filter: blur(26px); opacity: 0.4; }
+.gframe .gfx-white   { height: 45px; filter: blur(2px); }
+.gframe .gfx-border  { height: 43px; filter: blur(0.5px); }
+
+.gframe-content {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #031b16;
+  border-radius: 10px;
+  padding: 2px;
+}

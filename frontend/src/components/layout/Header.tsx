@@ -1,5 +1,7 @@
 import { type ReactNode } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
+import GlowFrame from '../GlowFrame.js';
+import iconPage from '../../images/icon-page.png';
 
 const navItems = [
   { to: '/home', label: 'Home' },
@@ -75,19 +77,18 @@ export default function Header() {
     <>
       <header className="app-header app-header--dark">
         <div className="header-brand">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path d="M12 2C7.5 4 4 8 4 13c0 4.5 3.5 8 8 8s8-3.5 8-8c0-5-3.5-9-8-11z" fill="#16A36A"/>
-            <path d="M12 6c-2.5 1.5-4 4-4 7 0 3 1.5 5.5 4 6.5V6z" fill="#9AD84B"/>
-          </svg>
+          <img src={iconPage} alt="" width="28" height="28" />
           <span className="brand-name">BioGuardians</span>
         </div>
 
         <nav className="header-nav" aria-label="Navegação principal">
-          {navItems.map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.to === '/'} className="header-nav-link">
-              {item.label}
-            </NavLink>
-          ))}
+          <GlowFrame>
+            {navItems.map((item) => (
+              <NavLink key={item.to} to={item.to} end={item.to === '/'} className="header-nav-link">
+                {item.label}
+              </NavLink>
+            ))}
+          </GlowFrame>
         </nav>
 
         <div className="header-right">
