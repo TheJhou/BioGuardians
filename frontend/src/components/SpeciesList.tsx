@@ -10,7 +10,7 @@ interface SpeciesListProps {
 }
 
 export default function SpeciesList({ filters, onSelectEspecie, onEditEspecie, onAddEspecie }: SpeciesListProps) {
-  const [especies, setEspecies] = useState<Especie[] | EspecieBusca[]>([]);
+  const [especies, setEspecies] = useState<(Especie | EspecieBusca)[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [biomas, setBiomas] = useState<Bioma[]>([]);
@@ -20,12 +20,12 @@ export default function SpeciesList({ filters, onSelectEspecie, onEditEspecie, o
     setLoading(true);
     setError(null);
     try {
-      const [data, biomaData, catData] = await Promise.all([
+      const [res, biomaData, catData] = await Promise.all([
         api.getEspecies(filters),
         api.getBiomas(),
         api.getCategorias(),
       ]);
-      setEspecies(data);
+      setEspecies(res.data);
       setBiomas(biomaData);
       setCategorias(catData);
     } catch (err) {
