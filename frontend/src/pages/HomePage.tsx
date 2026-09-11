@@ -14,25 +14,31 @@ import type { DashboardStats } from '../types/index.js';
 import cardMapsImg from '../images/card-maps-home.png';
 import cardEspecieImg from '../images/card-especie-home.png';
 import cardUcsImg from '../images/card-unid-conservacao-home.png';
+import iconMapaImg from '../images/icon-mapa.png';
+import iconEspecieImg from '../images/icon-especie.png';
+import iconUcImg from '../images/icon-uc.png';
 
-const platformCards: { title: string; description: ReactNode; to: string; image?: string }[] = [
+const platformCards: { title: string; description: ReactNode; to: string; image?: string; icon?: string }[] = [
   {
     title: 'Mapa interativo',
     description: <>Visualize a distribuição de espécies,<br />ocorrências e unidades de conservação<br />em todo o Brasil.</>,
     to: '/mapa',
     image: cardMapsImg,
+    icon: iconMapaImg,
   },
   {
     title: 'Catálogo de espécies',
     description: <>Explore informações detalhadas<br />sobre a fauna e flora brasileira.</>,
     to: '/especies',
     image: cardEspecieImg,
+    icon: iconEspecieImg,
   },
   {
     title: 'Unidades de conservação',
     description: <>Descubra áreas protegidas e sua<br />importância para a preservação<br />da biodiversidade.</>,
     to: '/dashboard',
     image: cardUcsImg,
+    icon: iconUcImg,
   },
 ];
 
@@ -158,7 +164,11 @@ export default function HomePage() {
             <Link key={card.title} to={card.to} className="platform-card" data-reveal>
               <div className="platform-card-body">
                 <div className="platform-card-header">
-                  <div className="icon-placeholder" data-label="ícone" />
+                  {card.icon ? (
+                    <img src={card.icon} alt="" className="platform-card-icon" />
+                  ) : (
+                    <div className="icon-placeholder" data-label="ícone" />
+                  )}
                   <h3 className="platform-card-title">{card.title}</h3>
                 </div>
                 <p className="platform-card-text">{card.description}</p>
