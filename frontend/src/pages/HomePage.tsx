@@ -58,13 +58,12 @@ function formatPlus(value: number): string {
 }
 
 function TiltPlatformCard({ card }: { card: { title: string; description: ReactNode; to: string; image?: string; icon?: string } }) {
-  const tilt = useTilt<HTMLAnchorElement>({ intensity: 12, scale: 1.04, glare: true });
+  const tilt = useTilt<HTMLAnchorElement>({ intensity: 20, scale: 1.08, glare: true });
   return (
     <Link
       ref={tilt.ref}
       to={card.to}
       className="platform-card tilt-card"
-      data-reveal
       onMouseMove={tilt.onMouseMove}
       onMouseLeave={tilt.onMouseLeave}
     >

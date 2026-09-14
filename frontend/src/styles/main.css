@@ -748,6 +748,7 @@ a, button { transition: all 0.2s ease; }
   backdrop-filter: blur(8px);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-card);
+  overflow: hidden;
   text-decoration: none;
   color: #fff;
   transition: box-shadow 0.2s ease;

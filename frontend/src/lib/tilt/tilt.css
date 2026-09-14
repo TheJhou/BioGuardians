@@ -3,7 +3,7 @@
   --tilt-glare-y: 50%;
   --tilt-glare-opacity: 0;
   transform-style: preserve-3d;
-  transition: transform 0.15s ease-out;
+  transition: transform 0.08s ease-out;
   will-change: transform;
   position: relative;
 }
@@ -16,8 +16,8 @@
   pointer-events: none;
   z-index: 2;
   background: radial-gradient(
-    circle 200px at var(--tilt-glare-x) var(--tilt-glare-y),
-    rgba(255, 255, 255, 0.18),
+    circle 250px at var(--tilt-glare-x) var(--tilt-glare-y),
+    rgba(255, 255, 255, 0.28),
     transparent 60%
   );
   opacity: var(--tilt-glare-opacity);
