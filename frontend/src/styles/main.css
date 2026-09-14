@@ -748,10 +748,9 @@ a, button { transition: all 0.2s ease; }
   backdrop-filter: blur(8px);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-card);
-  overflow: hidden;
   text-decoration: none;
   color: #fff;
-  transition: all 0.2s ease;
+  transition: box-shadow 0.2s ease;
   position: relative;
 }
 .platform-card:hover {
@@ -761,7 +760,7 @@ a, button { transition: all 0.2s ease; }
 
 /* Especificidade extra p/ vencer .sr-reveal.sr-visible (que trava o transform) */
 .platform-card[data-reveal].sr-visible:hover {
-  transform: translateY(-4px) scale(1.03);
+  box-shadow: 0 12px 32px var(--shadow-card-hover);
 }
 
 .platform-card-body {

@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { useScrollReveal } from '../lib/scroll-reveal';
+import { useTilt } from '../lib/tilt';
 import { LazyImage } from '../lib/lazy-image';
 import Header from '../components/layout/Header.js';
 import LeafIcon from '../components/icons/LeafIcon.js';
@@ -54,6 +55,40 @@ const sourceCards = [
 
 function formatPlus(value: number): string {
   return `${value}+`;
+}
+
+function TiltPlatformCard({ card }: { card: { title: string; description: ReactNode; to: string; image?: string; icon?: string } }) {
+  const tilt = useTilt<HTMLAnchorElement>({ intensity: 12, scale: 1.04, glare: true });
+  return (
+    <Link
+      ref={tilt.ref}
+      to={card.to}
+      className="platform-card tilt-card"
+      data-reveal
+      onMouseMove={tilt.onMouseMove}
+      onMouseLeave={tilt.onMouseLeave}
+    >
+      <div className="platform-card-body">
+        <div className="platform-card-header">
+          {card.icon ? (
+            <img src={card.icon} alt="" className="platform-card-icon" />
+          ) : (
+            <div className="icon-placeholder" data-label="ícone" />
+          )}
+          <h3 className="platform-card-title">{card.title}</h3>
+        </div>
+        <p className="platform-card-text">{card.description}</p>
+      </div>
+      <div className="platform-card-image">
+        {card.image ? (
+          <LazyImage src={card.image} alt={card.title} className="platform-card-img" style={{ opacity: 0.72 }} />
+        ) : (
+          <div className="image-placeholder" data-label="imagem" />
+        )}
+        <span className="platform-card-arrow">→</span>
+      </div>
+    </Link>
+  );
 }
 
 export default function HomePage() {
@@ -161,27 +196,7 @@ export default function HomePage() {
 
         <div className="platform-cards">
           {platformCards.map((card) => (
-            <Link key={card.title} to={card.to} className="platform-card" data-reveal>
-              <div className="platform-card-body">
-                <div className="platform-card-header">
-                  {card.icon ? (
-                    <img src={card.icon} alt="" className="platform-card-icon" />
-                  ) : (
-                    <div className="icon-placeholder" data-label="ícone" />
-                  )}
-                  <h3 className="platform-card-title">{card.title}</h3>
-                </div>
-                <p className="platform-card-text">{card.description}</p>
-              </div>
-              <div className="platform-card-image">
-                {card.image ? (
-                  <LazyImage src={card.image} alt={card.title} className="platform-card-img" style={{ opacity: 0.72 }} />
-                ) : (
-                  <div className="image-placeholder" data-label="imagem" />
-                )}
-                <span className="platform-card-arrow">→</span>
-              </div>
-            </Link>
+            <TiltPlatformCard key={card.title} card={card} />
           ))}
         </div>
 
