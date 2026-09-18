@@ -122,13 +122,9 @@ router.get('/tiles/:z/:x/:y.mvt', async (req, res, next) => {
       `SELECT COALESCE(encode(ST_AsMVT(mvt, 'uc', 4096, 'geom'), 'base64'), '') AS mvt
        FROM (
          SELECT
-           ST_AsMVTGeom(ST_Transform(a.geom, 3857), bounds.b, 4096, 256, true) AS geom,
+           ST_AsMVTGeom(ST_SimplifyPreserveTopology(ST_Transform(a.geom, 3857), 156543.03392 / POWER(2, $1)), bounds.b, 4096, 256, true) AS geom,
            a.id,
-           a.nome,
-           a.categoria_uc::text,
-           a.esfera::text,
-           a.bioma_id,
-           a.area_ha::float
+           a.categoria_uc::text
          FROM area_protegida a
          CROSS JOIN (SELECT ST_TileEnvelope($1::int, $2::int, $3::int) AS b) bounds
          WHERE ${where}
@@ -172,6 +168,29 @@ router.get('/:id', validateId, async (req, res, next) => {
     }
 
     res.json(rows[0].geojson);
+  } catch (err) { next(err); }
+});
+
+// GET /api/areas/:id/info — metadados leves para o clique do mapa (sem geometria;
+// o tile carrega só id + categoria_uc pra manter o payload pequeno)
+router.get('/:id/info', validateId, async (req, res, next) => {
+  try {
+    const id = parseParam(req.params.id)!;
+    const { rows } = await query(
+      `SELECT a.id, a.nome, a.categoria_uc::text, a.esfera::text,
+              a.bioma_id, b.nome AS bioma, a.area_ha::float
+       FROM area_protegida a
+       LEFT JOIN bioma b ON b.id = a.bioma_id
+       WHERE a.id = $1`,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      res.status(404).json({ error: 'Area not found' });
+      return;
+    }
+
+    res.json(rows[0]);
   } catch (err) { next(err); }
 });
 

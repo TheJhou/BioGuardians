@@ -1,7 +1,7 @@
 import type {
   Bioma, Estado, Categoria, Taxon, Especie, EspecieBusca,
   GeoJSONFeatureCollection, OcorrenciaProperties, DashboardData,
-  EspecieEmArea, AreaProtegeEspecie, PaginatedResponse,
+  EspecieEmArea, AreaProtegeEspecie, PaginatedResponse, AreaInfo,
 } from '../types/index.js';
 
 export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
@@ -146,6 +146,10 @@ export const api = {
     return fetchApi<GeoJSONFeatureCollection>(`/areas/${id}`);
   },
 
+  async getAreaInfo(id: number): Promise<AreaInfo> {
+    return fetchApi<AreaInfo>(`/areas/${id}/info`);
+  },
+
   async getEspeciesEmArea(id: number): Promise<EspecieEmArea[]> {
     return fetchApi<EspecieEmArea[]>(`/areas/${id}/especies`);
   },
@@ -196,6 +200,10 @@ export const api = {
       bioma: params?.bioma,
     });
     return `${API_URL}/ocorrencias/tiles/{z}/{x}/{y}.mvt${query ? `?${query}` : ''}`;
+  },
+
+  async getOcorrencia(id: number): Promise<OcorrenciaProperties> {
+    return fetchApi<OcorrenciaProperties>(`/ocorrencias/${id}`);
   },
 
   async createOcorrencia(data: {

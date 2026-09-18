@@ -165,15 +165,6 @@ router.get('/tiles/:z/:x/:y.mvt', async (req, res, next) => {
            ST_AsMVTGeom(ST_Transform(o.geom, 3857), bounds.b, 4096, 64, true) AS geom,
            o.id,
            o.especie_id,
-           o.data_evento::text,
-           o.fonte::text,
-           o.base_registro,
-           o.confianca_ia::float,
-           o.lat::float,
-           o.lon::float,
-           e.nome_cientifico,
-           e.nome_popular,
-           e.imagem_url,
            e.categoria_ameaca::text
          FROM ocorrencia o
          JOIN especie e ON e.id = o.especie_id
@@ -269,6 +260,31 @@ router.get('/gbif', cacheMiddleware(
       count: features.length,
       gbif_total: data.count,
     });
+  } catch (err) { next(err); }
+});
+
+// GET /api/ocorrencias/:id — detalhe completo (buscado no clique do mapa;
+// o tile carrega só id + categoria pra manter o payload leve)
+router.get('/:id', validateId, async (req, res, next) => {
+  try {
+    const id = parseParam(req.params.id)!;
+    const { rows } = await query(
+      `SELECT o.id, o.especie_id, o.lat::float, o.lon::float,
+              o.data_evento::text, o.fonte::text, o.base_registro,
+              o.confianca_ia::float,
+              e.nome_cientifico, e.nome_popular, e.imagem_url, e.categoria_ameaca::text
+       FROM ocorrencia o
+       JOIN especie e ON e.id = o.especie_id
+       WHERE o.id = $1`,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      res.status(404).json({ error: 'Occurrence not found' });
+      return;
+    }
+
+    res.json(rows[0]);
   } catch (err) { next(err); }
 });
 

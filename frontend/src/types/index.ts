@@ -85,6 +85,7 @@ export interface AreaProtegeEspecie {
 }
 
 export interface OcorrenciaProperties {
+  id: number;
   especie_id: number;
   lat: number;
   lon: number;
@@ -96,6 +97,29 @@ export interface OcorrenciaProperties {
   nome_popular: string | null;
   imagem_url: string | null;
   categoria_ameaca: string;
+}
+
+// Subset carregado nos tiles vetoriais — o resto vem de GET /ocorrencias/:id
+export interface OcorrenciaTileProperties {
+  id: number;
+  especie_id: number;
+  categoria_ameaca: string;
+}
+
+// Subset dos tiles de áreas — o resto vem de GET /areas/:id/info
+export interface AreaTileProperties {
+  id: number;
+  categoria_uc: string;
+}
+
+export interface AreaInfo {
+  id: number;
+  nome: string;
+  categoria_uc: string;
+  esfera: string;
+  bioma_id: number | null;
+  bioma: string | null;
+  area_ha: number | null;
 }
 
 export interface DashboardStats {
