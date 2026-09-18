@@ -1,0 +1,48 @@
+.animated-tabs {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 28px;
+}
+
+.animated-tabs .tab {
+  background: none;
+  border: none;
+  padding: 14px 18px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 1rem;
+  margin-bottom: -2px;
+  transition: color 0.2s ease;
+  position: relative;
+  z-index: 1;
+}
+
+.animated-tabs .tab.active {
+  color: var(--green-primary);
+}
+
+.animated-tabs .tab:hover {
+  color: var(--green-primary);
+}
+
+.animated-tabs-indicator {
+  position: absolute;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--green-primary);
+  transition: left 0.3s cubic-bezier(0.22, 1, 0.36, 1), width 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  z-index: 0;
+}
+
+.animated-tab-content {
+  animation: tab-fade-in 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes tab-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}

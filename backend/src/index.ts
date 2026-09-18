@@ -14,6 +14,7 @@ import areasRoutes from './routes/areas.js';
 import ocorrenciasRoutes from './routes/ocorrencias.js';
 import dashboardRoutes from './routes/dashboard.js';
 import deteccoesRoutes from './routes/deteccoes.js';
+import { warmupTileCache } from './tileWarmup.js';
 
 const app = express();
 
@@ -41,6 +42,7 @@ app.use(errorHandler);
 // --- Start ---
 app.listen(env.port, () => {
   logger.info('server_listening', { port: env.port });
+  if (env.tileWarmup) warmupTileCache(env.port);
 });
 
 export default app;

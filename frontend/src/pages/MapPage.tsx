@@ -9,7 +9,7 @@ import GlowButton from '../components/GlowButton.js';
 import CosmicToggle from '../components/CosmicToggle.js';
 import { FONTE_LABELS, FONTE_OPTIONS, CATEGORY_OPTIONS } from '../constants/index.js';
 import { api } from '../api/client.js';
-import type { Especie, OcorrenciaProperties, EspecieEmArea } from '../types/index.js';
+import type { Especie, OcorrenciaProperties, OcorrenciaTileProperties, AreaTileProperties, EspecieEmArea } from '../types/index.js';
 
 interface MapFilters {
   categoria?: string;
@@ -81,7 +81,7 @@ export default function MapPage() {
     api.getEspeciesEmArea(selectedArea.id)
       .then(setSelectedAreaSpecies)
       .catch(() => setSelectedAreaSpecies([]));
-  }, [selectedArea]);
+  }, [selectedArea?.id]);
 
   const handleClear = () => {
     setDraft(defaultFilters);
@@ -113,14 +113,19 @@ export default function MapPage() {
     setSelectedEspecies((prev) => prev.filter((e) => e.id !== id));
   };
 
-  const handleSelectOcorrencia = useCallback((ocorrencia: OcorrenciaProperties) => {
+  const handleSelectOcorrencia = useCallback((tile: OcorrenciaTileProperties) => {
     setSelectedArea(null);
-    setSelectedOcorrencia(ocorrencia);
+    api.getOcorrencia(tile.id)
+      .then(setSelectedOcorrencia)
+      .catch(() => setSelectedOcorrencia(null));
   }, []);
 
-  const handleSelectArea = useCallback((area: { id: number; nome: string }) => {
+  const handleSelectArea = useCallback((tile: AreaTileProperties) => {
     setSelectedOcorrencia(null);
-    setSelectedArea(area);
+    setSelectedArea({ id: tile.id, nome: '' });
+    api.getAreaInfo(tile.id)
+      .then((info) => setSelectedArea((cur) => (cur?.id === info.id ? { ...cur, nome: info.nome } : cur)))
+      .catch(() => {});
   }, []);
 
   const selectedEspecieIds = useMemo(

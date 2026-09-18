@@ -161,7 +161,8 @@ export default function HomePage() {
 
         <div className="platform-cards">
           {platformCards.map((card) => (
-            <Link key={card.title} to={card.to} className="platform-card" data-reveal>
+            <Link key={card.title} to={card.to} className="platform-card glass-card" data-reveal>
+              <div className="glass-card-orb" />
               <div className="platform-card-body">
                 <div className="platform-card-header">
                   {card.icon ? (

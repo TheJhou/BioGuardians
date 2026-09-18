@@ -3,7 +3,7 @@ import { Map, Source, Layer, NavigationControl } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { api } from '../api/client.js';
 import { MAP_DEFAULTS, CATEGORY_COLORS, UC_CATEGORY_COLORS } from '../constants/index.js';
-import type { OcorrenciaProperties } from '../types/index.js';
+import type { OcorrenciaTileProperties, AreaTileProperties } from '../types/index.js';
 
 const MAPTILER_API_KEY = import.meta.env.VITE_MAPTILER_API_KEY || '';
 
@@ -22,8 +22,8 @@ interface MapViewProps {
   filters: MapFilters;
   layers: MapLayers;
   selectedEspecieIds?: number[];
-  onSelectOcorrencia?: (ocorrencia: OcorrenciaProperties, lngLat: { lng: number; lat: number }) => void;
-  onSelectArea?: (area: { id: number; nome: string }, lngLat: { lng: number; lat: number }) => void;
+  onSelectOcorrencia?: (ocorrencia: OcorrenciaTileProperties, lngLat: { lng: number; lat: number }) => void;
+  onSelectArea?: (area: AreaTileProperties, lngLat: { lng: number; lat: number }) => void;
 }
 
 const INITIAL_VIEW = {
@@ -74,12 +74,9 @@ function MapView({
     const point = { lng: lngLat.lng, lat: lngLat.lat };
 
     if (ocorrenciaFeature && ocorrenciaFeature.properties && onSelectOcorrencia) {
-      onSelectOcorrencia(ocorrenciaFeature.properties as OcorrenciaProperties, point);
+      onSelectOcorrencia(ocorrenciaFeature.properties as OcorrenciaTileProperties, point);
     } else if (areaFeature && areaFeature.properties && onSelectArea) {
-      onSelectArea(
-        { id: areaFeature.properties.id as number, nome: areaFeature.properties.nome as string },
-        point
-      );
+      onSelectArea(areaFeature.properties as AreaTileProperties, point);
     }
   }, [onSelectOcorrencia, onSelectArea]);
 

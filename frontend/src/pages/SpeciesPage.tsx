@@ -6,6 +6,7 @@ import { useScrollReveal } from '../lib/scroll-reveal';
 import { CATEGORY_LABELS } from '../constants/index.js';
 import StatCard from '../components/ui/StatCard.js';
 import GlowSearch from '../components/GlowSearch.js';
+import { useAnimatedTabs } from '../lib/animated-tabs';
 import type { Especie, OcorrenciaProperties, PaginatedResponse } from '../types/index.js';
 
 const TABS = ['Sobre', 'Ocorrências', 'Unidades de Conservação'] as const;
@@ -16,7 +17,7 @@ export default function SpeciesPage() {
 
   const [items, setItems] = useState<Especie[]>([]);
   const [selected, setSelected] = useState<Especie | null>(null);
-  const [tab, setTab] = useState<typeof TABS[number]>('Sobre');
+  const { active: tab, select: setTab, setRef: tabRef, indicator } = useAnimatedTabs(TABS, 'Sobre');
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -277,16 +278,26 @@ export default function SpeciesPage() {
               </div>
             </div>
 
-            <div className="species-tabs">
+            <div className="animated-tabs species-tabs">
               {TABS.map((t) => (
-                <button key={t} className={`tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
+                <button
+                  key={t}
+                  ref={tabRef(t)}
+                  className={`tab ${tab === t ? 'active' : ''}`}
+                  onClick={() => setTab(t)}
+                >
                   {t}
                 </button>
               ))}
+              <span
+                className="animated-tabs-indicator"
+                style={{ left: indicator.left, width: indicator.width }}
+              />
             </div>
 
             <div className="species-tab-content">
-              {tab === 'Sobre' && (
+              <div key={tab} className="animated-tab-content">
+                {tab === 'Sobre' && (
                 <div className="species-detail-grid">
                   <div className="detail-card summary">
                     <h4>Resumo da Espécie</h4>
@@ -337,6 +348,7 @@ export default function SpeciesPage() {
                 </div>
               )}
               {tab === 'Unidades de Conservação' && <p className="empty-state">Unidades de conservação com registros serão listadas aqui.</p>}
+              </div>
             </div>
           </>
         ) : (

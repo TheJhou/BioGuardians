@@ -16,7 +16,6 @@ export default function App() {
           <Route path="mapa" element={<MapPage />} />
           <Route path="especies" element={<SpeciesPage />} />
           <Route path="especies/:id" element={<SpeciesPage />} />
-          <Route path="relatorios" element={<div className="page-placeholder">Relatórios</div>} />
           <Route path="sobre" element={<div className="page-placeholder">Sobre</div>} />
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Route>
