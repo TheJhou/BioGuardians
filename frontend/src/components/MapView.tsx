@@ -145,7 +145,7 @@ function MapView({
               source-layer="ocorrencia"
               paint={{
                 'circle-color': occurrenceColorMatch as any,
-                'circle-radius': ['interpolate', ['linear'], ['zoom'], 4, 10, 10, 8, 14, 6] as any,
+                'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, 3, 8, 6, 14, 10] as any,
                 'circle-stroke-color': '#fff',
                 'circle-stroke-width': 1.5,
                 'circle-opacity': 0.95,
