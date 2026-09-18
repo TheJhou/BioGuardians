@@ -3,6 +3,12 @@ import { query } from '../db/pool.js';
 import { validateId } from '../middleware/validateId.js';
 import { cacheMiddleware, cacheInvalidateAll, getTileCache, setTileCache } from '../cache/cache.js';
 import { parseParam, getParam } from '../utils/params.js';
+import {
+  getStoredAreaTile,
+  storeAreaTile,
+  invalidateAreaTilesForArea,
+  invalidateAreaTilesForGeom,
+} from '../tileStore.js';
 
 const router = Router();
 
@@ -101,6 +107,23 @@ router.get('/tiles/:z/:x/:y.mvt', async (req, res, next) => {
     }
 
     const { esfera, categoria, bioma } = req.query;
+    const hasFilters = Boolean(esfera || categoria || bioma);
+
+    // Cache persistente: tiles pré-gerados cobrem o dataset completo.
+    // Requests com filtro não usam a tabela (cada filtro geraria uma
+    // variante do tile) — seguem o LRU em memória como antes.
+    if (!hasFilters) {
+      try {
+        const stored = await getStoredAreaTile(z, x, y);
+        if (stored) {
+          sendTile(res, stored);
+          return;
+        }
+      } catch {
+        // Tabela ainda não migrada — cai no caminho normal.
+      }
+    }
+
     const key = `route:${req.originalUrl}`;
     const cached = getTileCache(key);
     if (cached) {
@@ -133,6 +156,13 @@ router.get('/tiles/:z/:x/:y.mvt', async (req, res, next) => {
     );
 
     const buffer = rows[0].mvt ? Buffer.from(rows[0].mvt, 'base64') : Buffer.alloc(0);
+    if (!hasFilters) {
+      try {
+        await storeAreaTile(z, x, y, buffer);
+      } catch {
+        // Persistência best-effort — a resposta já está garantida.
+      }
+    }
     setTileCache(key, buffer);
     sendTile(res, buffer);
   } catch (err) { next(err); }
@@ -222,6 +252,7 @@ router.post('/', async (req, res, next) => {
     );
 
     cacheInvalidateAll(['route:/api/areas', 'route:/api/dashboard']);
+    try { await invalidateAreaTilesForArea(result.rows[0].id); } catch { /* tiles se re-geram */ }
     res.status(201).json({ id: result.rows[0].id, message: 'Area created' });
   } catch (err) { next(err); }
 });
@@ -266,6 +297,7 @@ router.put('/:id', validateId, async (req, res, next) => {
     }
 
     cacheInvalidateAll(['route:/api/areas', 'route:/api/dashboard']);
+    try { await invalidateAreaTilesForArea(id); } catch { /* tiles se re-geram */ }
     res.json({ message: 'Area updated' });
   } catch (err) { next(err); }
 });
@@ -274,7 +306,11 @@ router.put('/:id', validateId, async (req, res, next) => {
 router.delete('/:id', validateId, async (req, res, next) => {
   try {
     const id = parseParam(req.params.id)!;
-    const { rowCount } = await query('DELETE FROM area_protegida WHERE id = $1', [id]);
+    // RETURNING geom: a geometria é necessária pra invalidar os tiles afetados.
+    const { rows, rowCount } = await query(
+      'DELETE FROM area_protegida WHERE id = $1 RETURNING geom',
+      [id]
+    );
 
     if (rowCount === 0) {
       res.status(404).json({ error: 'Area not found' });
@@ -282,6 +318,7 @@ router.delete('/:id', validateId, async (req, res, next) => {
     }
 
     cacheInvalidateAll(['route:/api/areas', 'route:/api/dashboard']);
+    try { await invalidateAreaTilesForGeom(rows[0].geom); } catch { /* tiles se re-geram */ }
     res.json({ message: 'Area deleted' });
   } catch (err) { next(err); }
 });
