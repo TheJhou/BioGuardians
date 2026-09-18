@@ -9,10 +9,10 @@ const cache = new LRUCache<string, Record<string, unknown>>({
   ttl: env.cache.ttlMs,
 });
 
-// Separate cache for vector tiles (binary buffers) — data is essentially static.
+// Separate cache for vector tiles (binary buffers).
 const tileCache = new LRUCache<string, Buffer>({
   max: 2000,
-  ttl: 7 * 24 * 60 * 60 * 1000, // 7 dias
+  ttl: 60 * 60 * 1000, // 1 hora
 });
 
 // Invalidate cache entries matching a prefix (e.g. "dashboard:*").

@@ -92,7 +92,7 @@ function MapView({
       <Map
         initialViewState={INITIAL_VIEW}
         style={{ width: '100%', height: '100%' }}
-        mapStyle={`https://api.maptiler.com/maps/outdoor-v2/style.json?key=${MAPTILER_API_KEY}`}
+        mapStyle={`https://api.maptiler.com/maps/hybrid/style.json?key=${MAPTILER_API_KEY}`}
         fadeDuration={0}
         maxTileCacheSize={1000}
         onClick={handleClick}

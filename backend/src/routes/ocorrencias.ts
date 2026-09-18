@@ -16,7 +16,7 @@ function isValidTile(z: number, x: number, y: number): boolean {
 
 function sendTile(res: any, buffer: Buffer): void {
   res.set('Content-Type', 'application/vnd.mapbox-vector-tile');
-  res.set('Cache-Control', 'public, max-age=604800');
+  res.set('Cache-Control', 'public, max-age=3600');
   res.send(buffer);
 }
 
