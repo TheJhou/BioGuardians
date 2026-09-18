@@ -1,5 +1,5 @@
-import { type ReactNode } from 'react';
-import { NavLink } from 'react-router-dom';
+import { type ReactNode, useRef, useLayoutEffect, useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import GlowFrame from '../GlowFrame.js';
 import iconPage from '../../images/icon-page.png';
 
@@ -57,6 +57,20 @@ function SpeciesIcon() {
 }
 
 export default function Header() {
+  const location = useLocation();
+  const navRefs = useRef<Record<string, HTMLAnchorElement | null>>({});
+  const bottomRefs = useRef<Record<string, HTMLAnchorElement | null>>({});
+  const [indicator, setIndicator] = useState({ left: 0, width: 0, visible: false });
+  const [bottomIndicator, setBottomIndicator] = useState({ left: 0, width: 0, visible: false });
+
+  useLayoutEffect(() => {
+    const activePath = navItems.find((n) => location.pathname.startsWith(n.to))?.to ?? navItems[0].to;
+    const el = navRefs.current[activePath];
+    if (el) setIndicator({ left: el.offsetLeft, width: el.offsetWidth, visible: true });
+    const bottomEl = bottomRefs.current[activePath];
+    if (bottomEl) setBottomIndicator({ left: bottomEl.offsetLeft, width: bottomEl.offsetWidth, visible: true });
+  }, [location.pathname]);
+
   return (
     <>
       <header className="app-header app-header--dark">
@@ -68,10 +82,20 @@ export default function Header() {
         <nav className="header-nav" aria-label="Navegação principal">
           <GlowFrame>
             {navItems.map((item) => (
-              <NavLink key={item.to} to={item.to} end={item.to === '/'} className="header-nav-link">
+              <NavLink
+                key={item.to}
+                ref={(el) => { navRefs.current[item.to] = el; }}
+                to={item.to}
+                end={item.to === '/home'}
+                className="header-nav-link"
+              >
                 {item.label}
               </NavLink>
             ))}
+            <span
+              className="header-nav-indicator"
+              style={{ left: indicator.left, width: indicator.width, opacity: indicator.visible ? 1 : 0 }}
+            />
           </GlowFrame>
         </nav>
 
@@ -79,11 +103,21 @@ export default function Header() {
 
       <nav className="bottom-nav" aria-label="Navegação mobile">
         {bottomNavItems.map((item) => (
-          <NavLink key={item.to} to={item.to} end={item.to === '/'} className="bottom-nav-link">
+          <NavLink
+            key={item.to}
+            ref={(el) => { bottomRefs.current[item.to] = el; }}
+            to={item.to}
+            end={item.to === '/home'}
+            className="bottom-nav-link"
+          >
             {item.icon()}
             <span>{item.label}</span>
           </NavLink>
         ))}
+        <span
+          className="bottom-nav-indicator"
+          style={{ left: bottomIndicator.left, width: bottomIndicator.width, opacity: bottomIndicator.visible ? 1 : 0 }}
+        />
       </nav>
     </>
   );

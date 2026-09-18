@@ -17,6 +17,7 @@ export function useTilt<T extends HTMLElement = HTMLDivElement>({
     (e: React.MouseEvent<T>) => {
       const el = ref.current;
       if (!el) return;
+      el.style.transition = 'transform 0.08s ease-out';
       const rect = el.getBoundingClientRect();
       const px = (e.clientX - rect.left) / rect.width;
       const py = (e.clientY - rect.top) / rect.height;
@@ -33,6 +34,7 @@ export function useTilt<T extends HTMLElement = HTMLDivElement>({
   const onMouseLeave = useCallback(() => {
     const el = ref.current;
     if (!el) return;
+    el.style.transition = 'transform 0.5s cubic-bezier(0.22, 1, 0.36, 1)';
     el.style.transform = 'perspective(800px) rotateX(0) rotateY(0) scale(1)';
     if (glare) el.style.setProperty('--tilt-glare-opacity', '0');
   }, [glare]);
