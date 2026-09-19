@@ -147,12 +147,12 @@ export interface UcsPorEsfera {
   area_ha: number | null;
 }
 
-export interface EspeciePorUc {
-  area_id: number;
-  area_nome: string;
+export interface EspeciePresenteUc {
   especie_id: number;
   nome_cientifico: string;
-  categoria_ameaca: string;
+  nome_popular: string | null;
+  imagem_url: string | null;
+  total_ucs: number;
 }
 
 export interface BiomaCount {
@@ -181,7 +181,7 @@ export interface DashboardData {
   stats: DashboardStats;
   ranking: RankingCategoria[];
   ucs_por_esfera: UcsPorEsfera[];
-  especies_por_uc: EspeciePorUc[];
+  especies_mais_presentes_uc: EspeciePresenteUc[];
   especies_por_bioma: BiomaCount[];
   ocorrencias_por_ano: OcorrenciaPorAno[];
   ucs_por_categoria: UcPorCategoria[];

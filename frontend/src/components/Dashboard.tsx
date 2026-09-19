@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import iconPage from '../images/icon-page.png';
 import { Doughnut, Line } from 'react-chartjs-2';
@@ -16,7 +16,7 @@ import {
 } from 'chart.js';
 import { api } from '../api/client.js';
 import { UC_CATEGORY_LABELS } from '../constants/index.js';
-import type { DashboardData, Especie } from '../types/index.js';
+import type { DashboardData } from '../types/index.js';
 
 ChartJS.register(
   CategoryScale,
@@ -56,10 +56,6 @@ function formatNumber(value: number): string {
   return value.toLocaleString('pt-BR');
 }
 
-function getSpeciesImage(species: Especie | undefined): string | null {
-  return species?.imagem_url || null;
-}
-
 function Icon({ type }: { type: 'leaf' | 'records' | 'shield' | 'database' }) {
   const common = {
     width: 18,
@@ -81,27 +77,17 @@ function Icon({ type }: { type: 'leaf' | 'records' | 'shield' | 'database' }) {
 
 export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
-  const [species, setSpecies] = useState<Especie[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
 useEffect(() => {
     let active = true;
 
-    Promise.all([
-      api.getDashboard(),
-      api.getEspecies({ page: 1, per_page: 100 }),
-    ])
-      .then(([dashboard, speciesResponse]) => {
+    api.getDashboard()
+      .then((dashboard) => {
         if (!active) return;
 
         setData(dashboard);
-
-        const rows = speciesResponse.data.filter(
-          (item): item is Especie => 'id' in item
-        );
-
-        setSpecies(rows);
       })
       .catch((err) => {
         if (!active) return;
@@ -121,33 +107,11 @@ useEffect(() => {
     };
   }, []);
 
-  const derived = useMemo(() => {
-    if (!data) return null;
-
-    const speciesById = new Map(species.map((item) => [item.id, item]));
-    const speciesUcCount = new Map<number, number>();
-
-    data.especies_por_uc.forEach((row) => {
-      speciesUcCount.set(row.especie_id, (speciesUcCount.get(row.especie_id) ?? 0) + 1);
-    });
-
-    const topSpecies = [...speciesUcCount.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([id, ucCount]) => ({ species: speciesById.get(id), ucCount }))
-      .filter((item) => item.species);
-
-    const fallbackSpecies = species.slice(0, 5).map((item) => ({ species: item, ucCount: 0 }));
-    const ranking = topSpecies.length ? topSpecies : fallbackSpecies;
-
-    return { ranking };
-  }, [data, species]);
-
   if (loading) {
     return <div className="dashboard-loading" role="status" aria-live="polite">Carregando dashboard...</div>;
   }
 
-  if (error || !data || !derived) {
+  if (error || !data) {
     return <div className="dashboard-error" role="alert">Erro ao carregar o dashboard: {error ?? 'dados indisponíveis'}.</div>;
   }
 
@@ -279,9 +243,6 @@ useEffect(() => {
             <div className="dashboard-panel-inner">
               <div className="dashboard-panel-header">
                 <div><h2 className="dashboard-panel-title">Ocorrências ao longo do tempo</h2><p className="dashboard-panel-subtitle">Total de registros por ano, conforme os dados disponíveis na API.</p></div>
-                <select className="dashboard-select" defaultValue="anos" aria-label="Período do gráfico">
-                  <option value="anos">Período disponível</option>
-                </select>
               </div>
               <div className="dashboard-chart"><Line data={temporalData} options={temporalOptions} /></div>
             </div>
@@ -294,21 +255,18 @@ useEffect(() => {
                 <Link to="/especies" className="dashboard-link">Ver todas →</Link>
               </div>
               <ol className="dashboard-ranking">
-                {derived.ranking.length ? derived.ranking.map((item, index) => {
-                  const itemSpecies = item.species;
-                  return (
-                    <li className="dashboard-ranking-item" key={itemSpecies?.id ?? index}>
-                      <span className="dashboard-rank">{index + 1}</span>
-                      {getSpeciesImage(itemSpecies) ? <img className="dashboard-ranking-avatar" src={getSpeciesImage(itemSpecies) ?? undefined} alt="" /> : <div className="dashboard-ranking-avatar" aria-hidden="true" />}
-                      <span className="dashboard-ranking-name">
-                        {itemSpecies?.nome_popular ?? itemSpecies?.nome_cientifico ?? 'Espécie sem nome'}
-                        <small>{itemSpecies?.nome_cientifico ?? 'Nome científico indisponível'}</small>
-                      </span>
-                      <span className="dashboard-ranking-value">{item.ucCount ? `${item.ucCount} UCs` : '—'}</span>
-                      <span className="dashboard-ranking-arrow" aria-hidden="true">›</span>
-                    </li>
-                  );
-                }) : <li className="dashboard-panel-subtitle">Não há dados suficientes para montar o ranking.</li>}
+                {data.especies_mais_presentes_uc.length ? data.especies_mais_presentes_uc.map((item, index) => (
+                  <li className="dashboard-ranking-item" key={item.especie_id}>
+                    <span className="dashboard-rank">{index + 1}</span>
+                    {item.imagem_url ? <img className="dashboard-ranking-avatar" src={item.imagem_url} alt="" /> : <div className="dashboard-ranking-avatar" aria-hidden="true" />}
+                    <span className="dashboard-ranking-name">
+                      {item.nome_popular ?? item.nome_cientifico}
+                      <small>{item.nome_cientifico}</small>
+                    </span>
+                    <span className="dashboard-ranking-value">{item.total_ucs} UCs</span>
+                    <span className="dashboard-ranking-arrow" aria-hidden="true">›</span>
+                  </li>
+                )) : <li className="dashboard-panel-subtitle">Não há dados suficientes para montar o ranking.</li>}
               </ol>
             </div>
           </section>

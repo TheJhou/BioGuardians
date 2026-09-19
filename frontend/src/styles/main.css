@@ -195,7 +195,11 @@ a, button { transition: all 0.2s ease; }
 }
 
 .app-header {
-  background: var(--card-bg);
+  background-color: var(--navy);
+  background-image: linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45)), url('../images/FundoHome.png');
+  background-size: 100% auto;
+  background-position: top center;
+  background-repeat: no-repeat;
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
@@ -213,7 +217,6 @@ a, button { transition: all 0.2s ease; }
 
 /* ---- Header dark (global) ---- */
 .app-header--dark {
-  background: var(--navy);
   border-bottom: 1px solid var(--header-dark-border);
 }
 
@@ -552,8 +555,13 @@ a, button { transition: all 0.2s ease; }
    ============================================================ */
 
 /* ---- Gradiente cobre header + conteúdo da Home ---- */
+/* Imagem de fundo cobre header + conteúdo da Home */
 .app-layout:has(.home-page) {
-  background: var(--bg-gradient);
+  background-color: var(--navy);
+  background-image: linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45)), url('../images/FundoHome.png');
+  background-size: 100% auto;
+  background-position: top center;
+  background-repeat: no-repeat;
 }
 
 .home-page {
@@ -564,7 +572,6 @@ a, button { transition: all 0.2s ease; }
   flex-direction: column;
   color: #fff;
   overflow: hidden;
-  background: var(--bg-gradient);
 }
 
 /* Área rolável da Home — começa abaixo do header */
@@ -1980,9 +1987,14 @@ a, button { transition: all 0.2s ease; }
   color: #fff;
 }
 
-.map-sidebar .dropdown-trigger { border-color: transparent; }
+.map-sidebar .dropdown-trigger { border-color: transparent; height: 33px; }
 .map-sidebar .dropdown-arrow { color: var(--text-on-blue-muted); }
+.map-sidebar .gsearch-input { height: 33px; font-size: 0.85rem; }
 .map-sidebar .gsearch-input::placeholder { color: var(--text-on-blue-muted); }
+.map-sidebar .gsearch .gfx-border  { height: 34px; }
+.map-sidebar .gsearch .gfx-white   { height: 35px; }
+.map-sidebar .gsearch .gfx-dark-bg { height: 37px; }
+.map-sidebar .gsearch .gfx-glow    { height: 70px; }
 
 .map-sidebar .dropdown-trigger:hover { background: var(--blue-primary); }
 .map-sidebar .gbtn-btn:hover { background: var(--blue-strong); }
@@ -2007,6 +2019,12 @@ a, button { transition: all 0.2s ease; }
 .map-clear-btn {
   margin-bottom: 16px;
 }
+
+.map-clear-btn .gbtn-btn { height: 33px; }
+.map-clear-btn .gfx-border  { height: 34px; }
+.map-clear-btn .gfx-white   { height: 35px; }
+.map-clear-btn .gfx-dark-bg { height: 37px; }
+.map-clear-btn .gfx-glow    { height: 70px; }
 
 .filter-group { margin-bottom: 18px; }
 .filter-label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--text); margin-bottom: 6px; }

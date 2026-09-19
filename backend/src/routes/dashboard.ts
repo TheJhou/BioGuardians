@@ -12,7 +12,18 @@ router.get('/', cacheMiddleware(undefined, () => 60_000), async (_req, res, next
       query('SELECT total_especies::int, total_cr::int, total_en::int, total_vu::int, total_nt::int, total_lc::int, total_dd::int, total_areas::int, area_total_ha::float, total_ocorrencias::int FROM dashboard_stats'),
       query('SELECT * FROM ranking_especies_categoria'),
       query('SELECT * FROM ucs_por_esfera'),
-      query('SELECT * FROM especies_por_uc ORDER BY area_nome, nome_cientifico'),
+      // Top 6 espécies por quantidade de UCs distintas em que ocorrem
+      // (junção pré-calculada por trigger — cobre todas as espécies ativas).
+      query(
+        `SELECT e.id AS especie_id, e.nome_cientifico, e.nome_popular, e.imagem_url,
+                COUNT(DISTINCT oa.area_id)::int AS total_ucs
+         FROM ocorrencia_area oa
+         JOIN ocorrencia o ON o.id = oa.ocorrencia_id
+         JOIN especie e ON e.id = o.especie_id AND e.status = 'ativo'
+         GROUP BY e.id, e.nome_cientifico, e.nome_popular, e.imagem_url
+         ORDER BY total_ucs DESC, e.nome_cientifico
+         LIMIT 6`
+      ),
       // Espécies por bioma (via vínculo especie↔bioma).
       query(
         `SELECT b.nome, COUNT(DISTINCT e.id)::int AS total
@@ -50,7 +61,7 @@ router.get('/', cacheMiddleware(undefined, () => 60_000), async (_req, res, next
       stats: stats.rows[0],
       ranking: ranking.rows,
       ucs_por_esfera: ucsEsfera.rows,
-      especies_por_uc: especiesUc.rows,
+      especies_mais_presentes_uc: especiesUc.rows,
       especies_por_bioma: especiesBioma.rows,
       ocorrencias_por_ano: occAno.rows,
       ucs_por_categoria: ucsCategoria.rows,
