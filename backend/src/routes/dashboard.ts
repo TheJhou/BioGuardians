@@ -8,7 +8,7 @@ const router = Router();
 // Cached for 60s. Uses Promise.all to fetch all views concurrently.
 router.get('/', cacheMiddleware(undefined, () => 60_000), async (_req, res, next) => {
   try {
-    const [stats, ranking, ucsEsfera, especiesUc, especiesBioma, occAno, ucsCategoria] = await Promise.all([
+    const [stats, ranking, ucsEsfera, especiesUc, especiesBioma, occAno, ucsCategoria, topEspecies] = await Promise.all([
       query('SELECT total_especies::int, total_cr::int, total_en::int, total_vu::int, total_nt::int, total_lc::int, total_dd::int, total_areas::int, area_total_ha::float, total_ocorrencias::int FROM dashboard_stats'),
       query('SELECT * FROM ranking_especies_categoria'),
       query('SELECT * FROM ucs_por_esfera'),
@@ -22,13 +22,11 @@ router.get('/', cacheMiddleware(undefined, () => 60_000), async (_req, res, next
          GROUP BY b.nome
          ORDER BY total DESC`
       ),
-      // Ocorrências por ano do evento (a partir de 2000 — antes disso é ruido).
+      // Ocorrências por ano — data_evento com fallback para criado_em,
+      // assim registros sem data do evento também entram no gráfico.
       query(
-        `SELECT EXTRACT(YEAR FROM o.data_evento)::int AS ano, COUNT(*)::int AS total
+        `SELECT EXTRACT(YEAR FROM COALESCE(o.data_evento, o.criado_em))::int AS ano, COUNT(*)::int AS total
          FROM ocorrencia o
-         JOIN especie e ON e.id = o.especie_id AND e.status = 'ativo'
-         WHERE o.data_evento IS NOT NULL
-           AND EXTRACT(YEAR FROM o.data_evento) >= 2000
          GROUP BY ano
          ORDER BY ano`
       ),
@@ -36,6 +34,15 @@ router.get('/', cacheMiddleware(undefined, () => 60_000), async (_req, res, next
         `SELECT categoria_uc, COUNT(*)::int AS total
          FROM area_protegida
          GROUP BY categoria_uc`
+      ),
+      // Top 6 espécies por número de ocorrências.
+      query(
+        `SELECT o.especie_id, e.nome_cientifico, e.nome_popular, COUNT(*)::int AS total
+         FROM ocorrencia o
+         JOIN especie e ON e.id = o.especie_id AND e.status = 'ativo'
+         GROUP BY o.especie_id, e.nome_cientifico, e.nome_popular
+         ORDER BY total DESC, e.nome_cientifico
+         LIMIT 6`
       ),
     ]);
 
@@ -47,6 +54,7 @@ router.get('/', cacheMiddleware(undefined, () => 60_000), async (_req, res, next
       especies_por_bioma: especiesBioma.rows,
       ocorrencias_por_ano: occAno.rows,
       ucs_por_categoria: ucsCategoria.rows,
+      especies_mais_ocorrencias: topEspecies.rows,
     });
   } catch (err) { next(err); }
 });

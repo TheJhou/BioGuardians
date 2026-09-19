@@ -1,17 +1,15 @@
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import Header from './Header.js';
+import Footer from './Footer.js';
 
 export default function Layout() {
-  const { pathname } = useLocation();
-  const isHome = pathname === '/' || pathname === '/home';
-  const isMap = pathname === '/mapa';
-
   return (
     <div className="app-layout">
-      {!isHome && !isMap && <Header />}
+      <Header />
       <main className="page-main">
         <Outlet />
       </main>
+      <Footer />
     </div>
   );
 }

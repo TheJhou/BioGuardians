@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { useScrollReveal } from '../lib/scroll-reveal';
 import { LazyImage } from '../lib/lazy-image';
-import Header from '../components/layout/Header.js';
 import LeafIcon from '../components/icons/LeafIcon.js';
 import GraficoIcon from '../components/icons/GraficoIcon.js';
 import PersonsIcon from '../components/icons/PersonsIcon.js';
@@ -70,8 +69,7 @@ export default function HomePage() {
   }, []);
 
   return (
-    <div className="home-page">
-      <Header />
+    <div className="home-page container">
       <div className="home-scroll" ref={revealRef}>
       {/* ===== Seção 1 — Hero + Features + Stats ===== */}
       <section className="home-section home-section--hero">
@@ -212,7 +210,7 @@ export default function HomePage() {
         {/* --- CTA banner --- */}
         <div className="cta-banner" data-reveal>
           <div className="cta-banner-left">
-            <span className="cta-eyebrow">Natureza hoje,<br />Oportunidades amanhã</span>
+            <span className="cta-eyebrow">Natureza hoje, Oportunidades amanhã</span>
             <h2 className="cta-title">
               Informação que<br />
               conecta <span className="hero-accent">pessoas e natureza.</span>

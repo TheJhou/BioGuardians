@@ -8,7 +8,7 @@
 .gbtn-btn {
   position: relative;
   z-index: 1;
-  background: var(--green-darker);
+  background: var(--blue-accent);
   border: none;
   border-radius: 8px;
   color: var(--text-on-dark);

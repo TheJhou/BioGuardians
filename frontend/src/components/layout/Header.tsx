@@ -74,31 +74,32 @@ export default function Header() {
   return (
     <>
       <header className="app-header app-header--dark">
-        <div className="header-brand">
-          <img src={iconPage} alt="" width="28" height="28" />
-          <span className="brand-name">BioGuardians</span>
+        <div className="header-inner container">
+          <div className="header-brand">
+            <img src={iconPage} alt="" width="28" height="28" />
+            <span className="brand-name">BioGuardians</span>
+          </div>
+
+          <nav className="header-nav" aria-label="Navegação principal">
+            <GlowFrame>
+              {navItems.map((item) => (
+                <NavLink
+                  key={item.to}
+                  ref={(el) => { navRefs.current[item.to] = el; }}
+                  to={item.to}
+                  end={item.to === '/home'}
+                  className="header-nav-link"
+                >
+                  {item.label}
+                </NavLink>
+              ))}
+              <span
+                className="header-nav-indicator"
+                style={{ left: indicator.left, width: indicator.width, opacity: indicator.visible ? 1 : 0 }}
+              />
+            </GlowFrame>
+          </nav>
         </div>
-
-        <nav className="header-nav" aria-label="Navegação principal">
-          <GlowFrame>
-            {navItems.map((item) => (
-              <NavLink
-                key={item.to}
-                ref={(el) => { navRefs.current[item.to] = el; }}
-                to={item.to}
-                end={item.to === '/home'}
-                className="header-nav-link"
-              >
-                {item.label}
-              </NavLink>
-            ))}
-            <span
-              className="header-nav-indicator"
-              style={{ left: indicator.left, width: indicator.width, opacity: indicator.visible ? 1 : 0 }}
-            />
-          </GlowFrame>
-        </nav>
-
       </header>
 
       <nav className="bottom-nav" aria-label="Navegação mobile">

@@ -1,5 +1,4 @@
 ﻿import { useState, useEffect, useCallback, useMemo } from 'react';
-import Header from '../components/layout/Header.js';
 import MapView from '../components/MapView.js';
 import OccurrencePanel from '../components/OccurrencePanel.js';
 import AreaPanel from '../components/AreaPanel.js';
@@ -134,9 +133,7 @@ export default function MapPage() {
   );
 
   return (
-    <div className="map-page">
-      <Header />
-
+    <div className="map-page container">
       <div className="map-content">
         <aside className={`map-sidebar ${showFilters ? 'map-sidebar--open' : ''}`}>
           <h3 className="sidebar-title">Filtros</h3>

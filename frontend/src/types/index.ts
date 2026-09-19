@@ -170,6 +170,13 @@ export interface UcPorCategoria {
   total: number;
 }
 
+export interface EspecieMaisOcorrencias {
+  especie_id: number;
+  nome_cientifico: string;
+  nome_popular: string | null;
+  total: number;
+}
+
 export interface DashboardData {
   stats: DashboardStats;
   ranking: RankingCategoria[];
@@ -178,6 +185,7 @@ export interface DashboardData {
   especies_por_bioma: BiomaCount[];
   ocorrencias_por_ano: OcorrenciaPorAno[];
   ucs_por_categoria: UcPorCategoria[];
+  especies_mais_ocorrencias: EspecieMaisOcorrencias[];
 }
 
 // GeoJSON types
