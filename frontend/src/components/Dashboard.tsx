@@ -15,13 +15,7 @@ import {
   Plugin,
 } from 'chart.js';
 import { api } from '../api/client.js';
-import {
-  CATEGORY_COLORS,
-  CATEGORY_LABELS,
-  SPHERE_COLORS,
-  SPHERE_LABELS,
-  UC_CATEGORY_LABELS,
-} from '../constants/index.js';
+import { UC_CATEGORY_LABELS } from '../constants/index.js';
 import type { DashboardData, Especie } from '../types/index.js';
 
 ChartJS.register(
@@ -48,10 +42,10 @@ const doughnutTotalPlugin: Plugin<'doughnut'> = {
     ctx.save();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#F5FBF8';
+    ctx.fillStyle = '#FFFFFF';
     ctx.font = `800 ${Math.max(16, Math.round(arc.outerRadius * 0.22))}px Inter, sans-serif`;
     ctx.fillText(total.toLocaleString('pt-BR'), arc.x, arc.y - 5);
-    ctx.fillStyle = 'rgba(229,242,236,.68)';
+    ctx.fillStyle = 'rgba(184,213,245,.68)';
     ctx.font = `500 ${Math.max(9, Math.round(arc.outerRadius * 0.09))}px Inter, sans-serif`;
     ctx.fillText('total', arc.x, arc.y + 14);
     ctx.restore();
@@ -66,7 +60,7 @@ function getSpeciesImage(species: Especie | undefined): string | null {
   return species?.imagem_url || null;
 }
 
-function Icon({ type }: { type: 'leaf' | 'records' | 'shield' | 'database' | 'trend' | 'pin' | 'spark' }) {
+function Icon({ type }: { type: 'leaf' | 'records' | 'shield' | 'database' }) {
   const common = {
     width: 18,
     height: 18,
@@ -82,10 +76,7 @@ function Icon({ type }: { type: 'leaf' | 'records' | 'shield' | 'database' | 'tr
   if (type === 'leaf') return <svg {...common}><path d="M20 4C10 4 4 10 4 20c6 0 12-2 15-7 1-2 1-5 1-9Z" /><path d="M4 20c3-4 6-7 11-10" /></svg>;
   if (type === 'records') return <svg {...common}><rect x="5" y="3" width="14" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></svg>;
   if (type === 'shield') return <svg {...common}><path d="M12 3 19 6v5c0 5-3.2 8.5-7 10-3.8-1.5-7-5-7-10V6l7-3Z" /><path d="m9 12 2 2 4-4" /></svg>;
-  if (type === 'database') return <svg {...common}><ellipse cx="12" cy="5" rx="7" ry="3" /><path d="M5 5v7c0 1.7 3.1 3 7 3s7-1.3 7-3V5" /><path d="M5 12v7c0 1.7 3.1 3 7 3s7-1.3 7-3v-7" /></svg>;
-  if (type === 'trend') return <svg {...common}><path d="M4 16 9 11l4 4 7-8" /><path d="M15 7h5v5" /></svg>;
-  if (type === 'pin') return <svg {...common}><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="2.5" /></svg>;
-  return <svg {...common}><path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3Z" /><path d="m19 16 .8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8L19 16Z" /></svg>;
+  return <svg {...common}><ellipse cx="12" cy="5" rx="7" ry="3" /><path d="M5 5v7c0 1.7 3.1 3 7 3s7-1.3 7-3V5" /><path d="M5 12v7c0 1.7 3.1 3 7 3s7-1.3 7-3v-7" /></svg>;
 }
 
 export default function Dashboard() {
@@ -148,19 +139,8 @@ useEffect(() => {
 
     const fallbackSpecies = species.slice(0, 5).map((item) => ({ species: item, ucCount: 0 }));
     const ranking = topSpecies.length ? topSpecies : fallbackSpecies;
-    const featured = ranking[0]?.species ?? species[0];
 
-    const yearly = [...data.ocorrencias_por_ano].sort((a, b) => a.ano - b.ano);
-    const latest = yearly.at(-1);
-    const previous = yearly.at(-2);
-    const growth = latest && previous && previous.total > 0
-      ? Math.round(((latest.total - previous.total) / previous.total) * 100)
-      : null;
-
-    const leadingBiome = [...data.especies_por_bioma].sort((a, b) => b.total - a.total)[0];
-    const leadingThreat = [...data.ranking].sort((a, b) => b.total - a.total)[0];
-
-    return { ranking, featured, growth, latest, previous, leadingBiome, leadingThreat };
+    return { ranking };
   }, [data, species]);
 
   if (loading) {
@@ -172,22 +152,21 @@ useEffect(() => {
   }
 
   const stats = data.stats;
-  const threatTotal = stats.total_cr + stats.total_en + stats.total_vu + stats.total_nt;
 
   const temporalData = {
     labels: data.ocorrencias_por_ano.map((item) => String(item.ano)),
     datasets: [{
       label: 'Ocorrências',
       data: data.ocorrencias_por_ano.map((item) => item.total),
-      borderColor: '#39E58F',
-      backgroundColor: 'rgba(57, 229, 143, 0.12)',
+      borderColor: '#4486D9',
+      backgroundColor: 'rgba(68, 134, 217, 0.15)',
       fill: true,
       tension: 0.38,
       borderWidth: 2,
       pointRadius: 3,
       pointHoverRadius: 5,
-      pointBackgroundColor: '#39E58F',
-      pointBorderColor: '#08271e',
+      pointBackgroundColor: '#4486D9',
+      pointBorderColor: '#031D2D',
       pointBorderWidth: 2,
     }],
   };
@@ -198,32 +177,44 @@ useEffect(() => {
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: '#062A20',
-        borderColor: 'rgba(126,221,177,.25)',
+        backgroundColor: '#052237',
+        borderColor: 'rgba(184,213,245,.25)',
         borderWidth: 1,
         titleColor: '#fff',
-        bodyColor: '#dcebe4',
+        bodyColor: '#B8D5F5',
         displayColors: false,
         callbacks: { label: (context: { parsed: { y: number | null } }) => `${formatNumber(context.parsed.y ?? 0)} ocorrências` },
       },
     },
     scales: {
-      y: { beginAtZero: true, ticks: { color: 'rgba(229,242,236,.55)', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,.07)' }, border: { display: false } },
-      x: { ticks: { color: 'rgba(229,242,236,.55)', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,.045)' }, border: { display: false } },
+      y: { beginAtZero: true, ticks: { color: 'rgba(184,213,245,.55)', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,.07)' }, border: { display: false } },
+      x: { ticks: { color: 'rgba(184,213,245,.55)', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,.045)' }, border: { display: false } },
     },
   };
 
-  const biomeColors = ['#39E58F', '#9AD84B', '#20B8FF', '#F2CA35', '#FF8A3D', '#AEBBB5', '#7E65FF'];
+  const biomeColors = ['#4486D9', '#1677E8', '#20B8FF', '#F2CA35', '#FF8A3D', '#AEBBB5', '#7E65FF'];
   const biomeData = {
     labels: data.especies_por_bioma.map((item) => item.nome),
     datasets: [{ data: data.especies_por_bioma.map((item) => item.total), backgroundColor: biomeColors, borderWidth: 0, hoverOffset: 5 }],
+  };
+
+  const recorrenciaColors = ['#1677E8', '#4486D9', '#20B8FF', '#0D4588', '#B8D5F5', '#7E65FF'];
+  const recorrenciaLabels = data.especies_mais_ocorrencias.map((item) => item.nome_popular ?? item.nome_cientifico);
+  const recorrenciaData = {
+    labels: recorrenciaLabels,
+    datasets: [{
+      data: data.especies_mais_ocorrencias.map((item) => item.total),
+      backgroundColor: recorrenciaColors,
+      borderWidth: 0,
+      hoverOffset: 5,
+    }],
   };
 
   const ucData = {
     labels: data.ucs_por_categoria.map((item) => UC_CATEGORY_LABELS[item.categoria_uc] ?? item.categoria_uc),
     datasets: [{
       data: data.ucs_por_categoria.map((item) => item.total),
-      backgroundColor: data.ucs_por_categoria.map((item) => item.categoria_uc === 'protecao_integral' ? '#39E58F' : '#20B8FF'),
+      backgroundColor: data.ucs_por_categoria.map((item) => item.categoria_uc === 'protecao_integral' ? '#4486D9' : '#20B8FF'),
       borderWidth: 0,
       hoverOffset: 5,
     }],
@@ -236,21 +227,16 @@ useEffect(() => {
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: '#062A20',
+        backgroundColor: '#052237',
         titleColor: '#fff',
-        bodyColor: '#dcebe4',
-        borderColor: 'rgba(126,221,177,.25)',
+        bodyColor: '#B8D5F5',
+        borderColor: 'rgba(184,213,245,.25)',
         borderWidth: 1,
       },
     },
   };
 
-  const sources = [
-    ['MMA', 'Espécies ameaçadas'],
-    ['GBIF', 'Ocorrências globais'],
-    ['speciesLink', 'Dados de coleções'],
-    ['CNUC', 'Áreas protegidas'],
-  ];
+  const sources = ['MMA', 'GBIF', 'speciesLink', 'CNUC', 'Wildlife Insights', 'IA (OpenRouter)', 'iNaturalist'];
 
   return (
     <div className="dashboard-page">
@@ -264,19 +250,7 @@ useEffect(() => {
         </div>
       </aside>
 
-      <div className="dashboard-shell dashboard-main">
-        <header className="dashboard-intro">
-          <div>
-            <p className="dashboard-kicker">Biodiversidade em foco</p>
-            <h1 className="dashboard-title">Bem-vindo!</h1>
-            <p className="dashboard-description">Aqui estão os principais dados sobre a biodiversidade brasileira, organizados para facilitar a leitura e a tomada de decisão.</p>
-          </div>
-          <div className="dashboard-update">
-            <span className="dashboard-update-dot" aria-hidden="true" />
-            <span>Dados consolidados<br /><strong>{derived.latest?.ano ?? '—'}</strong></span>
-          </div>
-        </header>
-
+      <div className="dashboard-shell dashboard-main container">
         <section className="dashboard-stats" aria-label="Indicadores principais">
           <article className="dashboard-stat">
             <div className="dashboard-stat-head"><span className="dashboard-stat-icon"><Icon type="leaf" /></span><span className="dashboard-stat-label">Espécies registradas</span></div>
@@ -296,11 +270,11 @@ useEffect(() => {
           <article className="dashboard-stat">
             <div className="dashboard-stat-head"><span className="dashboard-stat-icon"><Icon type="database" /></span><span className="dashboard-stat-label">Fontes de dados</span></div>
             <strong className="dashboard-stat-value">{sources.length}</strong>
-            <span className="dashboard-stat-meta muted">MMA, GBIF, speciesLink, CNUC</span>
+            <span className="dashboard-stat-meta muted">{sources.join(', ')}</span>
           </article>
         </section>
 
-        <div className="dashboard-grid dashboard-grid--main">
+        <div className="dashboard-grid">
           <section className="dashboard-panel dashboard-panel--chart">
             <div className="dashboard-panel-inner">
               <div className="dashboard-panel-header">
@@ -338,76 +312,46 @@ useEffect(() => {
               </ol>
             </div>
           </section>
-        </div>
 
-        <div className="dashboard-grid dashboard-grid--wide">
-          <section className="dashboard-panel">
+          <div className="dashboard-grid-doughnuts">
+          <section className="dashboard-panel dashboard-panel--doughnut">
             <div className="dashboard-panel-inner">
               <div className="dashboard-panel-header"><div><h2 className="dashboard-panel-title">Espécies por bioma</h2><p className="dashboard-panel-subtitle">Distribuição disponível no dashboard atual.</p></div></div>
-              <div className="dashboard-doughnut"><Doughnut data={biomeData} plugins={[doughnutTotalPlugin]} options={doughnutOptions} /></div>
-              <div className="dashboard-legend">
-                {data.especies_por_bioma.map((item, index) => <div className="dashboard-legend-item" key={item.nome}><span className="dashboard-legend-dot" style={{ background: biomeColors[index % biomeColors.length] }} /><span>{item.nome} · {formatNumber(item.total)}</span></div>)}
+              <div className="dashboard-doughnut-row">
+                <div className="dashboard-legend">
+                  {data.especies_por_bioma.map((item, index) => <div className="dashboard-legend-item" key={item.nome}><span className="dashboard-legend-dot" style={{ background: biomeColors[index % biomeColors.length] }} /><span>{item.nome} · {formatNumber(item.total)}</span></div>)}
+                </div>
+                <div className="dashboard-doughnut"><Doughnut data={biomeData} plugins={[doughnutTotalPlugin]} options={doughnutOptions} /></div>
               </div>
             </div>
           </section>
 
-          <section className="dashboard-panel">
+          <section className="dashboard-panel dashboard-panel--doughnut">
             <div className="dashboard-panel-inner">
               <div className="dashboard-panel-header"><div><h2 className="dashboard-panel-title">Unidades de Conservação por categoria</h2><p className="dashboard-panel-subtitle">Totais reais retornados pela aplicação.</p></div></div>
-              <div className="dashboard-doughnut"><Doughnut data={ucData} plugins={[doughnutTotalPlugin]} options={doughnutOptions} /></div>
-              <div className="dashboard-legend">
-                {data.ucs_por_categoria.map((item) => <div className="dashboard-legend-item" key={item.categoria_uc}><span className="dashboard-legend-dot" style={{ background: item.categoria_uc === 'protecao_integral' ? '#39E58F' : '#20B8FF' }} /><span>{UC_CATEGORY_LABELS[item.categoria_uc] ?? item.categoria_uc} · {formatNumber(item.total)}</span></div>)}
-              </div>
-            </div>
-          </section>
-        </div>
-
-        <div className="dashboard-grid dashboard-grid--bottom">
-          <section className="dashboard-panel">
-            <div className="dashboard-panel-inner">
-              <div className="dashboard-panel-header"><div><h2 className="dashboard-panel-title">Insights da biodiversidade</h2><p className="dashboard-panel-subtitle">Indicadores derivados somente dos dados disponíveis.</p></div></div>
-              <div className="dashboard-insights">
-                <article className="dashboard-insight"><div className="dashboard-insight-icon"><Icon type="trend" /></div><span className="dashboard-insight-label">Variação anual</span><strong className="dashboard-insight-value">{derived.growth === null ? '—' : `${derived.growth > 0 ? '+' : ''}${derived.growth}%`}</strong><p className="dashboard-insight-text">Comparação entre o último ano e o ano anterior com dados disponíveis.</p></article>
-                <article className="dashboard-insight"><div className="dashboard-insight-icon"><Icon type="pin" /></div><span className="dashboard-insight-label">Bioma com mais espécies</span><strong className="dashboard-insight-value">{derived.leadingBiome?.nome ?? '—'}</strong><p className="dashboard-insight-text">Maior total na distribuição de espécies por bioma.</p></article>
-                <article className="dashboard-insight"><div className="dashboard-insight-icon"><Icon type="spark" /></div><span className="dashboard-insight-label">Categoria predominante</span><strong className="dashboard-insight-value">{derived.leadingThreat ? (CATEGORY_LABELS[derived.leadingThreat.categoria_ameaca] ?? derived.leadingThreat.categoria_ameaca) : '—'}</strong><p className="dashboard-insight-text">Maior quantidade entre as categorias de ameaça retornadas.</p></article>
-              </div>
-            </div>
-          </section>
-
-          <section className="dashboard-panel">
-            <div className="dashboard-panel-inner">
-              <div className="dashboard-panel-header"><div><h2 className="dashboard-panel-title">Espécie em destaque</h2><p className="dashboard-panel-subtitle">Primeira espécie do ranking disponível.</p></div></div>
-              {derived.featured ? (
-                <div className="dashboard-featured">
-                  <div className="dashboard-featured-media">
-                    {getSpeciesImage(derived.featured) ? <img src={getSpeciesImage(derived.featured) ?? undefined} alt={derived.featured.nome_popular ?? derived.featured.nome_cientifico} /> : <div className="dashboard-featured-placeholder">Imagem não disponível</div>}
-                  </div>
-                  <div>
-                    <h3 className="dashboard-featured-name">{derived.featured.nome_popular ?? derived.featured.nome_cientifico}</h3>
-                    <div className="dashboard-featured-scientific">{derived.featured.nome_cientifico}</div>
-                    <p className="dashboard-featured-description">{derived.featured.descricao ?? 'Descrição ainda não disponível para esta espécie.'}</p>
-                    <strong className="dashboard-featured-count">{derived.ranking[0]?.ucCount ?? 0}<small> UCs relacionadas</small></strong>
-                    <Link to={`/especies/${derived.featured.id}`} className="dashboard-featured-button">Ver página da espécie →</Link>
-                  </div>
+              <div className="dashboard-doughnut-row">
+                <div className="dashboard-legend">
+                  {data.ucs_por_categoria.map((item) => <div className="dashboard-legend-item" key={item.categoria_uc}><span className="dashboard-legend-dot" style={{ background: item.categoria_uc === 'protecao_integral' ? '#4486D9' : '#20B8FF' }} /><span>{UC_CATEGORY_LABELS[item.categoria_uc] ?? item.categoria_uc} · {formatNumber(item.total)}</span></div>)}
                 </div>
-              ) : <p className="dashboard-panel-subtitle">Nenhuma espécie disponível para destaque.</p>}
-            </div>
-          </section>
-
-          <section className="dashboard-panel">
-            <div className="dashboard-panel-inner">
-              <div className="dashboard-panel-header"><div><h2 className="dashboard-panel-title">Fontes de dados</h2><p className="dashboard-panel-subtitle">Bases já utilizadas pelo sistema.</p></div></div>
-              <div className="dashboard-sources">
-                {sources.map(([name, description]) => <div className="dashboard-source" key={name}><span className="dashboard-source-mark">{name.slice(0, 2)}</span><span><strong className="dashboard-source-name">{name}</strong><small className="dashboard-source-desc">{description}</small></span></div>)}
+                <div className="dashboard-doughnut"><Doughnut data={ucData} plugins={[doughnutTotalPlugin]} options={doughnutOptions} /></div>
               </div>
             </div>
           </section>
+
+          <section className="dashboard-panel dashboard-panel--doughnut">
+            <div className="dashboard-panel-inner">
+              <div className="dashboard-panel-header"><div><h2 className="dashboard-panel-title">Maior recorrência por espécie</h2><p className="dashboard-panel-subtitle">As 6 espécies com mais ocorrências registradas no banco.</p></div></div>
+              <div className="dashboard-doughnut-row">
+                <div className="dashboard-legend">
+                  {data.especies_mais_ocorrencias.map((item, index) => <div className="dashboard-legend-item" key={item.especie_id}><span className="dashboard-legend-dot" style={{ background: recorrenciaColors[index % recorrenciaColors.length] }} /><span>{item.nome_popular ?? item.nome_cientifico} · {formatNumber(item.total)}</span></div>)}
+                </div>
+                <div className="dashboard-doughnut"><Doughnut data={recorrenciaData} plugins={[doughnutTotalPlugin]} options={doughnutOptions} /></div>
+              </div>
+            </div>
+          </section>
+          </div>
         </div>
 
-        <footer className="dashboard-footer">
-          <span><img className="dashboard-footer-logo" src={iconPage} alt="" width="16" height="16" /> BioGuardians · Dados abertos. Natureza viva.</span>
-          <span>Ciência · Conservação · Tecnologia · Brasil</span>
-        </footer>
       </div>
     </div>
   );

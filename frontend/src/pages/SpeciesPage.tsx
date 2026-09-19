@@ -190,7 +190,7 @@ export default function SpeciesPage() {
   if (loading && items.length === 0) return <div className="loading">Carregando espécies...</div>;
 
   return (
-    <div className="species-page">
+    <div className="species-page container">
       <aside className="species-list-panel">
         <div className="species-search">
           <GlowSearch
@@ -243,7 +243,7 @@ export default function SpeciesPage() {
         </div>
       </aside>
 
-      <main className="species-detail" ref={detailRef}>
+      <section className="species-detail" ref={detailRef}>
         {selected ? (
           <>
             <div className="species-detail-header">
@@ -354,7 +354,7 @@ export default function SpeciesPage() {
         ) : (
           <div className="empty-state">Selecione uma espécie para ver os detalhes.</div>
         )}
-      </main>
+      </section>
     </div>
   );
 }
