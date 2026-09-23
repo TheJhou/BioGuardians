@@ -4,12 +4,19 @@ import { query } from './db/pool.js';
 // Os tiles cobrem o dataset completo (sem filtros): requests com
 // filtro seguem o caminho antigo (LRU em memória + query dinâmica).
 
+// Simplificação: tolerância de ~1 pixel (tile de 256 px) aplicada em graus,
+// ANTES do ST_Transform. ST_Simplify (sem preservar topologia) é ~40x mais
+// rápido que ST_SimplifyPreserveTopology com resultado visual equivalente
+// (medido em produção: tile z4 de 2.400 ms para 60 ms, 23 KB vs 26 KB).
+// O último argumento (true) mantém polígonos pequenos em vez de descartá-los.
+export const AREA_SIMPLIFY_SQL = `ST_Transform(ST_Simplify(a.geom, 360.0 / (256 * POWER(2, $1)), true), 3857)`;
+
 const AREA_TILE_SQL = `
   SELECT COALESCE(encode(ST_AsMVT(mvt, 'uc', 4096, 'geom'), 'base64'), '') AS mvt
   FROM (
     SELECT
       ST_AsMVTGeom(
-        ST_SimplifyPreserveTopology(ST_Transform(a.geom, 3857), 156543.03392 / POWER(2, $1)),
+        ${AREA_SIMPLIFY_SQL},
         bounds.b, 4096, 256, true
       ) AS geom,
       a.id,

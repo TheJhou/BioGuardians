@@ -228,6 +228,7 @@ sh db/migrate.sh --dry-run   # simula
 | `002_schema_hardening.sql` | `registro_id` BIGINT na auditoria, `deteccao.geom` + GIST, sync bidirecional lat/lon ↔ geom, `dashboard_stats` com scan único |
 | `003_ocorrencia_area.sql` | Junção `ocorrencia_area` mantida por trigger; funções e `especies_por_uc` sem `ST_Contains` na leitura |
 | `004_area_tile_cache.sql` | Tabela `area_tile` com os tiles MVT das UCs (ver `docs/AREA_TILE_CACHE.md`) |
+| `005_audit_without_geometry.sql` | Auditoria guarda `geom_md5` em vez do polígono inteiro |
 
 ## Otimizações de BD
 

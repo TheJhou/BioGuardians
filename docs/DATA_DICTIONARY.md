@@ -193,6 +193,8 @@ Mantida por triggers em `ocorrencia` e `area_protegida` (migration 003).
 ### `log_auditoria`
 
 Log de alterações em `especie` e `area_protegida` (populado por trigger).
+Desde a migration 005, a coluna `geom` não é copiada para `dados_anteriores`/`dados_novos`:
+ela é substituída por `geom_md5` (hash do GeoJSON), que indica se a geometria mudou.
 
 | Coluna | Tipo | Nulidade | PK | FK | Default | Descrição |
 |--------|------|----------|----|----|---------|-----------|

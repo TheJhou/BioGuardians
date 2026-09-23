@@ -9,9 +9,13 @@ const cache = new LRUCache<string, Record<string, unknown>>({
   ttl: env.cache.ttlMs,
 });
 
-// Separate cache for vector tiles (binary buffers).
+// Separate cache for vector tiles (binary buffers). Limited by bytes as well
+// as count: low-zoom tiles can be tens of KB and the production container
+// has 512 MB, so a count-only limit could grow unbounded with many filters.
 const tileCache = new LRUCache<string, Buffer>({
   max: 2000,
+  maxSize: 64 * 1024 * 1024, // 64 MB
+  sizeCalculation: (buf) => Math.max(1, buf.length), // tiles vazios têm 0 byte
   ttl: 60 * 60 * 1000, // 1 hora
 });
 
