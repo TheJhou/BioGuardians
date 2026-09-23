@@ -195,11 +195,7 @@ a, button { transition: all 0.2s ease; }
 }
 
 .app-header {
-  background-color: var(--navy);
-  background-image: linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45)), url('../images/FundoHome.png');
-  background-size: 100% auto;
-  background-position: top center;
-  background-repeat: no-repeat;
+  background: #0B2101;
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
@@ -242,7 +238,7 @@ a, button { transition: all 0.2s ease; }
 .app-header--dark .menu-bar { background: #fff; }
 
 .app-header--dark .header-nav-mobile {
-  background: var(--navy);
+  background: #0B2101;
   border-bottom: 1px solid var(--header-dark-border);
 }
 
@@ -551,11 +547,10 @@ a, button { transition: all 0.2s ease; }
 .error { color: var(--danger); }
 
 /* ============================================================
-   Home — 2 viewports com gradiente da paleta como background
+   Home — 2 viewports com FundoHome.png como background
    ============================================================ */
 
-/* ---- Gradiente cobre header + conteúdo da Home ---- */
-/* Imagem de fundo cobre header + conteúdo da Home */
+/* Imagem de fundo cobre o conteúdo da Home (header segue cor sólida) */
 .app-layout:has(.home-page) {
   background-color: var(--navy);
   background-image: linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45)), url('../images/FundoHome.png');
