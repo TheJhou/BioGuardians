@@ -23,6 +23,14 @@
   --rgb-white: 255 255 255;
   --rgb-black: 0 0 0;
 
+  /* ---- Cores de apoio (séries dos gráficos, ícones do dashboard) ----
+     Também lidas pelos gráficos via constants/chartTheme.ts */
+  --rgb-mint: 32 255 181;          /* #20FFB5 */
+  --rgb-yellow: 242 202 53;        /* #F2CA35 */
+  --rgb-orange: 255 138 61;        /* #FF8A3D */
+  --rgb-gray: 174 187 181;         /* #AEBBB5 */
+  --rgb-violet: 126 101 255;       /* #7E65FF */
+
   /* ---- Cores ---- */
   --color-bg: rgb(var(--rgb-bg));
   --color-surface: rgb(var(--rgb-surface));

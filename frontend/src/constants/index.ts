@@ -1,5 +1,10 @@
 // Shared constants for BioGuardians frontend.
 // Centralizes colors, labels, and configuration to avoid hardcoding.
+//
+// Cores de DADOS (categoria de ameaça, categoria de UC) vivem aqui e são a
+// fonte única para mapa (MapLibre), badges e legendas — MapLibre precisa dos
+// valores em JS. Cores da INTERFACE (paleta verde) vivem em styles/tokens.css;
+// os gráficos as leem de lá via constants/chartTheme.ts.
 
 // --- Threat category colors (IUCN/MMA standard) ---
 export const CATEGORY_COLORS: Record<string, string> = {
@@ -10,6 +15,11 @@ export const CATEGORY_COLORS: Record<string, string> = {
   LC: '#388e3c', // green — Least Concern
   DD: '#757575', // gray — Data Deficient
   NE: '#90a4ae', // blue-gray — Not Evaluated / non-wildlife
+};
+
+// Texto sobre o fundo da categoria: escuro só onde o fundo é claro (VU amarelo).
+const CATEGORY_TEXT_COLORS: Record<string, string> = {
+  VU: '#333333',
 };
 
 // --- Threat category labels (Portuguese, public-friendly) ---
@@ -31,16 +41,8 @@ export const UC_CATEGORY_COLORS: Record<string, string> = {
 
 // --- UC category labels ---
 export const UC_CATEGORY_LABELS: Record<string, string> = {
-  protecao_integral: 'Protecao Integral',
-  uso_sustentavel: 'Uso Sustentavel',
-};
-
-// --- Sphere colors ---
-export const SPHERE_COLORS: Record<string, string> = {
-  federal: '#1565c0',
-  estadual: '#2e7d32',
-  municipal: '#f57c00',
-  particular: '#757575',
+  protecao_integral: 'Proteção Integral',
+  uso_sustentavel: 'Uso Sustentável',
 };
 
 // --- Sphere labels ---
@@ -103,6 +105,11 @@ export const MAP_DEFAULTS = {
 // --- Helper: get color for a category, fallback to gray ---
 export function getCategoryColor(category: string): string {
   return CATEGORY_COLORS[category] || '#757575';
+}
+
+// --- Helper: text color readable on top of the category color ---
+export function getCategoryTextColor(category: string): string {
+  return CATEGORY_TEXT_COLORS[category] || '#ffffff';
 }
 
 // --- Helper: get color for a UC category, fallback to blue ---

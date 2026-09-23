@@ -1,5 +1,5 @@
 import { LazyImage } from '../lib/lazy-image';
-import { CATEGORY_LABELS } from '../constants/index.js';
+import CategoryBadge from './ui/CategoryBadge.js';
 import type { OcorrenciaProperties } from '../types/index.js';
 
 interface OccurrencePanelProps {
@@ -39,9 +39,7 @@ export default function OccurrencePanel({ ocorrencia, onClose }: OccurrencePanel
             {ocorrencia.nome_popular || ocorrencia.nome_cientifico}
           </h4>
           <p className="bottom-panel-subtitle">{ocorrencia.nome_cientifico}</p>
-          <span className={`cat-badge cat-${ocorrencia.categoria_ameaca.toLowerCase()}`}>
-            {CATEGORY_LABELS[ocorrencia.categoria_ameaca] || ocorrencia.categoria_ameaca}
-          </span>
+          <CategoryBadge code={ocorrencia.categoria_ameaca} />
           <div className="bottom-panel-meta">
             <span><strong>Data:</strong> {ocorrencia.data_evento || 'N/A'}</span>
             <span><strong>Fonte:</strong> {ocorrencia.fonte}</span>

@@ -1,4 +1,4 @@
-import { CATEGORY_LABELS } from '../constants/index.js';
+import CategoryBadge from './ui/CategoryBadge.js';
 import type { EspecieEmArea } from '../types/index.js';
 
 interface AreaPanelProps {
@@ -26,9 +26,7 @@ export default function AreaPanel({ areaId, areaName, species, onClose }: AreaPa
                 <li key={sp.especie_id} className="bottom-panel-list-item">
                   <strong>{sp.nome_cientifico}</strong>
                   {sp.nome_popular && ` (${sp.nome_popular})`}
-                  <span className={`cat-badge cat-${sp.categoria.toLowerCase()}`}>
-                    {CATEGORY_LABELS[sp.categoria] || sp.categoria}
-                  </span>
+                  <CategoryBadge code={sp.categoria} />
                 </li>
               ))}
             </ul>

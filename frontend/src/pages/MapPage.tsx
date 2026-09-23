@@ -6,7 +6,10 @@ import DropdownSelect from '../components/DropdownSelect.js';
 import SpeciesSearch from '../components/SpeciesSearch.js';
 import GlowButton from '../components/GlowButton.js';
 import CosmicToggle from '../components/CosmicToggle.js';
-import { FONTE_LABELS, FONTE_OPTIONS, CATEGORY_OPTIONS } from '../constants/index.js';
+import {
+  FONTE_LABELS, FONTE_OPTIONS, CATEGORY_OPTIONS,
+  CATEGORY_COLORS, UC_CATEGORY_COLORS, UC_CATEGORY_LABELS,
+} from '../constants/index.js';
 import { api } from '../api/client.js';
 import type { Especie, OcorrenciaProperties, OcorrenciaTileProperties, AreaTileProperties, EspecieEmArea } from '../types/index.js';
 
@@ -31,26 +34,38 @@ const defaultLayers: MapLayers = { unidades: true, ocorrencias: true };
 const fonteOptions = FONTE_OPTIONS.map((f) => ({ value: f, label: FONTE_LABELS[f] || f }));
 const categoriaOptions = CATEGORY_OPTIONS.map((c) => ({ value: c.codigo, label: c.nome }));
 
+// Rótulos curtos para caber na barra lateral; as cores vêm das mesmas
+// constantes que o MapView usa para pintar polígonos e pontos.
+const LEGEND_CATEGORY_LABELS: [code: string, label: string][] = [
+  ['CR', 'CR — Criticamente em Perigo'],
+  ['EN', 'EN — Entrando em Extinção'],
+  ['VU', 'VU — Alto Risco'],
+  ['NT', 'NT — Em Ameaça'],
+  ['LC', 'LC — Sem Risco'],
+  ['DD', 'DD — Sem Dados'],
+  ['NE', 'NE — Não Avaliada'],
+];
+
 function MapLegend() {
   return (
     <div className="map-legend">
       <h4>Legenda</h4>
       <div className="legend-section">
+        {/* O mapa pinta as UCs pela categoria SNUC (categoria_uc), não pela esfera */}
         <span className="legend-section-title">Unidades de Conservação</span>
-        <div className="legend-item"><span className="legend-dot dot-uc-fed"></span> Federal</div>
-        <div className="legend-item"><span className="legend-dot dot-uc-est"></span> Estadual</div>
-        <div className="legend-item"><span className="legend-dot dot-uc-mun"></span> Municipal</div>
-        <div className="legend-item"><span className="legend-dot dot-uc-part"></span> Particular</div>
+        {Object.entries(UC_CATEGORY_COLORS).map(([code, color]) => (
+          <div className="legend-item" key={code}>
+            <span className="legend-dot" style={{ background: color }}></span> {UC_CATEGORY_LABELS[code] ?? code}
+          </div>
+        ))}
       </div>
       <div className="legend-section">
         <span className="legend-section-title">Ocorrências por Categoria</span>
-        <div className="legend-item"><span className="legend-dot" style={{ background: '#d32f2f' }}></span> CR — Criticamente em Perigo</div>
-        <div className="legend-item"><span className="legend-dot" style={{ background: '#f57c00' }}></span> EN — Entrando em Extinção</div>
-        <div className="legend-item"><span className="legend-dot" style={{ background: '#fbc02d' }}></span> VU — Alto Risco</div>
-        <div className="legend-item"><span className="legend-dot" style={{ background: '#689f38' }}></span> NT — Em Ameaça</div>
-        <div className="legend-item"><span className="legend-dot" style={{ background: '#388e3c' }}></span> LC — Sem Risco</div>
-        <div className="legend-item"><span className="legend-dot" style={{ background: '#757575' }}></span> DD — Sem Dados</div>
-        <div className="legend-item"><span className="legend-dot" style={{ background: '#90a4ae' }}></span> NE — Não Avaliada</div>
+        {LEGEND_CATEGORY_LABELS.map(([code, label]) => (
+          <div className="legend-item" key={code}>
+            <span className="legend-dot" style={{ background: CATEGORY_COLORS[code] }}></span> {label}
+          </div>
+        ))}
       </div>
     </div>
   );

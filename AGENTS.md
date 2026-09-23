@@ -70,6 +70,8 @@ docs/           PROJECT_PLAN, DATA_DICTIONARY, ERD, OBSERVABILITY, AREA_TILE_CAC
 - O `@import` da fonte precisa ficar no topo do `tokens.css`: em outro lugar o Vite o descarta ou ele não chega ao início do bundle
 - CSS próprio ao lado do componente só em `Glow*.css` e `lib/*` (importados pelo próprio componente)
 - Paleta (verde escuro) em `styles/tokens.css`: cada cor existe uma vez como canais RGB (`--rgb-accent: 68 216 142`); as cores `--color-*` e as transparências derivam deles (`rgb(var(--rgb-accent) / 0.25)`). Não escreva hex/rgba da paleta direto no CSS: use `var(--color-*)` ou `rgb(var(--rgb-*) / a)`. Trocar a paleta = editar só os `--rgb-*`
+- Cores de **dados** (categoria de ameaça, categoria de UC) têm fonte única em `constants/index.ts` (`CATEGORY_COLORS`, `UC_CATEGORY_COLORS`), usada pelo mapa, pela legenda e pelo `components/ui/CategoryBadge.tsx` — nunca escreva essas cores em CSS ou inline. O mapa pinta UCs por `categoria_uc` (não por esfera)
+- Gráficos (Chart.js) leem a paleta dos tokens CSS em tempo de execução via `constants/chartTheme.ts` (`getChartTheme()`, `tokenColor()`); não escreva hex/rgba nos componentes de gráfico
 - Nomes de tokens: `--color-bg`, `--color-surface`, `--color-field`, `--color-primary`, `--color-accent`, `--color-accent-strong`, `--color-text`, `--color-text-muted`, `--color-text-faint`, `--color-border`, `--color-danger`, `--color-header-bg`, `--gradient-bg`, `--glass-*`, `--nav-*`, `--shadow*`, `--radius-*`
 - Busca de espécies com scroll infinito (15 por página)
 - Responsivo: header com navegação mobile + bottom nav, grids adaptáveis

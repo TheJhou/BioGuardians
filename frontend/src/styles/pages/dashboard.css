@@ -18,8 +18,6 @@
 
 .dashboard-page {
   --dash-border: rgb(var(--rgb-text-muted) / 0.16);
-  --dash-blue: #20FFB5;
-  --dash-yellow: #f2ca35;
   --dash-radius: 14px;
 
   position: relative;
@@ -194,15 +192,15 @@
 }
 
 .dashboard-stat:nth-child(2) .dashboard-stat-icon {
-  color: var(--dash-blue);
-  background: rgba(32, 255, 181, 0.1);
-  border-color: rgba(32, 255, 181, 0.15);
+  color: rgb(var(--rgb-mint));
+  background: rgb(var(--rgb-mint) / 0.1);
+  border-color: rgb(var(--rgb-mint) / 0.15);
 }
 
 .dashboard-stat:nth-child(3) .dashboard-stat-icon {
-  color: var(--dash-yellow);
-  background: rgba(242, 202, 53, 0.1);
-  border-color: rgba(242, 202, 53, 0.15);
+  color: rgb(var(--rgb-yellow));
+  background: rgb(var(--rgb-yellow) / 0.1);
+  border-color: rgb(var(--rgb-yellow) / 0.15);
 }
 
 .dashboard-stat:nth-child(4) .dashboard-stat-icon {
