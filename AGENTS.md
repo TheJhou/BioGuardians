@@ -13,7 +13,7 @@
 ```
 backend/        API Express (routes/, cache/, db/, middleware/, telemetry/, utils/, tileStore.ts, tileWarmup.ts)
 backend/scripts/generateAreaTiles.ts   pré-geração dos tiles MVT das UCs
-frontend/       SPA React (pages/, components/, lib/, api/client.ts, styles/main.css)
+frontend/       SPA React (pages/, components/, lib/, api/client.ts, styles/)
 db/             migrate.sh, migrations/ (001–004), tests/smoke_test.sql
 ml-service/     FastAPI + CLI de classificação de camera trap
 scripts/data/   importadores e enriquecimento (MMA, CNUC, GBIF, speciesLink, Wikipedia, iNaturalist)
@@ -66,7 +66,9 @@ docs/           PROJECT_PLAN, DATA_DICTIONARY, ERD, OBSERVABILITY, AREA_TILE_CAC
 - Cliente da API centralizado em `src/api/client.ts` (`VITE_API_URL`, default `http://localhost:3001/api`)
 - Mapa: tiles vetoriais MVT de áreas e ocorrências servidos pelo backend + basemap MapTiler (`VITE_MAPTILER_API_KEY`)
 - Efeitos visuais isolados em `src/lib/` (glow, tilt, scroll-reveal, animated-tabs, lazy-image)
-- Estilos: `src/styles/main.css` (global, tokens em `:root`) + CSS próprio de alguns componentes (`Glow*.css`) e de `lib/*`
+- Estilos globais em `src/styles/`, com entrada única `index.css` (importado no `main.tsx`). A ordem dos `@import` define a cascata: `tokens.css` (variáveis + fonte) → `base.css` → `layout.css` → `components/*.css` → `pages/*.css`. Cada media query fica no arquivo da área que ela afeta
+- O `@import` da fonte precisa ficar no topo do `tokens.css`: em outro lugar o Vite o descarta ou ele não chega ao início do bundle
+- CSS próprio ao lado do componente só em `Glow*.css` e `lib/*` (importados pelo próprio componente)
 - Paleta atual: verde escuro (os tokens ainda se chamam `--blue-*`/`--navy` por herança da paleta anterior)
 - Busca de espécies com scroll infinito (15 por página)
 - Responsivo: header com navegação mobile + bottom nav, grids adaptáveis

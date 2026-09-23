@@ -1,0 +1,34 @@
+/* ============================================================
+   Footer
+   ============================================================ */
+
+.app-footer {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 0.61rem;
+}
+
+.app-footer-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  padding-block: 12px;
+}
+
+/* O mapa é full-screen: o footer global não aparece nele */
+.app-layout:has(.map-page) .app-footer { display: none; }
+
+.app-footer-logo {
+  vertical-align: -3px;
+  object-fit: contain;
+}
+
+.app-footer span:last-child {
+  text-align: right;
+}
+
+@media (max-width: 1024px) {
+  .app-footer { display: none; }
+}

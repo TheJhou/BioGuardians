@@ -1,5 +1,5 @@
 /* ---- Scroll reveal (elementos entram ao rolar) ---- */
-/* Importar este arquivo uma vez no projeto (ex: main.css ou index.tsx). */
+/* Importar este arquivo uma vez no projeto (hoje: main.tsx). */
 
 [data-reveal].sr-reveal {
   opacity: 0;

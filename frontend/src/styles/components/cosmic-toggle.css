@@ -1,0 +1,232 @@
+/* ---- Cosmic toggle (camadas) — adaptado de uiverse.io/3HugaDa3, escala ~0.7 ---- */
+.cosmic-toggle {
+  display: block;
+  position: relative;
+  width: 36px;
+  height: 20px;
+  transform-style: preserve-3d;
+  perspective: 500px;
+  cursor: pointer;
+}
+
+.cosmic-toggle .toggle {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.cosmic-toggle .slider {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+  background: linear-gradient(45deg, var(--navy), var(--navy-2));
+  border-radius: 10px;
+  transition: 0.5s;
+  transform-style: preserve-3d;
+  box-shadow:
+    0 0 8px rgba(0, 0, 0, 0.5),
+    inset 0 0 6px rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+}
+
+.cosmic-toggle .cosmos {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(1px 1px at 10% 10%, #fff 100%, transparent),
+    radial-gradient(1px 1px at 20% 20%, #fff 100%, transparent),
+    radial-gradient(2px 2px at 30% 30%, #fff 100%, transparent),
+    radial-gradient(1px 1px at 40% 40%, #fff 100%, transparent),
+    radial-gradient(2px 2px at 50% 50%, #fff 100%, transparent),
+    radial-gradient(1px 1px at 60% 60%, #fff 100%, transparent),
+    radial-gradient(2px 2px at 70% 70%, #fff 100%, transparent),
+    radial-gradient(1px 1px at 80% 80%, #fff 100%, transparent),
+    radial-gradient(1px 1px at 90% 90%, #fff 100%, transparent);
+  background-size: 200% 200%;
+  opacity: 0.1;
+  transition: 0.5s;
+}
+
+.cosmic-toggle .toggle-orb {
+  position: absolute;
+  height: 16px;
+  width: 16px;
+  left: 2px;
+  bottom: 2px;
+  background: linear-gradient(145deg, var(--blue-accent), var(--blue-field));
+  border-radius: 50%;
+  transition: 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  transform-style: preserve-3d;
+  z-index: 2;
+}
+
+.cosmic-toggle .inner-orb {
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #fff, #e6e6e6);
+  transition: 0.5s;
+  overflow: hidden;
+}
+
+.cosmic-toggle .inner-orb::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    rgba(0, 0, 0, 0.1) 10deg,
+    transparent 20deg
+  );
+  animation: patternRotate 10s linear infinite;
+}
+
+.cosmic-toggle .ring {
+  position: absolute;
+  inset: -1px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  transition: 0.5s;
+}
+
+.cosmic-toggle .toggle:checked + .slider {
+  background: linear-gradient(45deg, var(--navy-2), var(--blue-field));
+}
+
+.cosmic-toggle .toggle:checked + .slider .toggle-orb {
+  transform: translateX(16px) rotate(360deg);
+  background: linear-gradient(145deg, var(--blue-accent), var(--blue-strong));
+}
+
+.cosmic-toggle .toggle:checked + .slider .inner-orb {
+  background: linear-gradient(145deg, var(--blue-strong), var(--blue-field));
+  transform: scale(0.9);
+}
+
+.cosmic-toggle .toggle:checked + .slider .ring {
+  border-color: rgba(68, 216, 142, 0.4);
+  animation: ringPulse 2s infinite;
+}
+
+.cosmic-toggle .energy-line {
+  position: absolute;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(68, 216, 142, 0.5), transparent);
+  transform-origin: left;
+  opacity: 0;
+  transition: 0.5s;
+}
+
+.cosmic-toggle .energy-line:nth-of-type(2) { top: 20%; transform: rotate(15deg); }
+
+.cosmic-toggle .energy-line:nth-of-type(3) { top: 50%; transform: rotate(0deg); }
+
+.cosmic-toggle .energy-line:nth-of-type(4) { top: 80%; transform: rotate(-15deg); }
+
+.cosmic-toggle .toggle:checked + .slider .energy-line {
+  opacity: 1;
+  animation: energyFlow 2s linear infinite;
+}
+
+.cosmic-toggle .particles {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+}
+
+.cosmic-toggle .particle {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  background: var(--blue-accent);
+  border-radius: 50%;
+  opacity: 0;
+}
+
+.cosmic-toggle .toggle:checked + .slider .particle {
+  animation: particleBurst 1s ease-out infinite;
+}
+
+.cosmic-toggle .particle:nth-child(1) { --angle: 30deg; left: 20%; animation-delay: 0s; }
+
+.cosmic-toggle .particle:nth-child(2) { --angle: 60deg; left: 40%; animation-delay: 0.2s; }
+
+.cosmic-toggle .particle:nth-child(3) { --angle: 90deg; left: 60%; animation-delay: 0.4s; }
+
+.cosmic-toggle .particle:nth-child(4) { --angle: 120deg; left: 80%; animation-delay: 0.6s; }
+
+.cosmic-toggle .particle:nth-child(5) { --angle: 150deg; left: 30%; animation-delay: 0.8s; }
+
+.cosmic-toggle .particle:nth-child(6) { --angle: 180deg; left: 70%; animation-delay: 1s; }
+
+.cosmic-toggle .slider:hover .toggle-orb {
+  filter: brightness(1.2);
+  box-shadow:
+    0 0 20px rgba(68, 216, 142, 0.5),
+    0 0 40px rgba(68, 216, 142, 0.3);
+}
+
+.cosmic-toggle .slider:hover .cosmos {
+  opacity: 0.2;
+  animation: cosmosPan 20s linear infinite;
+}
+
+.cosmic-toggle .toggle:active + .slider .toggle-orb { transform: scale(0.95); }
+
+.cosmic-toggle:hover .slider { transform: rotateX(10deg) rotateY(10deg); }
+
+.cosmic-toggle:hover .toggle-orb { transform: translateZ(4px); }
+
+.cosmic-toggle:hover .toggle:checked + .slider .toggle-orb {
+  transform: translateX(16px) rotate(360deg) translateZ(4px);
+}
+
+.cosmic-toggle .toggle:focus-visible + .slider {
+  outline: 2px solid var(--blue-accent);
+  outline-offset: 2px;
+}
+
+.cosmic-toggle .toggle:checked + .slider::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at var(--x) var(--y), rgba(68, 216, 142, 0.2), transparent 50%);
+  opacity: 0;
+  animation: glowFollow 2s linear infinite;
+}
+
+@keyframes ringPulse {
+  0%, 100% { transform: scale(1); opacity: 0.3; }
+  50% { transform: scale(1.1); opacity: 0.6; }
+}
+
+@keyframes patternRotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes energyFlow {
+  0% { transform: scaleX(0) translateX(0); opacity: 0; }
+  50% { transform: scaleX(1) translateX(50%); opacity: 1; }
+  100% { transform: scaleX(0) translateX(100%); opacity: 0; }
+}
+
+@keyframes particleBurst {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% {
+    transform: translate(calc(cos(var(--angle)) * 15px), calc(sin(var(--angle)) * 15px)) scale(0);
+    opacity: 0;
+  }
+}
+
+@keyframes cosmosPan {
+  0% { background-position: 0% 0%; }
+  100% { background-position: 200% 200%; }
+}
+
+@keyframes glowFollow {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 0.5; }
+}

@@ -1,0 +1,21 @@
+/* ============================================================
+   BioGuardians — ponto de entrada dos estilos globais
+   A ordem dos imports define a cascata: tokens → base → layout
+   → componentes → páginas.
+   ============================================================ */
+
+@import './tokens.css';
+@import './base.css';
+@import './layout.css';
+@import './components/header.css';
+@import './components/footer.css';
+@import './components/ui.css';
+@import './components/category-badge.css';
+@import './components/dropdown-select.css';
+@import './components/species-search.css';
+@import './components/species-chips.css';
+@import './components/cosmic-toggle.css';
+@import './pages/home.css';
+@import './pages/dashboard.css';
+@import './pages/map.css';
+@import './pages/species.css';

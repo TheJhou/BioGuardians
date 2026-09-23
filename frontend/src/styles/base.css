@@ -1,0 +1,60 @@
+/* ============================================================
+   Base — reset, body, scrollbar, animações e skeleton globais
+   ============================================================ */
+
+* { margin: 0; padding: 0; box-sizing: border-box; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+
+body {
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--bg-gradient);
+  color: var(--text);
+  overflow-x: hidden;
+}
+
+html { overflow-x: hidden; }
+
+/* ---- Scrollbar global fina (~metade do padrão) ---- */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+
+::-webkit-scrollbar-track { background: transparent; }
+
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+
+img, svg, canvas, iframe, video { max-width: 100%; height: auto; }
+
+a, button { transition: all 0.2s ease; }
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---- Scroll reveal (elementos entram ao rolar) ---- */
+/* Implementação em src/lib/scroll-reveal/ — CSS importado via main.tsx */
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--border) 0%, rgba(184, 245, 225, 0.25) 50%, var(--border) 100%);
+  background-size: 200% 100%;
+  animation: skeleton 1.2s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+.image-skeleton-wrapper { width: 100%; height: 100%; }
+
+.species-avatar-skeleton { width: 100%; height: 100%; border-radius: 50%; }
+
+.species-detail-img-skeleton { width: 100%; height: 100%; border-radius: var(--radius-md); }
+
+.occurrence-image-skeleton { width: 100%; height: 100%; border-radius: var(--radius-md); }
+
+@keyframes skeleton {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

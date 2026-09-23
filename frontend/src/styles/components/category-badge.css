@@ -1,0 +1,24 @@
+/* ============================================================
+   Badges de categoria
+   ============================================================ */
+
+.cat-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.cat-cr { background: #d32f2f; }
+
+.cat-en { background: #f57c00; }
+
+.cat-vu { background: #fbc02d; color: #333; }
+
+.cat-nt { background: #689f38; }
+
+.cat-lc { background: #388e3c; }
+
+.cat-dd { background: #757575; }

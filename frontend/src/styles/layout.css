@@ -1,0 +1,85 @@
+/* ============================================================
+   Layout global
+   ============================================================ */
+
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--bg-gradient);
+}
+
+.page-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+  min-width: 0;
+  padding-bottom: 24px;
+  animation: fade-in 0.35s ease-out;
+}
+
+/* ============================================================
+   Container — caixa de conteúdo reutilizável.
+   Centraliza, limita a largura e aplica o padding lateral.
+   Tags que precisam dessa configuração usam somente a classe;
+   ajustes finos via --container-max e --container-pad.
+   ============================================================ */
+
+.container {
+  width: 100%;
+  max-width: var(--container-max);
+  margin-inline: auto;
+  padding-inline: var(--container-pad);
+}
+
+/* Home, Mapa e Dashboard ocupam 100% sem padding */
+.page-main:has(.home-page),
+.page-main:has(.map-page),
+.page-main:has(.dashboard-page) { padding-bottom: 0; overflow-x: hidden; }
+
+/* Espécies: padding inferior próprio (o scroll do page-main depende dele) */
+.page-main:has(.species-page) { padding-bottom: 12px; }
+
+/* Dashboard ocupa toda a área disponível abaixo do header */
+.page-main:has(.dashboard-page) {
+  padding: 0;
+  overflow-x: hidden;
+  min-width: 0;
+}
+
+.app-header {
+  background: #0B2101;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  position: relative;
+  min-height: 40px;
+}
+
+@media (max-width: 1024px) {
+  .page-main { padding-bottom: 20px; }
+  .page-main:has(.home-page),
+  .page-main:has(.dashboard-page) { padding-bottom: 0; }
+  .page-main:has(.map-page) { padding-bottom: 64px; }
+  .page-main:has(.species-page) { padding-bottom: 64px; }
+}
+
+@media (max-width: 768px) {
+  .page-main { padding-bottom: 88px; }
+  .page-main:has(.home-page),
+  .page-main:has(.map-page) { padding-bottom: 64px; }
+  .page-main:has(.species-page) { padding-bottom: 88px; }
+}
