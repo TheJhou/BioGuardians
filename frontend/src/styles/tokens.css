@@ -79,6 +79,17 @@
   --radius-card: 20px;
 }
 
+/* ============================================================
+   Breakpoints padrão (media query não aceita var(), então os
+   valores são escritos direto — use só estes quatro):
+     1400px  telas médias (ex.: grids de 3 colunas viram 1)
+     1024px  tablet: some a nav do header, aparece a bottom-nav
+      768px  celular grande
+      560px  celular pequeno
+   JS que depende de largura usa os mesmos valores
+   (ex.: SpeciesPage usa 768).
+   ============================================================ */
+
 @media (max-width: 1024px) {
   :root { --container-pad: 20px; }
 }

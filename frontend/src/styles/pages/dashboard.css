@@ -647,19 +647,8 @@
 }
 
 /* ============================================================
-   Tablet / telas menores
+   Tablet / telas menores (breakpoints padrão: ver tokens.css)
    ============================================================ */
-
-@media (max-width: 1180px) {
-  .dashboard-sidebar {
-    display: none;
-  }
-
-  .dashboard-main {
-    width: 100%;
-  }
-
-}
 
 @media (max-width: 1400px) {
   .dashboard-grid-doughnuts {
@@ -667,7 +656,10 @@
   }
 }
 
-@media (max-width: 900px) {
+/* 1024px = mesma largura em que a bottom-nav aparece; o padding-bottom
+   abre espaço para ela (antes era 900px e o fim do dashboard ficava
+   escondido atrás da barra entre 901 e 1024px). */
+@media (max-width: 1024px) {
   .dashboard-page {
     padding-bottom: 86px;
     background-attachment: scroll;

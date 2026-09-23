@@ -497,24 +497,14 @@
 
 .icon-placeholder--sm { width: 36px; height: 36px; }
 
-/* ---- Responsivo seção 2 ---- */
-@media (max-width: 1024px) {
-  .platform-cards { grid-template-columns: 1fr; }
-  .sources-cards { grid-template-columns: repeat(2, 1fr); }
-  .cta-banner { grid-template-columns: 1fr; gap: 24px; padding: 32px 0; }
-  .cta-banner-right { align-items: center; text-align: center; }
-  .section-header { flex-direction: column; align-items: flex-start; }
-}
-
-@media (max-width: 768px) {
-  .sources-cards { grid-template-columns: 1fr; }
-  .cta-banner { padding: 24px 0; }
-}
-
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
 }
+
+/* ============================================================
+   Responsivo (breakpoints padrão: ver tokens.css)
+   ============================================================ */
 
 @media (max-width: 1024px) {
   .home-section { padding: 40px 24px; }
@@ -522,7 +512,11 @@
   .hero-tag { margin: 0 auto; }
   .hero-text { max-width: 100%; }
   .hero-title { font-size: 2rem; }
+  .section-header { flex-direction: column; align-items: flex-start; }
+  .platform-cards { grid-template-columns: 1fr; }
   .sources-cards { grid-template-columns: repeat(2, 1fr); }
+  .cta-banner { grid-template-columns: 1fr; gap: 24px; padding: 32px 0; }
+  .cta-banner-right { align-items: center; text-align: center; }
 }
 
 @media (max-width: 768px) {
@@ -533,7 +527,6 @@
   .home-section--content { align-items: center; text-align: center; }
   .section-block { align-items: center; text-align: center; }
   .section-eyebrow { margin-left: auto; margin-right: auto; }
-  .hero-content { align-items: center; text-align: center; }
   .hero-title { font-size: 1.6rem; }
   .hero-text { font-size: 0.9rem; }
   .br-desktop { display: none; }
@@ -544,6 +537,6 @@
   .stats-section + .stats-section { border-left: none; }
   .stats-section:nth-child(odd) { border-right: 1px solid var(--glass-divider); }
   .stat-skeleton { min-width: 100%; }
-  .platform-cards { grid-template-columns: 1fr; }
   .sources-cards { grid-template-columns: 1fr; }
+  .cta-banner { padding: 24px 0; }
 }
