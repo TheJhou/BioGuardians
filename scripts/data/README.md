@@ -1,7 +1,8 @@
 # BioGuardians - Data Loading Scripts
 
 This directory contains scripts to populate the database with real data
-from official Brazilian biodiversity sources.
+from official Brazilian biodiversity sources, enrich species with
+descriptions and images, and standardize threat categories.
 
 ## Data Sources
 
@@ -19,23 +20,23 @@ from official Brazilian biodiversity sources.
 - **Portaria MMA Nº 444, de 17 de dezembro de 2014** — Lista de espécies
   aquáticas ameaçadas de extinção.
 
-**Categories used** (IUCN/MMA):
-| Código | Nome | Descrição |
-|--------|------|-----------|
-| CR | Criticamente em Perigo | Risco altíssimo de extinção |
-| EN | Em Perigo | Risco muito alto de extinção |
-| VU | Vulnerável | Risco alto de extinção |
-| NT | Quase Ameaçada | Próxima de qualificar como ameaçada |
-| LC | Menos Preocupante | Ampla distribuição, população estável |
-| DD | Dados Insuficientes | Informação inadequada para avaliação |
+**Categories used** (enum `categoria_ameaca_tipo`, labels as stored in `categoria_ameaca`):
+| Code | Label in the app | IUCN meaning |
+|------|------------------|--------------|
+| CR | Criticamente em Perigo | Critically Endangered |
+| EN | Entrando em Extinção | Endangered |
+| VU | Alto Risco de Entrar em Extinção | Vulnerable |
+| NT | Em Ameaça | Near Threatened |
+| LC | Sem Risco | Least Concern |
+| DD | Sem Dados para Avaliar | Data Deficient |
+| NE | Não Avaliada | Not Evaluated (also used for non-wildlife detected by camera traps) |
 
 **Where to download**:
 - Fauna: https://www.gov.br/mma/pt-br/temas/conservacao-da-biodiversidade/fauna-brasileira
 - Flora: https://www.gov.br/mma/pt-br/temas/conservacao-da-biodiversidade/flora-brasileira
-- Or directly from the MMA portal: https://www.mma.gov.br/
 
 **Format**: CSV (semicolon-separated, UTF-8)
-**Sample**: `input/mma_especies.csv` — 96 real threatened species included.
+**Sample**: `input/mma_especies.csv` — 97 real threatened species included.
 
 ---
 
@@ -56,49 +57,29 @@ metadata for all federal, state, municipal, and private UCs.
 | protecao_integral | Proteção Integral | Uso indireto dos recursos (não consome) |
 | uso_sustentavel | Uso Sustentável | Uso direto sustentável dos recursos |
 
-**Protection Integral subcategories**: Parque Nacional, Reserva Biológica,
-Estação Ecológica, Monumento Natural, Refúgio de Vida Silvestre.
-
-**Uso Sustentável subcategories**: Floresta Nacional, Reserva Extrativista,
-Reserva de Fauna, Área de Proteção Ambiental, Área de Relevante Interesse
-Ecológico, Reserva de Desenvolvimento Sustentável, Reserva Particular
-do Patrimônio Natural.
-
 **Administration spheres**: federal, estadual, municipal, particular.
 
 **Where to download**:
 - CNUC portal: http://cnuc.mma.gov.br/
 - Direct download (shapefile): http://cnuc.mma.gov.br/cnuc/app/gerenciar_dados_abertos
-- GeoServer WFS/WMS: http://geoserver.mma.gov.br/
 
-**Format**: Shapefile (SHP, SHX, DBF, PRJ)
-**SRID**: 4326 (WGS84) — converted automatically by the script.
+**Format**: Shapefile (SHP, SHX, DBF, PRJ) — read directly with the
+`shapefile` npm package (no `shp2pgsql` needed).
+**SRID**: 4326 (WGS84).
 
 ---
 
 ### 3. GBIF — Global Biodiversity Information Facility
 
-**What**: International network and data infrastructure that provides
-open access to biodiversity data from museums, herbaria, research
-institutions, and citizen science platforms worldwide.
-
-**Coverage**: ~2.5 billion occurrence records globally, including
-Brazilian data from:
-- SpeciesLink (Brazilian herbaria and museums)
-- INPA (Instituto Nacional de Pesquisas da Amazônia)
-- MPEG (Museu Paraense Emílio Goeldi)
-- ZUEC (Museu de Zoologia Unicamp)
-- And hundreds of other institutions
+**What**: International network that provides open access to biodiversity
+data from museums, herbaria, research institutions, and citizen science.
 
 **API**:
-- Base URL: `https://api.gbif.org/v1`
+- Base URL: `https://api.gbif.org/v1` (`GBIF_API_BASE`)
 - Endpoint: `/occurrence/search`
-- Parameters used: `country=BR`, `scientificName`, `hasCoordinate=true`
-- Rate limit: 500ms between requests (self-imposed, be nice)
-- No API key required (public API)
-
-**Documentation**: https://www.gbif.org/developer/summary
-**Brazilian portal**: https://www.gbif.org/country/BR/summary
+- Parameters used: `country=BR`, `scientificName`, `hasCoordinate=true`, `limit`
+- Rate limit: 500ms between requests (self-imposed)
+- No API key required
 
 **Data fields extracted**:
 | GBIF field | Our column | Description |
@@ -108,78 +89,48 @@ Brazilian data from:
 | eventDate | data_evento | Date of observation/collection |
 | institutionCode | base_registro | Source institution code |
 
-**Filter**: Only occurrences with coordinates within Brazil (`country=BR`).
+GBIF is also used by `validate_categories.mjs` to look up the IUCN category.
 
 ---
 
 ### 4. speciesLink — Rede speciesLink
 
-**What**: Brazilian network of biological collections that aggregates
-and provides open access to occurrence data from herbaria, museums,
-and biological collections across Brazil.
-
-**Coverage**: ~10 million records from ~400 collections, including:
-- Herbaria (e.g., SP, RB, BHCB, CESJ, HUEFS)
-- Zoological museums (e.g., MZUSP, MPEG, INPA)
-- Microorganism collections
-
-**Maintainer**: Centro de Referência em Informação Ambiental (CRIA)
-**Website**: https://www.splink.org.br/
-**API documentation**: https://api.splink.org.br/
+**What**: Brazilian network of biological collections (herbaria, museums)
+maintained by CRIA.
 
 **API**:
-- Base URL: `https://api.splink.org.br/records`
-- Endpoint: `/search`
-- Parameters: `scientificname`, `format=json`
+- Base URL: `https://specieslink.net/ws/1.0/search`
+- Parameters: `scientificname`, `format=json`, `limit`, `apikey`
+- **Requires an API key** (`SPLINK_API_KEY` in `.env`, get one at
+  https://specieslink.net/ws/1.0/). Without it, the script skips with a warning.
 - Rate limit: 1000ms between requests (self-imposed)
-- No API key required (public API)
 
-**Data fields extracted**:
-| speciesLink field | Our column | Description |
-|-------------------|------------|-------------|
-| decimalLatitude / latitude | lat | Latitude |
-| decimalLongitude / longitude | lon | Longitude |
-| eventDate / collectorDate | data_evento | Collection date |
-| institutionCode / institution | base_registro | Source collection |
+GBIF already aggregates much of speciesLink's data, so this loader is optional.
 
 ---
 
 ## Prerequisites
 
 ```bash
-# Copy .env and set credentials
+# From the repo root: copy .env and set DB credentials
 cp .env.example .env
 
-# Install dependencies (pg for Node.js scripts)
+# Install dependencies (pg, csv-parse, shapefile, dotenv)
 cd scripts/data
 npm install
 ```
 
-For CNUC shapefile loading, also required:
-- `shp2pgsql` (bundled with PostGIS)
-- `psql` (PostgreSQL client)
-
-```bash
-# Ubuntu/Debian
-sudo apt install postgis postgresql-client
-
-# macOS
-brew install postgis libpq
-```
+All scripts read the **root** `.env` (`../../.env`).
 
 ## Available Scripts
 
 ### 1. MMA — Espécies Ameaçadas
 
-**Input**: CSV file in `input/mma_especies.csv`
-**Script**: `load_mma_especies.mjs`
+**Script**: `load_mma_especies.mjs` (`npm run load:mma`)
 
 ```bash
-# Use the provided sample (96 real species)
-node load_mma_especies.mjs
-
-# Or use a custom CSV
-node load_mma_especies.mjs --file=input/custom_mma.csv
+node load_mma_especies.mjs                          # uses input/mma_especies.csv
+node load_mma_especies.mjs --file=input/custom.csv  # custom CSV
 ```
 
 **CSV format** (UTF-8, semicolon-separated):
@@ -189,85 +140,126 @@ panthera onca;onça-pintada;VU;Animalia;Chordata;Mammalia;Carnivora;Felidae;Pant
 ```
 
 **What it does**:
-1. Parses CSV with species data
-2. Creates taxonomy chain (reino → filo → classe → ordem → familia → genero)
+1. Parses the CSV
+2. Creates the taxonomy chain (reino → filo → classe → ordem → familia → genero)
 3. Inserts species with `ON CONFLICT (nome_cientifico) DO NOTHING`
-4. Links species to biomas (N:N via `especie_bioma`)
-5. Links species to estados (N:N via `especie_estado`)
+4. Links species to biomas (`especie_bioma`) and estados (`especie_estado`)
 
 ### 2. CNUC — Unidades de Conservação
 
-**Input**: Shapefile in `input/cnuc_ucs/`
-**Script**: `load_cnuc_ucs.mjs`
+**Script**: `load_cnuc_ucs.mjs` (`npm run load:cnuc`)
 
 ```bash
-# Download shapefile from CNUC (http://cnuc.mma.gov.br/)
-# Extract to: scripts/data/input/cnuc_ucs/
-
+# Extract .shp/.shx/.dbf/.prj from CNUC into input/cnuc_ucs/ (git-ignored)
 node load_cnuc_ucs.mjs
-
-# Or specify a custom directory
 node load_cnuc_ucs.mjs --dir=input/custom_cnuc
+node load_cnuc_ucs.mjs --file=input/cnuc_ucs/ucs.shp
 ```
 
 **What it does**:
-1. Runs `shp2pgsql` to convert shapefile to SQL (SRID 4326)
-2. Creates temporary table with raw shapefile data
-3. Auto-detects column names (nome, categoria, esfera, area, bioma, geom)
-4. Maps CNUC categories to `categoria_uc_tipo` enum
-5. Maps administration spheres to `esfera_tipo` enum
-6. Inserts into `area_protegida` with `ON CONFLICT (nome) DO NOTHING`
-7. Links biomas if bioma column exists
-8. Cleans up temporary table
+1. Reads the shapefile with the `shapefile` library
+2. Skips non-UC records (`limite` ≠ `uc`) and inactive UCs (`situacao` ≠ `ativo`)
+3. Maps `grupo` → `categoria_uc_tipo` and `esfera` → `esfera_tipo`
+4. Detects the bioma from the record attributes
+5. Inserts into `area_protegida` (`ST_Multi(ST_GeomFromText(...))`) with
+   `ON CONFLICT (nome) DO NOTHING`
+6. Calls `refresh_dashboard()` at the end
+
+The database triggers fill `ocorrencia_area` for existing occurrences. After a
+bulk UC load, regenerate the map tiles:
+
+```bash
+cd ../../backend && npm run generate-area-tiles
+```
 
 ### 3. GBIF — Ocorrências
 
-**Script**: `load_gbif_ocorrencias.mjs`
+**Script**: `load_gbif_ocorrencias.mjs` (`npm run load:gbif`)
 
 ```bash
-# Loads occurrences for all active species (limit 50 per species)
-node load_gbif_ocorrencias.mjs
-
-# Or for a specific species
-node load_gbif_ocorrencias.mjs --especie="panthera onca"
-
-# Or with a custom limit per species
-node load_gbif_ocorrencias.mjs --limit=100
+node load_gbif_ocorrencias.mjs                           # all active species, 50 per species
+node load_gbif_ocorrencias.mjs --especie="panthera onca" # one species
+node load_gbif_ocorrencias.mjs --limit=100               # custom limit per species
 ```
 
 **What it does**:
-1. Queries all active species from `especie` table
-2. For each species, calls GBIF API (`/occurrence/search?country=BR`)
-3. Filters results with valid coordinates
-4. Checks for duplicates via `(especie_id, lat, lon, fonte='gbif')`
-5. Inserts into `ocorrencia` with `geom = ST_MakePoint(lon, lat)`
-6. Rate-limits at 500ms between API calls
-7. Refreshes dashboard materialized views at the end
+1. Queries active species from `especie`
+2. Calls the GBIF API for each one (`country=BR`)
+3. Skips duplicates via `(especie_id, lat, lon, fonte='gbif')`
+4. Inserts into `ocorrencia` (the `geom` column and `ocorrencia_area` are filled by triggers)
+5. Calls `refresh_dashboard()` at the end
 
 ### 4. speciesLink — Ocorrências
 
-**Script**: `load_specieslink_ocorrencias.mjs`
+**Script**: `load_specieslink_ocorrencias.mjs` (`npm run load:splink`)
 
 ```bash
-# Loads occurrences for all active species
 node load_specieslink_ocorrencias.mjs
-
-# Or for a specific species
 node load_specieslink_ocorrencias.mjs --especie="panthera onca"
 ```
 
+Same flow as GBIF, with `fonte='specieslink'`. Requires `SPLINK_API_KEY`.
+
+### 5. Enriquecer resumos de espécies
+
+**Script**: `enrich_species_descriptions.mjs` (`npm run enrich:descriptions`)
+
+```bash
+node enrich_species_descriptions.mjs
+node enrich_species_descriptions.mjs --dry-run --limit=10
+```
+
 **What it does**:
-1. Queries all active species from `especie` table
-2. For each species, calls speciesLink API (`/records/search`)
-3. Parses coordinates from various field name formats
-4. Checks for duplicates via `(especie_id, lat, lon, fonte='specieslink')`
-5. Inserts into `ocorrencia` with `geom = ST_MakePoint(lon, lat)`
-6. Rate-limits at 1000ms between API calls
-7. Refreshes dashboard materialized views at the end
+1. Queries species without `descricao`
+2. Tries Wikipedia (PT/EN) by scientific and popular name, Wikipedia search,
+   Wikidata, iNaturalist and EOL
+3. Validates that the text mentions the species
+4. Updates `especie.descricao` (300ms between species)
+
+### 6. Enriquecer imagens de espécies
+
+**Script**: `enrich_species_images.mjs` (`npm run enrich:images`)
+
+```bash
+node enrich_species_images.mjs
+node enrich_species_images.mjs --dry-run --limit=50
+```
+
+**What it does**: for species without `imagem_url`, tries the iNaturalist
+default photo, then the Wikimedia Commons image from Wikidata (P18), then the
+Wikipedia page thumbnail. Updates `especie.imagem_url` (300ms between species).
+
+### 7. Validar categorias de ameaça
+
+**Script**: `validate_categories.mjs` (no npm alias)
+
+```bash
+node validate_categories.mjs --dry-run  # report only
+node validate_categories.mjs            # apply
+```
+
+**What it does**:
+1. Resolves each species' category by priority: **MMA** CSV (`categoria_fonte='mma'`)
+   → **IUCN** via GBIF (`'iucn'`) → keeps the current value marked as `'ai'`
+2. Marks non-wildlife species detected by camera traps (humans, domestic
+   animals) as `status='inativo'`
+
+Run it after the ML service creates new species (the AI never assigns a
+threat category — new species start as `DD`/`ai`).
+
+### Legacy SQL (one-off, already applied in production)
+
+- `cleanup_mock_data.sql` — removed the mock data inserted by the old
+  `008_seed_data.sql`
+- `fix_migration_checksum.sql` — updated the stored checksum of the old
+  migration `008`
+
+Both refer to the pre-consolidation migrations (now merged into
+`001_initial.sql`) and should not be needed on a new database.
 
 ## Environment Variables
 
-All scripts read from the root `.env` file:
+Read from the root `.env`:
 
 ```
 DB_USER=bioguard
@@ -276,6 +268,7 @@ DB_NAME=bioguardians
 DB_HOST=localhost
 DB_PORT=5432
 GBIF_API_BASE=https://api.gbif.org/v1
+SPLINK_API_KEY=            # optional, only for speciesLink
 ```
 
 ## Running Order
@@ -283,51 +276,24 @@ GBIF_API_BASE=https://api.gbif.org/v1
 For a full data load from scratch:
 
 ```bash
-# 1. Load species first (MMA)
-node load_mma_especies.mjs
-
-# 2. Load protected areas (CNUC)
-node load_cnuc_ucs.mjs
-
-# 3. Load occurrences (GBIF + speciesLink)
-node load_gbif_ocorrencias.mjs
-node load_specieslink_ocorrencias.mjs
+npm run load:mma             # 1. species
+npm run load:cnuc            # 2. protected areas
+npm run load:gbif            # 3. occurrences
+npm run load:splink          #    (optional)
+npm run enrich:descriptions  # 4. enrichment
+npm run enrich:images
+node validate_categories.mjs # 5. standardize categories
 ```
 
-Or run all at once:
-
-```bash
-npm run load:all
-```
-
-### 5. Enriquecer resumos de espécies
-
-**Script**: `enrich_species_descriptions.mjs`
-
-```bash
-# Busca resumos em Wikipedia (PT/EN), Wikidata e iNaturalist
-npm run enrich:descriptions
-
-# Testar sem salvar e limitar a 10 espécies
-node enrich_species_descriptions.mjs --dry-run --limit=10
-```
-
-**What it does**:
-1. Queries species without `descricao`
-2. Tries multiple sources (Wikipedia PT/EN, Wikidata, iNaturalist)
-3. Prefers popular name, then scientific name
-4. Validates that the extract mentions the species name
-5. Updates `especie.descricao` in the database
-6. Rate-limits at 300ms between API calls
+`npm run load:all` runs MMA + GBIF + speciesLink only — **it does not load CNUC**.
 
 ## Notes
 
 - Scripts are **idempotent** — running twice won't duplicate data
-- MMA and CNUC scripts require manual download of source files
-- GBIF and speciesLink scripts use public APIs (no API key needed)
-- All inserts use parameterized queries (SQL injection safe)
+- MMA and CNUC require manual download of the source files
+- GBIF needs no API key; speciesLink does
+- All inserts use parameterized queries
 - The `fonte` column in `ocorrencia` tracks the data source
-- Dashboard materialized views are refreshed after each load
 - Rate limits are self-imposed to be respectful to public APIs
 
 ## Data License

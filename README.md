@@ -1,60 +1,72 @@
 # BioGuardians
 
 Sistema de banco de dados espacial (PostgreSQL + PostGIS) para gestão de
-**especies ameacadas** e **areas protegidas** no Brasil, com aplicacao web
-(Node.js + React + MapTiler Cloud) como camada fina de demonstracao.
+**espécies ameaçadas** e **áreas protegidas** no Brasil, com aplicação web
+(Node.js + React + MapTiler Cloud) como camada fina de demonstração.
 
-> Projeto da disciplina de **Banco de Dados** — foco em modelagem, persistencia,
-> consultas espaciais, integridade e recursos avancados de BD.
+> Projeto da disciplina de **Banco de Dados** — foco em modelagem, persistência,
+> consultas espaciais, integridade e recursos avançados de BD.
 
 ## Estrutura
 
 ```
 BioGuardians/
-├── docker-compose.yml            # dev: db, migrate, backend, frontend, ml-service (GPU)
-├── docker-compose.observability.yml  # overlay: grafana, prometheus, tempo, loki
-├── docker-compose.prod.yml       # produção: backend, frontend (sem ML service)
-├── stack.yml                     # produção: backend, frontend, observabilidade
-├── .env.example                  # variáveis de ambiente (copiar para .env)
-├── .github/workflows/deploy.yml  # CI/CD: build, migrate, deploy na VM
-├── .github/workflows/ci.yml      # CI: validações e builds
+├── docker-compose.yml                # dev: db, migrate, backend, frontend, ml-service (GPU)
+├── docker-compose.observability.yml  # overlay: otel-collector, prometheus, tempo, loki, grafana
+├── docker-compose.prod.yml           # imagens do GHCR: backend + frontend (sem ML, sem observabilidade)
+├── stack.yml                         # produção (VM): backend, frontend + observabilidade
+├── otel-collector-config.yaml        # configuração do OTel Collector
+├── .env.example                      # variáveis de ambiente (copiar para .env)
+├── .github/workflows/
+│   ├── ci.yml                        # PRs/branches: migrations em banco efêmero + typecheck
+│   └── deploy.yml                    # main: build GHCR, migrations, deploy na VM
 ├── db/
-│   ├── migrate.sh                # migration runner
-│   ├── migrations/               # SQL numerados
-│   └── tests/
-│       └── smoke_test.sql
-├── backend/                      # Node 22 + Express + TypeScript
-├── frontend/                     # React 19 + Vite + MapLibre
-├── ml-service/                   # Python + FastAPI + Qwen2-VL (classificação de camera trap)
-├── scripts/data/                 # importadores de dados (MMA, GBIF, speciesLink, CNUC)
-├── observability/                # configuração do Grafana, Prometheus, Tempo, Loki
-├── otel-collector-config.yaml    # configuração do OTel Collector
+│   ├── migrate.sh                    # migration runner
+│   ├── migrations/                   # 001–004 (SQL numerados)
+│   └── tests/smoke_test.sql
+├── backend/                          # Node 22 + Express 5 + TypeScript
+│   └── scripts/generateAreaTiles.ts  # pré-geração dos tiles das UCs
+├── frontend/                         # React 19 + Vite + MapLibre + Chart.js
+├── ml-service/                       # Python + FastAPI (classificação de camera trap via OpenRouter)
+├── scripts/data/                     # importadores (MMA, CNUC, GBIF, speciesLink) e enriquecimento
+├── observability/                    # Grafana, Prometheus, Tempo, Loki
+├── infra/nginx/bioguardians.conf     # Nginx da VM (TLS + subdomínios)
 └── docs/
     ├── PROJECT_PLAN.md
     ├── DATA_DICTIONARY.md
     ├── ERD.md
-    └── OBSERVABILITY.md
+    ├── OBSERVABILITY.md
+    └── AREA_TILE_CACHE.md
 ```
 
 ## Como subir tudo (Docker Compose)
 
 ```bash
 cp .env.example .env
-# edite .env com suas credenciais, MapTiler API key e OTEL se quiser
+# edite .env: credenciais do banco e VITE_MAPTILER_API_KEY (obrigatória)
 
-docker compose up -d db            # sobe PostgreSQL + PostGIS (dev)
+docker compose up -d db            # PostgreSQL + PostGIS
 docker compose run --rm migrate    # aplica as migrations
-docker compose up -d backend       # sobe a API (porta 3001)
-docker compose up -d frontend      # sobe o frontend (porta 5173)
+docker compose up -d backend       # API (porta 3001, tsx watch com hot reload)
+docker compose up -d frontend      # build de produção servido por Nginx (porta 5173)
 ```
 
 Acesse:
 - Frontend: http://localhost:5173
 - API: http://localhost:3001/api/health
 - Banco: localhost:5432
-- Grafana (com observabilidade): http://localhost:3000
+- Grafana (com o overlay de observabilidade): http://localhost:3000
 
-Para subir a stack de observabilidade completa (OpenTelemetry, Grafana, Tempo, Prometheus, Loki), veja `docs/OBSERVABILITY.md`.
+> O container do frontend faz o build do Vite e serve os arquivos estáticos;
+> para hot reload rode `npm install && npm run dev` dentro de `frontend/`.
+
+Para subir a observabilidade junto:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
+```
+
+Detalhes em `docs/OBSERVABILITY.md`.
 
 ## Como subir o banco
 
@@ -81,46 +93,43 @@ sh db/migrate.sh
 ```
 
 Configure `pg_hba.conf` e `postgresql.conf` para conexões locais e da rede Docker. Veja a seção de deploy para detalhes.
+
 ## Carga de dados reais
 
-Os scripts em `scripts/data/` importam dados oficiais no banco:
+Os scripts em `scripts/data/` importam dados oficiais no banco
+(detalhes em `scripts/data/README.md`):
 
 ```bash
 cd scripts/data
 npm install
 
-# Lista de espécies ameaçadas (MMA)
-npm run load:mma
-
-# Ocorrências via GBIF e speciesLink
-npm run load:gbif
-npm run load:splink
-
-# Unidades de Conservação (ICMBio/CNUC)
-npm run load:cnuc
-
-# Buscar resumos de espécies na Wikipedia/Wikidata/iNaturalist
-npm run enrich:descriptions
-
-# Buscar imagens das espécies (iNaturalist, Wikimedia, GBIF, EOL)
-npm run enrich:images
+npm run load:mma             # espécies ameaçadas (MMA, CSV)
+npm run load:cnuc            # Unidades de Conservação (CNUC, shapefile em input/cnuc_ucs/)
+npm run load:gbif            # ocorrências via GBIF
+npm run load:splink          # ocorrências via speciesLink (requer SPLINK_API_KEY)
+npm run enrich:descriptions  # resumos: Wikipedia, Wikidata, iNaturalist, EOL
+npm run enrich:images        # imagens: iNaturalist, Wikimedia Commons, Wikipedia
+node validate_categories.mjs # padroniza categorias de ameaça (MMA > IUCN > IA)
 ```
 
-> **Atenção**: os scripts requerem Node.js 22+ e acesso ao banco via `.env`.
+> Os scripts requerem Node.js 22+ e leem as credenciais do `.env` da raiz.
 
-Após a carga, atualize as views materializadas do dashboard:
+Os loaders de UCs e ocorrências já chamam `refresh_dashboard()` no final. Depois
+de carregar UCs, regenere os tiles do mapa:
 
 ```bash
-psql -d $DB_NAME -U $DB_USER -c "SELECT refresh_dashboard();"
+cd backend && npm run generate-area-tiles
 ```
 
 ## ML Service — Classificação de Camera Trap com IA
 
 O `ml-service/` é um microserviço Python (FastAPI) que classifica fotos de
-camera trap usando **OpenRouter + Claude Sonnet 4** (API externa, paga por token).
+camera trap usando **OpenRouter + Claude Sonnet 4** (API externa, paga por token)
+e grava espécies, detecções e ocorrências direto no banco.
 
 > **Roda localmente** na máquina com GPU — **não é deployado na VM de produção**.
-> O backend na VM não tem dependência do ML service em produção.
+> O backend só expõe os jobs via proxy somente leitura (`/api/deteccoes`), que
+> responde erro quando o ML service não está rodando.
 
 ### Jornada técnica
 
@@ -135,7 +144,7 @@ camera trap usando **OpenRouter + Claude Sonnet 4** (API externa, paga por token
 
 ```
 Wildlife Insights CSV → download autenticado (GraphQL) → cache local
-    → OpenRouter/Claude classifica a imagem completa (8 em paralelo)
+    → OpenRouter/Claude classifica a imagem completa (VLM_CONCURRENCY em paralelo, default 8)
     → dedup: mesmo image_id, hash SHA-256 ou deployment+timestamp → pula
     → se confiança >= 0.3: salva espécie + ocorrência no banco
     → se confiança < 0.3 ou sem espécie: salva como rejeitada
@@ -175,6 +184,9 @@ docker run --rm --gpus all \
   bioguardians-ml python -m app.cli finetune --dataset-dir /data/dataset --output-dir /models/qwen2vl-finetuned
 ```
 
+Com o `docker-compose.yml`, o serviço `ml-service` sobe com a API em
+`127.0.0.1:8001` e monta `./dados` em `/data` (somente leitura).
+
 ### Env vars do ML service
 
 | Variável | Descrição | Default |
@@ -182,86 +194,110 @@ docker run --rm --gpus all \
 | `DATABASE_URL` | String de conexão PostgreSQL | (obrigatório) |
 | `OPENROUTER_API_KEY` | Chave OpenRouter (classificador principal) | vazio |
 | `OPENROUTER_MODEL` | Modelo | `anthropic/claude-sonnet-4` |
-| `LOCAL_VLM_ENABLED` | `false` = só OpenRouter | `true` |
+| `LOCAL_VLM_ENABLED` | `false` = só OpenRouter (recomendado) | `true` |
+| `LOCAL_VLM_PATH` | Caminho do modelo local fine-tuned | `models/qwen2vl-finetuned` (compose) |
 | `WI_CACHE_ONLY` | `true` = não baixa, só processa cache | `false` |
-| `YOLO_DEVICE` | Device VLM local (`cuda` ou `cpu`) | `cuda` |
+| `YOLO_DEVICE` | Device do VLM local (`cuda` ou `cpu`) | `cuda` |
 | `WI_EMAIL` / `WI_PASSWORD` | Credenciais Wildlife Insights | vazio |
 | `SPECIES_CONFIDENCE_THRESHOLD` | Threshold de aceitação | `0.3` |
 | `VLM_CONCURRENCY` | Chamadas OpenRouter em paralelo | `8` |
+| `HTTP_TIMEOUT` | Timeout das chamadas OpenRouter (s) | `120` |
+| `DB_POOL_MAX` | Tamanho do pool de conexões | `20` |
 | `IMAGE_STORAGE_DIR` | Cache de imagens | `/app/images` |
 
 ## Sistema de Migrations
 
 O projeto usa um sistema de migrations customizado (`db/migrate.sh`) que:
 
-- Aplica arquivos SQL de `db/migrations/` em ordem alfabetica
-- Rastreia migrations aplicadas na tabela `schema_migrations`
-- Calcula hash **SHA-256** de cada arquivo para detectar adulteracao
-- Cada migration roda numa **transacao** — se falhar, e revertida
-- E **idempotente** — rodar de novo pula o que ja foi aplicado
+- Aplica os arquivos SQL de `db/migrations/` em ordem alfabética
+- Registra as migrations aplicadas na tabela `schema_migrations`
+- Calcula o hash **SHA-256** de cada arquivo e **aborta** se um arquivo já aplicado foi alterado
+- Roda cada migration numa **transação** junto com o registro no journal — se falhar, é revertida.
+  Exceção: arquivos que começam com `-- @no-transaction` (a `001`, que usa `ALTER TYPE ... ADD VALUE`)
+- É **idempotente** — rodar de novo pula o que já foi aplicado
 
 ```bash
 sh db/migrate.sh             # aplica migrations pendentes
-sh db/migrate.sh --status    # mostra status
+sh db/migrate.sh --status    # mostra status (APPLIED / PENDING / TAMPERED)
 sh db/migrate.sh --dry-run   # simula
 ```
 
-## Otimizacoes de BD
+| Migration | Conteúdo |
+|-----------|----------|
+| `001_initial.sql` | Schema consolidado: extensões, enums, domínios, tabelas, índices, funções, triggers, views materializadas, dados de referência e parâmetros de performance |
+| `002_schema_hardening.sql` | `registro_id` BIGINT na auditoria, `deteccao.geom` + GIST, sync bidirecional lat/lon ↔ geom, `dashboard_stats` com scan único |
+| `003_ocorrencia_area.sql` | Junção `ocorrencia_area` mantida por trigger; funções e `especies_por_uc` sem `ST_Contains` na leitura |
+| `004_area_tile_cache.sql` | Tabela `area_tile` com os tiles MVT das UCs (ver `docs/AREA_TILE_CACHE.md`) |
 
-### Parallel Query
-- `max_parallel_workers_per_gather = 2` — queries espaciais (ST_Contains) usam workers
-- `max_parallel_workers = 4` — total de workers paralelos
-- Beneficia: scans em ocorrencia, joins espaciais com area_protegida
+## Otimizações de BD
 
-### Busca Composta (Full-Text Search)
-- Coluna gerada `tsv_busca` combina nome_cientifico + nome_popular + descricao
-- Indice GIN para busca rapida
-- Funcao `buscar_especies('onca')` retorna especies com relevancia (ts_rank)
-- Configuracao `portuguese` para stemming e acentos
+### Relação espacial pré-calculada
+- `ocorrencia_area` guarda em quais UCs cada ocorrência cai (N:N, UCs podem se sobrepor)
+- Triggers recalculam a relação quando uma ocorrência ou a geometria de uma área muda
+- `especies_em_area`, `areas_protegem_especie`, `contar_ocorrencias_em_area` e `especies_por_uc`
+  viram JOIN de inteiros — o `ST_Contains` roda uma vez por escrita, não a cada leitura
 
-### Indices Compostos
+### Tiles vetoriais
+- Áreas e ocorrências são servidas como tiles MVT (`ST_AsMVT`)
+- Tiles de UCs sem filtro ficam persistidos em `area_tile` (~10–20 ms por tile); ver `docs/AREA_TILE_CACHE.md`
+
+### Parâmetros do banco
+A `001` aplica via `ALTER DATABASE ... SET` (só quando o valor atual difere):
+- `max_parallel_workers_per_gather = 2`, `parallel_setup_cost = 100`, `parallel_tuple_cost = 0.03`
+- `effective_cache_size = 1GB`, `work_mem = 8MB`, `maintenance_work_mem = 128MB`
+- `random_page_cost = 1.1` (SSD)
+
+No `docker-compose.yml` (dev), o container do Postgres sobe com `shared_buffers=2GB`,
+`effective_cache_size=4GB`, `work_mem=64MB`, `maintenance_work_mem=512MB` e `shm_size: 4gb`.
+
+### Busca
+- A API (`GET /api/especies?busca=`) usa `unaccent(lower(...)) LIKE`, insensível a acento e caixa
+- No SQL também há full-text search: coluna gerada `tsv_busca` (nome científico + popular + descrição,
+  config `portuguese`) com índice GIN e a função `buscar_especies('onca')` ordenada por `ts_rank`
+
+### Índices compostos e parciais
 - `idx_ocorrencia_especie_data(especie_id, data_evento DESC)`
 - `idx_especie_cat_status(categoria_ameaca, status)`
+- Parciais em `deteccao`, `imagem_job` e `especie` (ex.: espécies sem imagem)
 
-### Configuracao de Memoria (container 2GB)
-- `shared_buffers = 256MB`
-- `effective_cache_size = 1GB`
-- `work_mem = 8MB`
-- `shm_size = 512mb` no Docker
-
-### Cache (LRU In-Memory)
-- Backend usa `lru-cache` para endpoints read-heavy
-- Dashboard: 60s, Referencias: 60s, Areas: 30s, GBIF: 5min
-- Invalidation automatica em POST/PUT/DELETE
-- Trigger no BD atualiza `cache_metadata` para invalidacao cross-process
+### Cache (LRU in-memory)
+- Backend usa `lru-cache` nos endpoints de leitura pesada
+- TTL por rota: dashboard e referências 60s, áreas e ocorrências 30s, detecções 10s, GBIF 5min, tiles 1h
+- Invalidação por prefixo em POST/PUT/DELETE
+- Trigger no BD atualiza `cache_metadata` a cada escrita em espécie/área/ocorrência
 
 ## CI/CD
 
-O GitHub Actions (`.github/workflows/deploy.yml`) roda a cada `push` na `main`:
+### CI (`.github/workflows/ci.yml`)
+Roda em PRs para a `main` e em push para qualquer outra branch:
+1. Sobe um PostGIS efêmero, aplica as migrations, roda o smoke test e aplica de novo (checa idempotência)
+2. `tsc --noEmit` no backend
+3. `tsc --noEmit` no frontend
 
-1. **prepare** — detecta quais serviços mudaram e valida migrations
-2. **build** — builda imagens Docker e publica no GHCR
-3. **migrate** — aplica migrations no PostgreSQL de produção
-4. **generate-stack** — renderiza `stack.yml` com secrets
-5. **deploy** — envia `stack.yml` e arquivos de observabilidade para a VM e sobe os containers
+### Deploy (`.github/workflows/deploy.yml`)
+Roda a cada `push` na `main` (commits que só mudam `*.md` não disparam):
 
-### Pipeline visual
+1. **prepare** — detecta quais serviços mudaram e valida a numeração sequencial das migrations
+2. **build** — builda e publica no GHCR as imagens que mudaram; as outras só recebem a nova tag
+3. **migrate** — aplica migrations e roda o smoke test no PostgreSQL de produção
+4. **generate-stack** — renderiza `stack.yml` com os secrets
+5. **deploy** — envia `stack.yml`, `observability/` e `otel-collector-config.yaml` para a VM e sobe os containers
 
 ```
 main
   │
   v
 GitHub Actions
-  │
-  +-- prepare (migrations, diff de caminhos)
-  +-- build (frontend + backend)
-  +-- migrate (psql na VM de produção)
+  +-- prepare (diff de caminhos, validação das migrations)
+  +-- build (frontend + backend → GHCR)
+  +-- migrate (migrate.sh + smoke test no banco de produção)
   +-- generate-stack (renderiza stack.yml)
   +-- deploy (SSH/SCP + docker compose na VM)
   v
 VM Oracle Linux
-  +-- Nginx (80/443) → frontend (:8080) / backend (:3001)
-  +-- Containers: backend, frontend, grafana, prometheus, tempo, loki, otel-collector
+  +-- Nginx (80/443) → frontend (:8080) / backend (:3001) / Grafana (:3000)
+  +-- Containers: backend, frontend, otel-collector, prometheus, tempo, loki, grafana
+  +-- PostgreSQL nativo
 ```
 
 ### Secrets necessários no GitHub
@@ -271,10 +307,10 @@ VM Oracle Linux
 | `DB_USER` | Usuário do PostgreSQL de produção |
 | `DB_PASSWORD` | Senha do PostgreSQL de produção |
 | `DB_NAME` | Nome do banco de produção |
-| `DB_HOST` | Host do banco (IP interno ou localhost da VM) |
+| `DB_HOST` | Host do banco (acessível pelo runner e pelos containers da VM) |
 | `DB_PORT` | Porta do PostgreSQL (default 5432) |
-| `FRONTEND_URL` | Origem permitida no CORS (ex: `https://seu-dominio.com`) |
-| `VITE_API_URL` | URL da API no build do frontend (ex: `https://api.seu-dominio.com/api`) |
+| `FRONTEND_URL` | Origem permitida no CORS (default `https://financemobile.com.br`) |
+| `VITE_API_URL` | URL da API no build do frontend (default `https://api.financemobile.com.br/api`) |
 | `VITE_MAPTILER_API_KEY` | Chave da API do MapTiler Cloud |
 | `GRAFANA_ADMIN_PASSWORD` | Senha do admin do Grafana |
 | `ORACLE_SSH_HOST` | IP público da VM |
@@ -293,106 +329,95 @@ sudo dnf install -y docker-ce nginx git
 sudo systemctl enable --now docker
 ```
 
-O PostgreSQL pode rodar **nativamente** na VM para melhor desempenho. Nesse caso, ajuste `pg_hba.conf` e `postgresql.conf` para aceitar conexões de `127.0.0.1` e da rede Docker (`172.17.0.0/16` ou a rede usada pelo Docker).
+O PostgreSQL roda **nativamente** na VM. Ajuste `pg_hba.conf` e `postgresql.conf` para aceitar conexões de `127.0.0.1` e da rede Docker.
 
-Crie o diretório de deploy:
-
-```bash
-mkdir -p ~/bioguardians/observability/grafana/provisioning/datasources
-mkdir -p ~/bioguardians/observability/grafana/provisioning/dashboards
-mkdir -p ~/bioguardians/observability/grafana/dashboards
-```
-
-O workflow enviará automaticamente `stack.yml`, `observability/` e `otel-collector-config.yaml` para `~/bioguardians/`.
-
-Subir manualmente:
-
-```bash
-cd ~/bioguardians
-sudo docker compose -f stack.yml pull
-sudo docker compose -f stack.yml up -d
-```
+O workflow cria `~/bioguardians/` e envia automaticamente `stack.yml`, `observability/` e `otel-collector-config.yaml`.
 
 ### Domínio e Nginx
 
-A arquitetura de produção esperada usa **Nginx na VM** como proxy reverso, com certificados TLS:
+Produção usa **Nginx na VM** como proxy reverso com certificado Cloudflare Origin CA
+(config em `infra/nginx/bioguardians.conf`):
 
 ```
-Internet
-  ↓
-Cloudflare
-  ↓
-Nginx (VM)  :80  :443
-  ├── /     → 127.0.0.1:8080 (frontend)
-  └── /api  → 127.0.0.1:3001 (backend)
+Internet → Cloudflare → Nginx (VM) :80 → redirect HTTPS / :443
+  financemobile.com.br          → 127.0.0.1:8080 (frontend)
+  api.financemobile.com.br      → 127.0.0.1:3001 (backend)
+  grafana.financemobile.com.br  → 127.0.0.1:3000 (Grafana)
+  pgadmin / portainer           → serviços rodando direto na VM
 ```
 
-Configure o Nginx em `/etc/nginx/conf.d/` e obtenha os certificados (ex: Cloudflare Origin CA, Let's Encrypt). Não commite certificados nem chaves no repositório.
+Não commite certificados nem chaves no repositório. Passo a passo no `AGENTS.md`.
 
 ### Deploy manual (emergência)
-
-Se precisar subir sem o GitHub Actions:
 
 ```bash
 cd ~/bioguardians
 sudo docker compose -f stack.yml pull
 sudo docker compose -f stack.yml up -d
-```
 
-Verifique:
-
-```bash
 sudo docker compose -f stack.yml ps
 sudo docker compose -f stack.yml logs backend --tail 50
 ```
+
 ## API Endpoints
 
-| Metodo | Endpoint | Descricao |
+| Método | Endpoint | Descrição |
 |--------|----------|-----------|
 | GET | `/api/health` | Health check |
 | GET | `/api/biomas` | Lista biomas |
 | GET | `/api/estados` | Lista estados |
-| GET | `/api/categorias` | Lista categorias de ameaca |
+| GET | `/api/categorias` | Lista categorias de ameaça |
 | GET | `/api/taxonomia?rank=genero` | Lista taxonomia |
-| GET | `/api/especies?categoria=CR&busca=onca` | Lista especies (filtros + FTS) |
-| GET | `/api/especies/:id` | Detalhe da especie |
-| POST | `/api/especies` | Cria especie |
-| PUT | `/api/especies/:id` | Atualiza especie |
-| DELETE | `/api/especies/:id` | Remove especie |
-| GET | `/api/especies/:id/areas-protegidas` | UCs que protegem a especie |
-| GET | `/api/areas` | Areas como GeoJSON FeatureCollection |
-| GET | `/api/areas/:id` | Area como GeoJSON Feature |
-| GET | `/api/areas/:id/especies` | Especies dentro da area (ST_Contains) |
-| POST | `/api/areas` | Cria area (recebe GeoJSON) |
-| PUT | `/api/areas/:id` | Atualiza area |
-| DELETE | `/api/areas/:id` | Remove area |
-| GET | `/api/ocorrencias?especie_id=42` | Ocorrencias como GeoJSON |
-| POST | `/api/ocorrencias` | Cria ocorrencia |
-| DELETE | `/api/ocorrencias/:id` | Remove ocorrencia |
-| GET | `/api/ocorrencias/gbif?especie=panthera+onca` | Proxy GBIF (tempo real) |
-| GET | `/api/dashboard` | Stats das views materializadas |
-| POST | `/api/dashboard/refresh` | Atualiza views + invalida cache |
+| GET | `/api/especies?categoria=CR&bioma=1&estado=SP&busca=onca&page=1&per_page=20` | Lista espécies (filtros + busca sem acento, paginada) |
+| GET | `/api/especies/:id` | Detalhe da espécie (com biomas e estados) |
+| GET | `/api/especies/:id/ocorrencias` | Ocorrências da espécie (paginada) |
+| GET | `/api/especies/:id/areas-protegidas` | UCs onde a espécie ocorre |
+| POST | `/api/especies` | Cria espécie |
+| PUT | `/api/especies/:id` | Atualiza espécie |
+| DELETE | `/api/especies/:id` | Remove espécie |
+| GET | `/api/areas?bioma=&esfera=&categoria=&busca=&bbox=&zoom=` | Áreas como GeoJSON FeatureCollection |
+| GET | `/api/areas/tiles/:z/:x/:y.mvt` | Tile vetorial das UCs (filtros opcionais: `esfera`, `categoria`, `bioma`) |
+| GET | `/api/areas/:id` | Área como GeoJSON Feature |
+| GET | `/api/areas/:id/info` | Metadados da área, sem geometria |
+| GET | `/api/areas/:id/especies` | Espécies ameaçadas (CR/EN/VU) dentro da área |
+| POST | `/api/areas` | Cria área (recebe GeoJSON) |
+| PUT | `/api/areas/:id` | Atualiza área |
+| DELETE | `/api/areas/:id` | Remove área |
+| GET | `/api/ocorrencias?especie_id=&categoria=&bioma=&fonte=&bbox=&limit=` | Ocorrências como GeoJSON |
+| GET | `/api/ocorrencias/tiles/:z/:x/:y.mvt` | Tile vetorial das ocorrências |
+| GET | `/api/ocorrencias/gbif?especie=panthera+onca` | Proxy GBIF (tempo real, cache 5min) |
+| GET | `/api/ocorrencias/:id` | Detalhe da ocorrência |
+| POST | `/api/ocorrencias` | Cria ocorrência |
+| DELETE | `/api/ocorrencias/:id` | Remove ocorrência |
+| GET | `/api/dashboard` | Stats das views materializadas + agregações do dashboard |
+| POST | `/api/dashboard/refresh` | `REFRESH ... CONCURRENTLY` das views + invalida cache |
+| GET | `/api/deteccoes/jobs` | Jobs do ML service (proxy, só com o serviço rodando) |
+| GET | `/api/deteccoes/jobs/:id` | Detalhe de um job do ML service (proxy) |
 
 ## Consultas de exemplo
 
 ```sql
--- Especies ameacadas dentro de uma UC (query espacial)
+-- Espécies ameaçadas dentro de uma UC (via ocorrencia_area)
 SELECT * FROM especies_em_area(1);
 
--- UCs que protegem a especie X
+-- UCs onde a espécie X ocorre
 SELECT * FROM areas_protegem_especie(
     (SELECT id FROM especie WHERE nome_cientifico = 'panthera onca')
 );
 
--- Busca composta (full-text search)
+-- Quantas ocorrências caem numa UC
+SELECT contar_ocorrencias_em_area(1);
+
+-- Busca full-text
 SELECT * FROM buscar_especies('onca');
 
 -- Dashboard (views materializadas)
 SELECT * FROM dashboard_stats;
 SELECT * FROM ranking_especies_categoria;
 SELECT * FROM ucs_por_esfera;
+SELECT * FROM especies_por_uc;
 
--- Atualizar views apos carga/alteracao
+-- Atualizar views após carga/alteração
 SELECT refresh_dashboard();
 
 -- Auditoria
@@ -402,14 +427,15 @@ FROM log_auditoria ORDER BY timestamp DESC LIMIT 20;
 
 ## Recursos de BD implementados
 
-- **PostGIS**: colunas `geometry`, `ST_Contains`, `ST_AsGeoJSON`, indices **GIST**.
+- **PostGIS**: colunas `geometry`, `ST_Contains`, `ST_AsGeoJSON`, `ST_AsMVT`, índices **GIST**.
 - **Constraints**: `CHECK`, `UNIQUE`, FKs com `ON DELETE RESTRICT/CASCADE/SET NULL`.
-- **Enums/Dominios**: `categoria_ameaca_tipo`, `esfera_tipo`, `nome_cientifico_dom`, etc.
-- **Triggers**: auditoria, validacao de geometria, sincronizacao geom, updated_at, cache invalidation.
-- **Funcoes PL/pgSQL**: `especies_em_area`, `areas_protegem_especie`, `buscar_especies`, `refresh_dashboard`.
-- **Views materializadas**: `dashboard_stats`, `especies_por_uc`, `ranking_especies_categoria`, `ucs_por_esfera`.
-- **Parallel Query**: configurado para ST_Contains e scans.
-- **Full-Text Search**: tsvector + GIN index em portugues.
-- **Indices compostos**: especie+data, categoria+status.
-- **Cache**: LRU in-memory no backend + cache_metadata no BD.
-- **Migrations**: sistema customizado com journal, SHA-256, transacoes atomicas.
+- **Enums/Domínios**: `categoria_ameaca_tipo`, `esfera_tipo`, `fonte_ocorrencia_tipo`, `nome_cientifico_dom`, `uf_dom`, etc.
+- **Triggers**: auditoria, validação de geometria, sincronização lat/lon ↔ geom, `atualizado_em`,
+  manutenção de `ocorrencia_area`, invalidação de cache.
+- **Funções**: `especies_em_area`, `areas_protegem_especie`, `contar_ocorrencias_em_area`, `buscar_especies`, `refresh_dashboard`.
+- **Views materializadas**: `dashboard_stats`, `especies_por_uc`, `ranking_especies_categoria`, `ucs_por_esfera` (todas com índice único).
+- **Denormalização controlada**: `ocorrencia_area` (relação espacial pré-calculada) e `area_tile` (tiles pré-gerados).
+- **Full-Text Search**: tsvector gerado + índice GIN em português.
+- **Índices compostos e parciais**: espécie+data, categoria+status, parciais em detecções/imagens.
+- **Cache**: LRU in-memory no backend + `cache_metadata` no BD.
+- **Migrations**: sistema customizado com journal, SHA-256 e transações atômicas.

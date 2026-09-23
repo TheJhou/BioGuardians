@@ -14,7 +14,7 @@ espécies ameaçadas e áreas protegidas no Brasil, com uma aplicação web simp
 - **Tema**: Gestão de biodiversidade e espécies ameaçadas (tema bio sustentável)
 - **Foco**: Banco de dados (modelagem, persistência, consultas, integridade).
   A aplicação web é uma camada fina de demonstração.
-- **Stack**: PostgreSQL + PostGIS, Node.js 22, React 19, Vite, MapLibre, MapTiler Cloud, OpenTelemetry, Grafana
+- **Stack**: PostgreSQL 16 + PostGIS 3.4, Node.js 22 + Express 5, React 19, Vite, MapLibre, MapTiler Cloud, Chart.js, OpenTelemetry, Grafana; ML service em Python (FastAPI + OpenRouter) rodando localmente
 - **Recorte geográfico**: Brasil
 - **Abordagem de dados**: Híbrida (carga inicial estática + consulta em tempo
   real ao GBIF)
@@ -111,9 +111,11 @@ geográficos com dados de espécies.
   - **Dashboard**: estatísticas das views materializadas com gráficos
   - **Mapa**: MapLibre + MapTiler Cloud com polígonos das UCs, filtros e legenda
   - **Espécies**: lista com scroll infinito (15 em 15) e detalhe com resumo da espécie
-- Responsivo: menu hamburger mobile, layouts adaptáveis
-- Enriquecimento de resumos: Wikipedia, Wikidata, iNaturalist e OpenRouter (IA)
-- Enriquecimento de imagens: iNaturalist, Wikimedia Commons, GBIF, EOL
+- Responsivo: navegação mobile com bottom nav, layouts adaptáveis
+- Enriquecimento de resumos: Wikipedia (PT/EN), Wikidata, iNaturalist e EOL
+- Enriquecimento de imagens: iNaturalist, Wikimedia Commons (via Wikidata) e Wikipedia
+- Classificação de fotos de camera trap por IA (OpenRouter + Claude), gerando
+  ocorrências com `confianca_ia` — ML service local, fora da produção
 - Observabilidade: traces, métricas e logs com OpenTelemetry + Grafana
 
 ### Fora do escopo
@@ -132,16 +134,19 @@ geográficos com dados de espécies.
 │  MMA (CSV)  ICMBio (DwC-A)  CNUC (Shapefile)  GBIF (API)   │
 └───────────┬─────────────────────────────────────────────────┘
 
-        │ scripts de importação (SQL, shp2pgsql, Node)
+        │ scripts Node em scripts/data (CSV, shapefile, APIs)
         ▼
 ┌─────────────────────────────────────────────────────────────┐
 │         PostgreSQL + PostGIS  (núcleo do projeto)           │
 │                                                             │
-│  Tabelas: especie, area_protegida, ocorrencia, bioma,       │
-│           estado, categoria_ameaca, taxon, log_auditoria    │
-│  Views materializadas: dashboard_stats, especies_por_uc     │
-│  Triggers: auditar_alteracao, validar_geometria             │
-│  Índices: GIST (geometria), B-tree (nome, categoria)        │
+│  Tabelas: especie, area_protegida, ocorrencia,              │
+│           ocorrencia_area, bioma, estado, categoria_ameaca, │
+│           taxon, log_auditoria, area_tile (+ tabelas de ML) │
+│  Views materializadas: dashboard_stats, especies_por_uc,    │
+│           ranking_especies_categoria, ucs_por_esfera        │
+│  Triggers: auditoria, validação de geometria, sync          │
+│           lat/lon↔geom, ocorrencia_area, cache              │
+│  Índices: GIST (geometria), GIN (FTS), B-tree               │
 └───────────┬─────────────────────────────────────────────────┘
 
         │ SQL / queries parametrizadas
@@ -149,43 +154,50 @@ geográficos com dados de espécies.
 ┌─────────────────────────────────────────────────────────────┐
 │              API Node.js (camada fina)                      │
 │  Endpoints REST que executam SQL no banco                   │
-│  - GET /api/especies (com filtros)                              │
-│  - GET /areas (com geometria GeoJSON)                       │
-│  - GET /ocorrencias?especie_id=                             │
-│  - GET /especies/:id/areas-protegidas  (query espacial)     │
-│  - POST/PUT/DELETE /especies, /areas                        │
+│  - GET /api/especies (filtros + busca)                      │
+│  - GET /api/areas/tiles/:z/:x/:y.mvt  (tiles das UCs)       │
+│  - GET /api/ocorrencias/tiles/:z/:x/:y.mvt                  │
+│  - GET /api/areas/:id/especies  (consulta espacial)         │
+│  - GET /api/especies/:id/areas-protegidas                   │
+│  - GET /api/dashboard                                       │
+│  - POST/PUT/DELETE /api/especies, /api/areas                │
 └───────────┬─────────────────────────────────────────────────┘
 
-        │ JSON / GeoJSON
+        │ JSON / GeoJSON / MVT
         ▼
 ┌─────────────────────────────────────────────────────────────┐
 │         React + MapTiler Cloud (interface de demo)          │
-│  - Mapa com polígonos das UCs                               │
-│  - Marcadores de ocorrências                                │
-│  - Filtros (categoria, bioma, estado)                       │
+│  - Mapa com polígonos das UCs e ocorrências (tiles MVT)     │
+│  - Filtros (esfera, categoria, bioma, espécie)              │
 │  - Dashboard com gráficos (stats das views)                 │
+│  - Lista e detalhe de espécies                              │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ### Fluxo de uso típico
 
-1. Usuário abre o mapa → React chama `GET /areas` → API roda
-   `SELECT id, nome, categoria, ST_AsGeoJSON(geom) FROM area_protegida` →
-   retorna GeoJSON → MapTiler Cloud desenha os polígonos
+1. Usuário abre o mapa → MapLibre pede `GET /api/areas/tiles/{z}/{x}/{y}.mvt` →
+   a API devolve o tile pré-gerado da tabela `area_tile` (ou gera com
+   `ST_AsMVT` e grava) → o mapa desenha os polígonos sobre o basemap MapTiler
 2. Usuário filtra "espécies criticamente ameaçadas (CR)" →
-   `GET /especies?categoria=CR` → API roda query com JOIN → retorna lista
-3. Usuário clica numa espécie → `GET /ocorrencias?especie_id=42` → API busca
-   ocorrências no banco e consulta GBIF em tempo real → marca no mapa
-4. Usuário clica numa UC → `GET /areas/5/especies` → API roda query espacial
-   `ST_Contains(geom, ponto)` → lista espécies ameaçadas dentro da UC
-5. Usuário cadastra nova espécie → `POST /especies` → trigger de auditoria
+   `GET /api/especies?categoria=CR` → API roda query com JOIN → retorna lista
+3. Usuário escolhe uma espécie → tiles de ocorrências filtrados por espécie →
+   pontos no mapa
+4. Usuário clica numa UC → `GET /api/areas/5/info` e `GET /api/areas/5/especies`
+   → `especies_em_area(5)` faz JOIN em `ocorrencia_area` (relação espacial já
+   calculada por trigger) → lista espécies ameaçadas dentro da UC
+5. Usuário cadastra nova espécie → `POST /api/especies` → trigger de auditoria
    registra a alteração na tabela `log_auditoria`
 
-## 6. Modelo de Dados (preliminar)
+## 6. Modelo de Dados
+
+> Esta seção foi o esboço inicial. O schema implementado (com colunas, tipos e
+> tabelas adicionadas depois, como `ocorrencia_area`, `area_tile` e as tabelas
+> do ML service) está em `DATA_DICTIONARY.md` e `ERD.md`.
 
 ### Tabelas principais
 
-- `categoria_ameaca` (CR, EN, VU, NT, LC, DD) — domínio fixo
+- `categoria_ameaca` (CR, EN, VU, NT, LC, DD, NE) — domínio fixo
 - `bioma` (Amazônia, Mata Atlântica, Cerrado, Caatinga, Pampa, Pantanal, Marinho)
 - `estado` (27 UF)
 - `taxon` — hierarquia taxonômica (reino → filo → classe → ordem → família → gênero)
@@ -213,7 +225,9 @@ geográficos com dados de espécies.
 |-------|---------|----------|-----|
 | MMA — dados.mma.gov.br | CSV | Lista oficial de espécies ameaçadas | Carga inicial |
 | ICMBio — ipt.icmbio.gov.br | DwC-A | Avaliações de risco da fauna | Carga complementar |
-| CNUC/MMA | Shapefile | Polígonos das UCs | Carga via shp2pgsql |
-| GBIF — api.gbif.org | API REST | Ocorrências georreferenciadas | Consulta em tempo real |
-| speciesLink | API REST | Ocorrências de coleções brasileiras | Fonte complementar |
-| IUCN Red List | API REST | Categoria global IUCN | Enriquecimento |
+| CNUC/MMA | Shapefile | Polígonos das UCs | Carga via `load_cnuc_ucs.mjs` (lib `shapefile`) |
+| GBIF — api.gbif.org | API REST | Ocorrências georreferenciadas | Carga + proxy em tempo real (`/api/ocorrencias/gbif`) |
+| speciesLink — specieslink.net | API REST (com chave) | Ocorrências de coleções brasileiras | Fonte complementar opcional |
+| IUCN Red List (via GBIF) | API REST | Categoria global IUCN | Validação de categorias (`validate_categories.mjs`) |
+| Wikipedia, Wikidata, iNaturalist, EOL, Wikimedia Commons | API REST | Resumos e imagens | Enriquecimento |
+| Wildlife Insights | CSV + imagens | Fotos de camera trap | Entrada do ML service |
