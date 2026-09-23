@@ -1,6 +1,5 @@
-/* Fonte: precisa ficar no topo do primeiro arquivo importado, senão o
-   @import externo não chega ao início do bundle e o navegador o ignora. */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+/* A fonte Inter é carregada por <link> no index.html (com preconnect),
+   não por @import aqui: assim o download começa em paralelo ao CSS. */
 
 /* ============================================================
    Design tokens

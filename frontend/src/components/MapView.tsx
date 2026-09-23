@@ -87,7 +87,7 @@ function MapView({
   ], [layers.unidades, layers.ocorrencias]);
 
   return (
-    <div className="map-container" style={{ width: '100%', height: '100%' }}>
+    <div className="map-container">
       {error && <div className="map-overlay map-error-inline">Erro: {error}</div>}
 
       <Map

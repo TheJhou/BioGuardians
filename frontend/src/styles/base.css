@@ -46,7 +46,9 @@ a, button { transition: all 0.2s ease; }
   border-radius: var(--radius-sm);
 }
 
-.image-skeleton-wrapper { width: 100%; height: 100%; }
+/* LazyImage: skeleton sobreposto à imagem enquanto ela carrega */
+.image-skeleton-wrapper { width: 100%; height: 100%; position: relative; }
+.image-skeleton-wrapper > .skeleton { position: absolute; inset: 0; }
 
 .species-avatar-skeleton { width: 100%; height: 100%; border-radius: 50%; }
 

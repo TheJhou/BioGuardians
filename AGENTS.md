@@ -67,7 +67,10 @@ docs/           PROJECT_PLAN, DATA_DICTIONARY, ERD, OBSERVABILITY, AREA_TILE_CAC
 - Mapa: tiles vetoriais MVT de áreas e ocorrências servidos pelo backend + basemap MapTiler (`VITE_MAPTILER_API_KEY`)
 - Efeitos visuais isolados em `src/lib/` (glow, tilt, scroll-reveal, animated-tabs, lazy-image)
 - Estilos globais em `src/styles/`, com entrada única `index.css` (importado no `main.tsx`). A ordem dos `@import` define a cascata: `tokens.css` (variáveis + fonte) → `base.css` → `layout.css` → `components/*.css` → `pages/*.css`. Cada media query fica no arquivo da área que ela afeta
-- O `@import` da fonte precisa ficar no topo do `tokens.css`: em outro lugar o Vite o descarta ou ele não chega ao início do bundle
+- Fonte Inter carregada por `<link>` (com `preconnect`) no `frontend/index.html`, não por `@import` no CSS
+- Breakpoints: use só 1400 / 1024 / 768 / 560px (documentados em `tokens.css`). 1024 é onde some a nav do header e aparece a bottom-nav fixa — páginas que rolam até o fim precisam de `padding-bottom` a partir de 1024
+- `!important` só nos `<canvas>` do Chart.js (única forma de vencer o estilo inline que a lib grava); não use em outros lugares
+- Estilo inline só para valores dinâmicos (cor vinda de dados, posição calculada); valores fixos vão para o CSS
 - CSS próprio ao lado do componente só em `Glow*.css` e `lib/*` (importados pelo próprio componente)
 - Paleta (verde escuro) em `styles/tokens.css`: cada cor existe uma vez como canais RGB (`--rgb-accent: 68 216 142`); as cores `--color-*` e as transparências derivam deles (`rgb(var(--rgb-accent) / 0.25)`). Não escreva hex/rgba da paleta direto no CSS: use `var(--color-*)` ou `rgb(var(--rgb-*) / a)`. Trocar a paleta = editar só os `--rgb-*`
 - Cores de **dados** (categoria de ameaça, categoria de UC) têm fonte única em `constants/index.ts` (`CATEGORY_COLORS`, `UC_CATEGORY_COLORS`), usada pelo mapa, pela legenda e pelo `components/ui/CategoryBadge.tsx` — nunca escreva essas cores em CSS ou inline. O mapa pinta UCs por `categoria_uc` (não por esfera)

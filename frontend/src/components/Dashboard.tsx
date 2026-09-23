@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import iconPage from '../images/icon-page.png';
 import { Doughnut, Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -197,15 +196,6 @@ useEffect(() => {
 
   return (
     <div className="dashboard-page">
-      <aside className="dashboard-sidebar" aria-label="Identidade do BioGuardians">
-        <div className="dashboard-sidebar-copy">
-          <p>Conhecimento hoje.<br /><strong>Conservação sempre.</strong></p>
-          <div className="dashboard-sidebar-brand">
-            <img className="dashboard-sidebar-brand-mark" src={iconPage} alt="" width="24" height="24" />
-            <span>BioGuardians</span>
-          </div>
-        </div>
-      </aside>
 
       <div className="dashboard-shell dashboard-main container">
         <section className="dashboard-stats" aria-label="Indicadores principais">
