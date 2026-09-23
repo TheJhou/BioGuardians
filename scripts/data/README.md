@@ -157,7 +157,10 @@ node load_cnuc_ucs.mjs --file=input/cnuc_ucs/ucs.shp
 ```
 
 **What it does**:
-1. Reads the shapefile with the `shapefile` library
+1. Reads the shapefile with the `shapefile` library, using the encoding from
+   the `.cpg` file (UTF-8 for CNUC). The library defaults to windows-1252,
+   which corrupted 2,671 UC names in the original load (fixed by
+   `fix_uc_names_encoding.mjs`, see below)
 2. Skips non-UC records (`limite` ≠ `uc`) and inactive UCs (`situacao` ≠ `ativo`)
 3. Maps `grupo` → `categoria_uc_tipo` and `esfera` → `esfera_tipo`
 4. Detects the bioma from the record attributes
@@ -246,6 +249,23 @@ node validate_categories.mjs            # apply
 
 Run it after the ML service creates new species (the AI never assigns a
 threat category — new species start as `DD`/`ai`).
+
+### 8. Corrigir nomes de UC com dupla codificação (one-off)
+
+**Script**: `fix_uc_names_encoding.mjs` — applied in production on 2026-09-23.
+
+```bash
+node fix_uc_names_encoding.mjs            # dry run (ROLLBACK)
+node fix_uc_names_encoding.mjs --commit   # apply
+```
+
+Reverts names like `RESERVA BIOLÃ“GICA` → `RESERVA BIOLÓGICA`. Every fixed
+name is checked against the original shapefile read as UTF-8; any mismatch,
+collision with an existing name or leftover corrupted text aborts with
+ROLLBACK. Old names are saved to `backups/` (git-ignored) before writing.
+Runs in a single transaction with the generic audit trigger disabled only
+inside it (it would copy each polygon into `log_auditoria`, ~244 MB); a
+compact audit row (old name → new name) is written for each UC instead.
 
 ### Legacy SQL (one-off, already applied in production)
 

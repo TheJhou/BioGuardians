@@ -3,7 +3,7 @@ import { query } from '../db/pool.js';
 import { validateId } from '../middleware/validateId.js';
 import { cacheMiddleware, getTileCache, setTileCache } from '../cache/cache.js';
 import { parseParam, getParam } from '../utils/params.js';
-import { getStoredAreaTile, storeAreaTile } from '../tileStore.js';
+import { getStoredAreaTile, storeAreaTile, AREA_SIMPLIFY_SQL } from '../tileStore.js';
 
 const router = Router();
 
@@ -34,10 +34,10 @@ router.get('/', cacheMiddleware(undefined, () => 30_000), async (req, res, next)
     if (esfera) { conditions.push(`a.esfera = $${idx++}`); params.push(esfera); }
     if (categoria) { conditions.push(`a.categoria_uc = $${idx++}`); params.push(categoria); }
     if (busca && typeof busca === 'string') {
-      conditions.push(`(a.nome ILIKE $${idx++} OR a.esfera ILIKE $${idx++} OR b.nome ILIKE $${idx++})`);
-      const like = `%${busca}%`;
-      params.push(like, like, like);
-      idx += 3;
+      // Um único parâmetro reaproveitado nas três colunas; esfera é enum (cast p/ texto).
+      conditions.push(`(a.nome ILIKE $${idx} OR a.esfera::text ILIKE $${idx} OR b.nome ILIKE $${idx})`);
+      params.push(`%${busca}%`);
+      idx++;
     }
 
     // Bounding box filter: only return areas intersecting the visible map region
@@ -140,7 +140,7 @@ router.get('/tiles/:z/:x/:y.mvt', async (req, res, next) => {
       `SELECT COALESCE(encode(ST_AsMVT(mvt, 'uc', 4096, 'geom'), 'base64'), '') AS mvt
        FROM (
          SELECT
-           ST_AsMVTGeom(ST_SimplifyPreserveTopology(ST_Transform(a.geom, 3857), 156543.03392 / POWER(2, $1)), bounds.b, 4096, 256, true) AS geom,
+           ST_AsMVTGeom(${AREA_SIMPLIFY_SQL}, bounds.b, 4096, 256, true) AS geom,
            a.id,
            a.categoria_uc::text
          FROM area_protegida a

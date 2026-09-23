@@ -15,7 +15,7 @@
 // Idempotent: uses ON CONFLICT (nome) DO NOTHING.
 // ============================================================
 
-import { existsSync, readdirSync } from 'fs';
+import { existsSync, readdirSync, readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
@@ -146,8 +146,13 @@ async function main() {
     const { rows: biomas } = await client.query('SELECT id, lower(nome) as nome FROM bioma');
     const biomaMap = new Map(biomas.map(b => [b.nome, b.id]));
 
-    // Open shapefile
-    const source = await shapefile.open(shpFile);
+    // Open shapefile. A lib 'shapefile' lê o .dbf como windows-1252 por padrão;
+    // o CNUC é UTF-8 (declarado no .cpg). Sem isso os nomes com acento viram
+    // "BIOLÃ“GICA" (foi o que aconteceu com 2.671 UCs na carga original).
+    const cpgFile = shpFile.replace(/\.shp$/i, '.cpg');
+    const encoding = existsSync(cpgFile) ? readFileSync(cpgFile, 'utf8').trim() || 'utf-8' : 'utf-8';
+    console.log(`   Encoding do .dbf: ${encoding}`);
+    const source = await shapefile.open(shpFile, undefined, { encoding });
 
     let total = 0;
     let inserted = 0;

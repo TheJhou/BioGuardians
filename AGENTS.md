@@ -36,6 +36,7 @@ docs/           PROJECT_PLAN, DATA_DICTIONARY, ERD, OBSERVABILITY, AREA_TILE_CAC
 2. `002_schema_hardening.sql` — `log_auditoria.registro_id` → BIGINT, coluna `deteccao.geom` + GIST, trigger de sincronização bidirecional lat/lon ↔ geom (`trg_sincroniza_geom_latlon`) em `ocorrencia` e `deteccao`, `dashboard_stats` reescrita com `FILTER` (scan único)
 3. `003_ocorrencia_area.sql` — tabela de junção `ocorrencia_area` mantida por triggers; `especies_em_area`, `areas_protegem_especie`, `contar_ocorrencias_em_area` e `especies_por_uc` passam a usar JOIN de inteiros em vez de `ST_Contains` na leitura
 4. `004_area_tile_cache.sql` — tabela `area_tile` (cache persistente dos tiles MVT das UCs, ver `docs/AREA_TILE_CACHE.md`)
+5. `005_audit_without_geometry.sql` — `trg_auditar` troca a coluna `geom` por `geom_md5` no JSON do log (o polígono inteiro chegava a 6 MB por registro)
 
 ## Comandos úteis
 - Subir banco (Docker): `docker compose up -d db`
@@ -249,7 +250,8 @@ docker exec bioguardians-ml python -m app.cli status --job-id 29
 ## Carga de dados
 - Scripts em `scripts/data/` (detalhes em `scripts/data/README.md`)
 - `load_mma_especies.mjs` — importa lista de espécies ameaçadas do MMA (CSV)
-- `load_cnuc_ucs.mjs` — importa Unidades de Conservação do CNUC (shapefile, lido com a lib `shapefile`)
+- `load_cnuc_ucs.mjs` — importa Unidades de Conservação do CNUC (shapefile, lido com a lib `shapefile`). Lê o encoding do `.cpg` (UTF-8): a lib usa windows-1252 por padrão e isso já corrompeu 2.671 nomes
+- `fix_uc_names_encoding.mjs` — correção única (já aplicada em produção em 2026-09-23) dos nomes com dupla codificação; simula por padrão, `--commit` aplica
 - `load_gbif_ocorrencias.mjs` — importa ocorrências da API GBIF
 - `load_specieslink_ocorrencias.mjs` — importa ocorrências do speciesLink (exige `SPLINK_API_KEY`)
 - `enrich_species_descriptions.mjs` — resumos via Wikipedia (PT/EN), Wikidata, iNaturalist e EOL

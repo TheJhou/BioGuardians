@@ -23,6 +23,15 @@ trabalho de vértice acontecia no request path. CPU e RAM sobrando não
 resolviam — era volume bruto de processamento geométrico repetido para o
 mesmo resultado.
 
+> **Atualização (2026-09-23):** medição em produção mostrou que ~85% desse
+> custo era o `ST_SimplifyPreserveTopology` (tile z4 com 889 UCs e 1,5 mi de
+> vértices: 2.400 ms). A geração agora usa
+> `ST_Transform(ST_Simplify(geom, 360 / (256·2^z), true), 3857)` — simplifica
+> em graus, com tolerância de ~1 pixel, antes de transformar: **64 ms** para o
+> mesmo tile, com tamanho equivalente (23 KB vs 26 KB). Recortar pelo tile
+> antes de simplificar (`ST_ClipByBox2D`) foi testado e quase não ajudou.
+> A tabela `area_tile` continua valendo: o hit é ~0,03 ms.
+
 Como UCs praticamente não mudam (e quando mudam, é uma adição), pagar esse
 custo por requisição não faz sentido.
 

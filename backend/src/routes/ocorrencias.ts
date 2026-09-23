@@ -121,7 +121,13 @@ router.get('/tiles/:z/:x/:y.mvt', async (req, res, next) => {
     }
 
     const { especie_id, categoria, bioma, fonte, incluir_inativos } = req.query;
-    const key = `route:${req.originalUrl}`;
+    // IDs normalizados (ordenados, sem repetição): "2,1" e "1,2" são o mesmo tile.
+    const ids = especie_id
+      ? [...new Set(String(especie_id).split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0))].sort((a, b) => a - b)
+      : [];
+    // Chave a partir dos filtros normalizados, não da URL crua.
+    const key = `route:/api/ocorrencias/tiles/${z}/${x}/${y}?` +
+      `e=${ids.join(',')}&c=${categoria ?? ''}&b=${bioma ?? ''}&f=${fonte ?? ''}&i=${incluir_inativos === 'true'}`;
     const cached = getTileCache(key);
     if (cached) {
       sendTile(res, cached);
@@ -136,12 +142,9 @@ router.get('/tiles/:z/:x/:y.mvt', async (req, res, next) => {
       conditions.push(`e.status = 'ativo'`);
     }
 
-    if (especie_id) {
-      const ids = String(especie_id).split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0);
-      if (ids.length > 0) {
-        conditions.push(`o.especie_id = ANY($${idx++}::int[])`);
-        params.push(ids);
-      }
+    if (ids.length > 0) {
+      conditions.push(`o.especie_id = ANY($${idx++}::int[])`);
+      params.push(ids);
     }
     if (categoria) {
       conditions.push(`e.categoria_ameaca = $${idx++}`);
