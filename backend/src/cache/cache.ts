@@ -15,21 +15,6 @@ const tileCache = new LRUCache<string, Buffer>({
   ttl: 60 * 60 * 1000, // 1 hora
 });
 
-// Invalidate cache entries matching a prefix (e.g. "dashboard:*").
-export function cacheInvalidate(prefix: string): void {
-  for (const key of cache.keys()) {
-    if (key.startsWith(prefix)) cache.delete(key);
-  }
-  for (const key of tileCache.keys()) {
-    if (key.startsWith(prefix)) tileCache.delete(key);
-  }
-}
-
-// Invalidate multiple prefixes at once (used after mutations).
-export function cacheInvalidateAll(prefixes: string[]): void {
-  for (const prefix of prefixes) cacheInvalidate(prefix);
-}
-
 // Tile cache helpers used by vector tile endpoints.
 export function getTileCache(key: string): Buffer | undefined {
   return tileCache.get(key);

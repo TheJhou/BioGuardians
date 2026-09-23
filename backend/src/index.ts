@@ -19,8 +19,8 @@ import { warmupTileCache } from './tileWarmup.js';
 const app = express();
 
 // --- Middleware ---
-app.use(cors({ origin: env.corsOrigin }));
-app.use(express.json({ limit: '10mb' }));
+// API somente leitura: só GET (e o preflight OPTIONS) é aceito.
+app.use(cors({ origin: env.corsOrigin, methods: ['GET'] }));
 app.use(requestLogger);
 
 // --- Health check ---

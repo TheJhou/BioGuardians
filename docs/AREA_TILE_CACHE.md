@@ -89,13 +89,9 @@ z/x/y — a chave da tabela não comportaria isso sem explodir em cardinalidade.
 
 ## Invalidação
 
-Quando uma área é criada, alterada ou removida (`POST/PUT/DELETE
-/api/areas`), a rota apaga **somente os tiles cuja bounding box intersecta
-a geometria afetada** (`invalidateAreaTilesForArea` /
-`invalidateAreaTilesForGeom` em `tileStore.ts`). Eles se re-geram sozinhos
-no próximo request via miss + upsert — não é preciso re-rodar o script.
-
-Se preferir re-gerar tudo de uma vez (ex.: carga em massa de UCs):
+A API é somente leitura, então não há invalidação automática: UCs só mudam
+por carga via script (`scripts/data/load_cnuc_ucs.mjs`) ou SQL direto. Depois
+de mudar áreas, re-gere os tiles:
 
 ```bash
 npm run generate-area-tiles
@@ -115,17 +111,17 @@ DELETE FROM area_tile;  -- tiles voltam a se gerar sob demanda
 - **Warm-up de boot reduzido**: `tileWarmup.ts` agora aquece só ocorrências
   (pontos são leves; áreas não dependem mais de memória).
 - **Dado novo não aparece sozinho**: tiles pré-gerados servem a versão
-  gravada até a invalidação rodar — aceitável porque UCs são estáticas.
-- **Custo de manutenção**: uma tabela pequena (~500 KB), um script
-  idempotente e invalidação cirúrgica — em troca, o pior caso de latência
-  caiu de ~4 s para ~20 ms.
+  gravada até alguém re-gerar ou apagar a tabela — aceitável porque UCs são
+  estáticas e só mudam por carga via script.
+- **Custo de manutenção**: uma tabela pequena (~500 KB) e um script
+  idempotente — em troca, o pior caso de latência caiu de ~4 s para ~20 ms.
 
 ## Arquivos relacionados
 
 | Arquivo | Papel |
 |---|---|
 | `db/migrations/004_area_tile_cache.sql` | cria a tabela `area_tile` |
-| `backend/src/tileStore.ts` | geração, leitura, upsert e invalidação |
+| `backend/src/tileStore.ts` | geração, leitura e upsert |
 | `backend/src/routes/areas.ts` | rota que consulta a tabela e faz miss+upsert |
 | `backend/scripts/generateAreaTiles.ts` | geração em massa (este script) |
 | `backend/src/tileWarmup.ts` | warm-up de boot (só ocorrências agora) |

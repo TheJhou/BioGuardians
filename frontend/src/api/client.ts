@@ -16,11 +16,10 @@ function fetchDeduplicated<T>(path: string): Promise<T> {
   return request;
 }
 
-async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  });
+// A API é somente leitura: todas as chamadas são GET simples (sem headers
+// customizados, então o navegador não dispara preflight CORS).
+async function fetchApi<T>(path: string): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`);
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'Request failed' }));
@@ -90,28 +89,6 @@ export const api = {
     return fetchApi<PaginatedResponse<OcorrenciaProperties>>(`/especies/${id}/ocorrencias${query ? `?${query}` : ''}`);
   },
 
-  async createEspecie(data: {
-    nome_cientifico: string; nome_popular?: string; categoria_ameaca: string;
-    genero_id: number; descricao?: string; biomas?: number[]; estados?: string[];
-  }): Promise<{ id: number }> {
-    return fetchApi<{ id: number }>('/especies', {
-      method: 'POST', body: JSON.stringify(data),
-    });
-  },
-
-  async updateEspecie(id: number, data: Partial<{
-    nome_cientifico: string; nome_popular: string; categoria_ameaca: string;
-    genero_id: number; descricao: string; status: string;
-  }>): Promise<{ message: string }> {
-    return fetchApi<{ message: string }>(`/especies/${id}`, {
-      method: 'PUT', body: JSON.stringify(data),
-    });
-  },
-
-  async deleteEspecie(id: number): Promise<{ message: string }> {
-    return fetchApi<{ message: string }>(`/especies/${id}`, { method: 'DELETE' });
-  },
-
   async getAreasProtegemEspecie(id: number): Promise<AreaProtegeEspecie[]> {
     return fetchApi<AreaProtegeEspecie[]>(`/especies/${id}/areas-protegidas`);
   },
@@ -154,25 +131,6 @@ export const api = {
     return fetchApi<EspecieEmArea[]>(`/areas/${id}/especies`);
   },
 
-  async createArea(data: {
-    nome: string; categoria_uc: string; esfera: string;
-    bioma_id?: number; area_ha?: number; geojson: unknown;
-  }): Promise<{ id: number }> {
-    return fetchApi<{ id: number }>('/areas', {
-      method: 'POST', body: JSON.stringify(data),
-    });
-  },
-
-  async updateArea(id: number, data: Record<string, unknown>): Promise<{ message: string }> {
-    return fetchApi<{ message: string }>(`/areas/${id}`, {
-      method: 'PUT', body: JSON.stringify(data),
-    });
-  },
-
-  async deleteArea(id: number): Promise<{ message: string }> {
-    return fetchApi<{ message: string }>(`/areas/${id}`, { method: 'DELETE' });
-  },
-
   // Ocorrencias
   async getOcorrencias(params?: {
     especie_id?: number | number[]; categoria?: string; bioma?: number; fonte?: string; limit?: number; bbox?: string;
@@ -206,19 +164,6 @@ export const api = {
     return fetchApi<OcorrenciaProperties>(`/ocorrencias/${id}`);
   },
 
-  async createOcorrencia(data: {
-    especie_id: number; lat: number; lon: number;
-    data_evento?: string; fonte?: string; base_registro?: string;
-  }): Promise<{ id: number }> {
-    return fetchApi<{ id: number }>('/ocorrencias', {
-      method: 'POST', body: JSON.stringify(data),
-    });
-  },
-
-  async deleteOcorrencia(id: number): Promise<{ message: string }> {
-    return fetchApi<{ message: string }>(`/ocorrencias/${id}`, { method: 'DELETE' });
-  },
-
   async getGbifOcorrencias(especie: string): Promise<GeoJSONFeatureCollection> {
     return fetchApi<GeoJSONFeatureCollection>(
       `/ocorrencias/gbif?especie=${encodeURIComponent(especie)}`
@@ -228,9 +173,5 @@ export const api = {
   // Dashboard
   async getDashboard(): Promise<DashboardData> {
     return fetchApi<DashboardData>('/dashboard');
-  },
-
-  async refreshDashboard(): Promise<{ message: string }> {
-    return fetchApi<{ message: string }>('/dashboard/refresh', { method: 'POST' });
   },
 };

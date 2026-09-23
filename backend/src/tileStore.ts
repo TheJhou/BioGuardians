@@ -39,23 +39,3 @@ export async function storeAreaTile(z: number, x: number, y: number, tile: Buffe
     [z, x, y, tile]
   );
 }
-
-// Apaga só os tiles cuja bounding box intersecta a área — eles se
-// re-geram sozinhos no próximo request (miss + upsert).
-export async function invalidateAreaTilesForArea(areaId: number): Promise<void> {
-  await query(
-    `DELETE FROM area_tile t
-     WHERE ST_Transform(ST_TileEnvelope(t.z, t.x, t.y), 4326) &&
-           (SELECT geom FROM area_protegida WHERE id = $1)`,
-    [areaId]
-  );
-}
-
-// Mesma invalidação, mas para área já removida (recebe a geometria).
-export async function invalidateAreaTilesForGeom(geom: string): Promise<void> {
-  await query(
-    `DELETE FROM area_tile t
-     WHERE ST_Transform(ST_TileEnvelope(t.z, t.x, t.y), 4326) && $1::geometry`,
-    [geom]
-  );
-}

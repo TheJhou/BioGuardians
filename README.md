@@ -263,7 +263,8 @@ No `docker-compose.yml` (dev), o container do Postgres sobe com `shared_buffers=
 ### Cache (LRU in-memory)
 - Backend usa `lru-cache` nos endpoints de leitura pesada
 - TTL por rota: dashboard e referências 60s, áreas e ocorrências 30s, detecções 10s, GBIF 5min, tiles 1h
-- Invalidação por prefixo em POST/PUT/DELETE
+- Como a API é somente leitura, o cache só expira por TTL; dados carregados pelos
+  scripts aparecem no máximo após o TTL da rota (ou reiniciando o backend)
 - Trigger no BD atualiza `cache_metadata` a cada escrita em espécie/área/ocorrência
 
 ## CI/CD
@@ -361,6 +362,10 @@ sudo docker compose -f stack.yml logs backend --tail 50
 
 ## API Endpoints
 
+A API é **somente leitura**: só existem rotas `GET` (o CORS também aceita só GET).
+Dados entram no banco pelos scripts de `scripts/data/`, pelas migrations e pelo
+ML service local — nunca pela API pública.
+
 | Método | Endpoint | Descrição |
 |--------|----------|-----------|
 | GET | `/api/health` | Health check |
@@ -372,25 +377,16 @@ sudo docker compose -f stack.yml logs backend --tail 50
 | GET | `/api/especies/:id` | Detalhe da espécie (com biomas e estados) |
 | GET | `/api/especies/:id/ocorrencias` | Ocorrências da espécie (paginada) |
 | GET | `/api/especies/:id/areas-protegidas` | UCs onde a espécie ocorre |
-| POST | `/api/especies` | Cria espécie |
-| PUT | `/api/especies/:id` | Atualiza espécie |
-| DELETE | `/api/especies/:id` | Remove espécie |
 | GET | `/api/areas?bioma=&esfera=&categoria=&busca=&bbox=&zoom=` | Áreas como GeoJSON FeatureCollection |
 | GET | `/api/areas/tiles/:z/:x/:y.mvt` | Tile vetorial das UCs (filtros opcionais: `esfera`, `categoria`, `bioma`) |
 | GET | `/api/areas/:id` | Área como GeoJSON Feature |
 | GET | `/api/areas/:id/info` | Metadados da área, sem geometria |
 | GET | `/api/areas/:id/especies` | Espécies ameaçadas (CR/EN/VU) dentro da área |
-| POST | `/api/areas` | Cria área (recebe GeoJSON) |
-| PUT | `/api/areas/:id` | Atualiza área |
-| DELETE | `/api/areas/:id` | Remove área |
 | GET | `/api/ocorrencias?especie_id=&categoria=&bioma=&fonte=&bbox=&limit=` | Ocorrências como GeoJSON |
 | GET | `/api/ocorrencias/tiles/:z/:x/:y.mvt` | Tile vetorial das ocorrências |
 | GET | `/api/ocorrencias/gbif?especie=panthera+onca` | Proxy GBIF (tempo real, cache 5min) |
 | GET | `/api/ocorrencias/:id` | Detalhe da ocorrência |
-| POST | `/api/ocorrencias` | Cria ocorrência |
-| DELETE | `/api/ocorrencias/:id` | Remove ocorrência |
 | GET | `/api/dashboard` | Stats das views materializadas + agregações do dashboard |
-| POST | `/api/dashboard/refresh` | `REFRESH ... CONCURRENTLY` das views + invalida cache |
 | GET | `/api/deteccoes/jobs` | Jobs do ML service (proxy, só com o serviço rodando) |
 | GET | `/api/deteccoes/jobs/:id` | Detalhe de um job do ML service (proxy) |
 

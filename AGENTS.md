@@ -45,7 +45,7 @@ docs/           PROJECT_PLAN, DATA_DICTIONARY, ERD, OBSERVABILITY, AREA_TILE_CAC
 - Smoke tests: `psql -f db/tests/smoke_test.sql` (credenciais via .env)
 - Resetar banco: `docker compose down -v && docker compose up -d db && docker compose run --rm migrate`
 - Conectar: `psql -d $DB_NAME -U $DB_USER`
-- Refresh views: `SELECT refresh_dashboard();` (ou `POST /api/dashboard/refresh`, que usa `CONCURRENTLY`)
+- Refresh views: `SELECT refresh_dashboard();` (os loaders de `scripts/data` já chamam no final)
 - Pré-gerar tiles das UCs: `cd backend && npm run generate-area-tiles`
 - Typecheck: `npm run typecheck` em `backend/` e `frontend/`
 - Subir produção: `cd ~/bioguardians && sudo docker compose -f stack.yml pull && sudo docker compose -f stack.yml up -d`
@@ -57,7 +57,7 @@ docs/           PROJECT_PLAN, DATA_DICTIONARY, ERD, OBSERVABILITY, AREA_TILE_CAC
 - Taxonomia hierárquica com auto-referência (reino → gênero)
 - Auditoria via trigger genérico (`to_jsonb` do registro inteiro) em `especie` e `area_protegida`
 - Relação ocorrência ↔ UC pré-calculada em `ocorrencia_area` (trigger na escrita) — leitura sem `ST_Contains`
-- Views materializadas com índice único (permite `REFRESH ... CONCURRENTLY` pela API); `refresh_dashboard()` usa refresh simples (CONCURRENTLY não roda dentro de função)
+- Views materializadas com índice único (permite `REFRESH ... CONCURRENTLY` fora de função); `refresh_dashboard()` usa refresh simples (CONCURRENTLY não roda dentro de função)
 - Tiles MVT das UCs persistidos em `area_tile` (z3–z6 pré-gerados, demais sob demanda)
 
 ## Frontend
@@ -72,12 +72,13 @@ docs/           PROJECT_PLAN, DATA_DICTIONARY, ERD, OBSERVABILITY, AREA_TILE_CAC
 - Responsivo: header com navegação mobile + bottom nav, grids adaptáveis
 
 ## Backend
+- **API somente leitura: só rotas GET.** Não criar POST/PUT/DELETE; dados entram pelos scripts de `scripts/data/`, migrations e ML service. CORS aceita só `GET`
 - Rotas: `/api/health`, `/api/biomas|estados|categorias|taxonomia`, `/api/especies`, `/api/areas`, `/api/ocorrencias`, `/api/dashboard`, `/api/deteccoes` (lista completa no README)
 - SQL escrito direto nas rotas via `db/pool.ts` (sem ORM); pool `DB_POOL_MAX` (default 20)
 - Busca de espécies (`?busca=`) usa `unaccent(lower(...)) LIKE` em nome científico e popular
 - Tiles MVT: `/api/areas/tiles/:z/:x/:y.mvt` (tabela `area_tile` sem filtros; LRU 1h com filtros) e `/api/ocorrencias/tiles/:z/:x/:y.mvt` (LRU 1h + warm-up de z3–z5 no boot, desligável com `TILE_WARMUP=false`)
 - Proxy ML (somente leitura): `GET /api/deteccoes/jobs`, `GET /api/deteccoes/jobs/:id` → `ML_SERVICE_URL` (default `http://localhost:8001`); só funciona com o ML service rodando
-- Cache LRU em memória (`CACHE_TTL_MS`, `CACHE_MAX`) com TTL por rota e invalidação por prefixo em POST/PUT/DELETE
+- Cache LRU em memória (`CACHE_TTL_MS`, `CACHE_MAX`) com TTL por rota; sem invalidação ativa (a API não escreve)
 - OpenTelemetry condicional (só ativa com `OTEL_EXPORTER_OTLP_ENDPOINT`)
 - Sem testes automatizados; o CI roda apenas `tsc --noEmit`
 

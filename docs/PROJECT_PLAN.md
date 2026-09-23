@@ -120,6 +120,8 @@ geográficos com dados de espécies.
 
 ### Fora do escopo
 
+- Criação, edição ou remoção de dados pela interface/API (a API é somente leitura;
+  a carga é feita por scripts)
 - Autenticação de usuários / login
 - Importação automática de shapefiles/CSVs via interface (via script SQL)
 - Relatórios em PDF
@@ -153,14 +155,13 @@ geográficos com dados de espécies.
         ▼
 ┌─────────────────────────────────────────────────────────────┐
 │              API Node.js (camada fina)                      │
-│  Endpoints REST que executam SQL no banco                   │
+│  Endpoints REST somente leitura (só GET)                    │
 │  - GET /api/especies (filtros + busca)                      │
 │  - GET /api/areas/tiles/:z/:x/:y.mvt  (tiles das UCs)       │
 │  - GET /api/ocorrencias/tiles/:z/:x/:y.mvt                  │
 │  - GET /api/areas/:id/especies  (consulta espacial)         │
 │  - GET /api/especies/:id/areas-protegidas                   │
 │  - GET /api/dashboard                                       │
-│  - POST/PUT/DELETE /api/especies, /api/areas                │
 └───────────┬─────────────────────────────────────────────────┘
 
         │ JSON / GeoJSON / MVT
@@ -186,8 +187,9 @@ geográficos com dados de espécies.
 4. Usuário clica numa UC → `GET /api/areas/5/info` e `GET /api/areas/5/especies`
    → `especies_em_area(5)` faz JOIN em `ocorrencia_area` (relação espacial já
    calculada por trigger) → lista espécies ameaçadas dentro da UC
-5. Usuário cadastra nova espécie → `POST /api/especies` → trigger de auditoria
-   registra a alteração na tabela `log_auditoria`
+5. Um script de carga (ex.: `load_mma_especies.mjs`) insere ou altera espécies →
+   o trigger de auditoria registra a alteração na tabela `log_auditoria`. A
+   interface web é só de consulta: não há cadastro pela API.
 
 ## 6. Modelo de Dados
 
