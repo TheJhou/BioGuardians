@@ -7,7 +7,7 @@ interface PersonsIconProps {
 // Ícone de pessoas (grupo) — verde por padrão, fundo transparente
 export default function PersonsIcon({
   size = 24,
-  color = 'var(--green-primary)',
+  color = 'var(--color-accent)',
   className,
 }: PersonsIconProps) {
   return (

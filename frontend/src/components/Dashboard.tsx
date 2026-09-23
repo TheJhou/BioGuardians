@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import iconPage from '../images/icon-page.png';
 import { Doughnut, Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -16,6 +15,7 @@ import {
 } from 'chart.js';
 import { api } from '../api/client.js';
 import { UC_CATEGORY_LABELS } from '../constants/index.js';
+import { getChartTheme } from '../constants/chartTheme.js';
 import type { DashboardData } from '../types/index.js';
 
 ChartJS.register(
@@ -38,14 +38,15 @@ const doughnutTotalPlugin: Plugin<'doughnut'> = {
     const values = chart.data.datasets[0]?.data ?? [];
     const total = values.reduce((sum, value) => sum + Number(value), 0);
     const { ctx } = chart;
+    const colors = getChartTheme().doughnutTotal;
 
     ctx.save();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = colors.value;
     ctx.font = `800 ${Math.max(16, Math.round(arc.outerRadius * 0.22))}px Inter, sans-serif`;
     ctx.fillText(total.toLocaleString('pt-BR'), arc.x, arc.y - 5);
-    ctx.fillStyle = 'rgba(184,213,245,.68)';
+    ctx.fillStyle = colors.label;
     ctx.font = `500 ${Math.max(9, Math.round(arc.outerRadius * 0.09))}px Inter, sans-serif`;
     ctx.fillText('total', arc.x, arc.y + 14);
     ctx.restore();
@@ -116,21 +117,22 @@ useEffect(() => {
   }
 
   const stats = data.stats;
+  const theme = getChartTheme();
 
   const temporalData = {
     labels: data.ocorrencias_por_ano.map((item) => String(item.ano)),
     datasets: [{
       label: 'Ocorrências',
       data: data.ocorrencias_por_ano.map((item) => item.total),
-      borderColor: '#4486D9',
-      backgroundColor: 'rgba(68, 134, 217, 0.15)',
+      borderColor: theme.line.stroke,
+      backgroundColor: theme.line.fill,
       fill: true,
       tension: 0.38,
       borderWidth: 2,
       pointRadius: 3,
       pointHoverRadius: 5,
-      pointBackgroundColor: '#4486D9',
-      pointBorderColor: '#031D2D',
+      pointBackgroundColor: theme.line.stroke,
+      pointBorderColor: theme.line.pointBorder,
       pointBorderWidth: 2,
     }],
   };
@@ -141,28 +143,24 @@ useEffect(() => {
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: '#052237',
-        borderColor: 'rgba(184,213,245,.25)',
-        borderWidth: 1,
-        titleColor: '#fff',
-        bodyColor: '#B8D5F5',
+        ...theme.tooltip,
         displayColors: false,
         callbacks: { label: (context: { parsed: { y: number | null } }) => `${formatNumber(context.parsed.y ?? 0)} ocorrências` },
       },
     },
     scales: {
-      y: { beginAtZero: true, ticks: { color: 'rgba(184,213,245,.55)', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,.07)' }, border: { display: false } },
-      x: { ticks: { color: 'rgba(184,213,245,.55)', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,.045)' }, border: { display: false } },
+      y: { beginAtZero: true, ticks: { color: theme.axis.tick, font: { size: 10 } }, grid: { color: theme.axis.gridY }, border: { display: false } },
+      x: { ticks: { color: theme.axis.tick, font: { size: 10 } }, grid: { color: theme.axis.gridX }, border: { display: false } },
     },
   };
 
-  const biomeColors = ['#4486D9', '#1677E8', '#20B8FF', '#F2CA35', '#FF8A3D', '#AEBBB5', '#7E65FF'];
+  const biomeColors = theme.biomes;
   const biomeData = {
     labels: data.especies_por_bioma.map((item) => item.nome),
     datasets: [{ data: data.especies_por_bioma.map((item) => item.total), backgroundColor: biomeColors, borderWidth: 0, hoverOffset: 5 }],
   };
 
-  const recorrenciaColors = ['#1677E8', '#4486D9', '#20B8FF', '#0D4588', '#B8D5F5', '#7E65FF'];
+  const recorrenciaColors = theme.topSpecies;
   const recorrenciaLabels = data.especies_mais_ocorrencias.map((item) => item.nome_popular ?? item.nome_cientifico);
   const recorrenciaData = {
     labels: recorrenciaLabels,
@@ -178,7 +176,7 @@ useEffect(() => {
     labels: data.ucs_por_categoria.map((item) => UC_CATEGORY_LABELS[item.categoria_uc] ?? item.categoria_uc),
     datasets: [{
       data: data.ucs_por_categoria.map((item) => item.total),
-      backgroundColor: data.ucs_por_categoria.map((item) => item.categoria_uc === 'protecao_integral' ? '#4486D9' : '#20B8FF'),
+      backgroundColor: data.ucs_por_categoria.map((item) => theme.ucCategory(item.categoria_uc)),
       borderWidth: 0,
       hoverOffset: 5,
     }],
@@ -190,13 +188,7 @@ useEffect(() => {
     cutout: '69%',
     plugins: {
       legend: { display: false },
-      tooltip: {
-        backgroundColor: '#052237',
-        titleColor: '#fff',
-        bodyColor: '#B8D5F5',
-        borderColor: 'rgba(184,213,245,.25)',
-        borderWidth: 1,
-      },
+      tooltip: theme.tooltip,
     },
   };
 
@@ -204,15 +196,6 @@ useEffect(() => {
 
   return (
     <div className="dashboard-page">
-      <aside className="dashboard-sidebar" aria-label="Identidade do BioGuardians">
-        <div className="dashboard-sidebar-copy">
-          <p>Conhecimento hoje.<br /><strong>Conservação sempre.</strong></p>
-          <div className="dashboard-sidebar-brand">
-            <img className="dashboard-sidebar-brand-mark" src={iconPage} alt="" width="24" height="24" />
-            <span>BioGuardians</span>
-          </div>
-        </div>
-      </aside>
 
       <div className="dashboard-shell dashboard-main container">
         <section className="dashboard-stats" aria-label="Indicadores principais">
@@ -289,7 +272,7 @@ useEffect(() => {
               <div className="dashboard-panel-header"><div><h2 className="dashboard-panel-title">Unidades de Conservação por categoria</h2><p className="dashboard-panel-subtitle">Totais reais retornados pela aplicação.</p></div></div>
               <div className="dashboard-doughnut-row">
                 <div className="dashboard-legend">
-                  {data.ucs_por_categoria.map((item) => <div className="dashboard-legend-item" key={item.categoria_uc}><span className="dashboard-legend-dot" style={{ background: item.categoria_uc === 'protecao_integral' ? '#4486D9' : '#20B8FF' }} /><span>{UC_CATEGORY_LABELS[item.categoria_uc] ?? item.categoria_uc} · {formatNumber(item.total)}</span></div>)}
+                  {data.ucs_por_categoria.map((item) => <div className="dashboard-legend-item" key={item.categoria_uc}><span className="dashboard-legend-dot" style={{ background: theme.ucCategory(item.categoria_uc) }} /><span>{UC_CATEGORY_LABELS[item.categoria_uc] ?? item.categoria_uc} · {formatNumber(item.total)}</span></div>)}
                 </div>
                 <div className="dashboard-doughnut"><Doughnut data={ucData} plugins={[doughnutTotalPlugin]} options={doughnutOptions} /></div>
               </div>

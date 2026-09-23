@@ -32,8 +32,9 @@ const INITIAL_VIEW = {
   zoom: MAP_DEFAULTS.zoom,
 };
 
-const occurrenceColorMatch = buildMatchExpression('categoria_ameaca', CATEGORY_COLORS, '#757575');
-const ucColorMatch = buildMatchExpression('categoria_uc', UC_CATEGORY_COLORS, '#1565c0');
+// Fallbacks = mesmas cores de getCategoryColor/getUcCategoryColor (DD e proteção integral)
+const occurrenceColorMatch = buildMatchExpression('categoria_ameaca', CATEGORY_COLORS, CATEGORY_COLORS.DD);
+const ucColorMatch = buildMatchExpression('categoria_uc', UC_CATEGORY_COLORS, UC_CATEGORY_COLORS.protecao_integral);
 
 function buildMatchExpression(inputProperty: string, pairs: Record<string, string>, fallback: string): any[] {
   const stops = Object.entries(pairs).flatMap(([k, v]) => [k, v]);
@@ -86,7 +87,7 @@ function MapView({
   ], [layers.unidades, layers.ocorrencias]);
 
   return (
-    <div className="map-container" style={{ width: '100%', height: '100%' }}>
+    <div className="map-container">
       {error && <div className="map-overlay map-error-inline">Erro: {error}</div>}
 
       <Map

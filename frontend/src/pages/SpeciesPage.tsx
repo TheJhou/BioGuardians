@@ -3,8 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { LazyImage } from '../lib/lazy-image';
 import { useScrollReveal } from '../lib/scroll-reveal';
-import { CATEGORY_LABELS } from '../constants/index.js';
 import StatCard from '../components/ui/StatCard.js';
+import CategoryBadge from '../components/ui/CategoryBadge.js';
 import GlowSearch from '../components/GlowSearch.js';
 import { useAnimatedTabs } from '../lib/animated-tabs';
 import type { Especie, OcorrenciaProperties, PaginatedResponse } from '../types/index.js';
@@ -230,7 +230,7 @@ export default function SpeciesPage() {
                 {(!s.nome_popular || s.nome_cientifico.toLowerCase() !== s.nome_popular.toLowerCase()) && (
                   <span className="species-scientific">{s.nome_cientifico}</span>
                 )}
-                <span className={`cat-badge cat-${s.categoria_ameaca.toLowerCase()}`}>{CATEGORY_LABELS[s.categoria_ameaca] || s.categoria_ameaca}</span>
+                <CategoryBadge code={s.categoria_ameaca} />
                 {s.confianca_ia != null && (
                   <span className="species-confidence-inline">Confiança IA: {Math.round(s.confianca_ia * 100)}%</span>
                 )}
@@ -269,7 +269,7 @@ export default function SpeciesPage() {
                 <h2>{selected.nome_popular || selected.nome_cientifico}</h2>
                 <p className="species-detail-scientific">{selected.nome_cientifico}</p>
                 <div className="species-badges">
-                  <span className={`cat-badge cat-${selected.categoria_ameaca.toLowerCase()}`}>{CATEGORY_LABELS[selected.categoria_ameaca] || selected.categoria_ameaca}</span>
+                  <CategoryBadge code={selected.categoria_ameaca} />
                   <span className="species-source" title="MMA — Ministério do Meio Ambiente">MMA — Ministério do Meio Ambiente</span>
                   {selected.confianca_ia != null && (
                     <span className="species-confidence">IA: {Math.round(selected.confianca_ia * 100)}%</span>

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { query } from '../db/pool.js';
 import { validateId } from '../middleware/validateId.js';
-import { cacheMiddleware, cacheInvalidateAll, getTileCache, setTileCache } from '../cache/cache.js';
+import { cacheMiddleware, getTileCache, setTileCache } from '../cache/cache.js';
 import { env } from '../config/env.js';
 import { parseParam, getParam } from '../utils/params.js';
 
@@ -177,44 +177,6 @@ router.get('/tiles/:z/:x/:y.mvt', async (req, res, next) => {
     const buffer = rows[0].mvt ? Buffer.from(rows[0].mvt, 'base64') : Buffer.alloc(0);
     setTileCache(key, buffer);
     sendTile(res, buffer);
-  } catch (err) { next(err); }
-});
-
-// POST /api/ocorrencias � lat/lon provided, trigger syncs geom
-router.post('/', async (req, res, next) => {
-  try {
-    const { especie_id, lat, lon, data_evento, fonte, base_registro } = req.body;
-
-    if (!especie_id || lat === undefined || lon === undefined) {
-      res.status(400).json({ error: 'especie_id, lat and lon are required' });
-      return;
-    }
-
-    const result = await query(
-      `INSERT INTO ocorrencia (especie_id, lat, lon, geom, data_evento, fonte, base_registro)
-       VALUES ($1, $2, $3, ST_SetSRID(ST_MakePoint($3, $2), 4326), $4, $5, $6)
-       RETURNING id`,
-      [especie_id, lat, lon, data_evento || null, fonte || 'manual', base_registro || null]
-    );
-
-    cacheInvalidateAll(['route:/api/ocorrencias', 'route:/api/dashboard']);
-    res.status(201).json({ id: result.rows[0].id, message: 'Occurrence created' });
-  } catch (err) { next(err); }
-});
-
-// DELETE /api/ocorrencias/:id
-router.delete('/:id', validateId, async (req, res, next) => {
-  try {
-    const id = parseParam(req.params.id)!;
-    const { rowCount } = await query('DELETE FROM ocorrencia WHERE id = $1', [id]);
-
-    if (rowCount === 0) {
-      res.status(404).json({ error: 'Occurrence not found' });
-      return;
-    }
-
-    cacheInvalidateAll(['route:/api/ocorrencias', 'route:/api/dashboard']);
-    res.json({ message: 'Occurrence deleted' });
   } catch (err) { next(err); }
 });
 

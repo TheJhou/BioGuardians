@@ -1,0 +1,98 @@
+/* A fonte Inter é carregada por <link> no index.html (com preconnect),
+   não por @import aqui: assim o download começa em paralelo ao CSS. */
+
+/* ============================================================
+   Design tokens
+
+   Cada cor da paleta existe uma única vez, como canais RGB
+   (--rgb-*). As cores (--color-*) e as transparências derivam
+   deles: rgb(var(--rgb-accent) / 0.25). Trocar a paleta = editar
+   só os --rgb-* abaixo.
+   ============================================================ */
+
+:root {
+  /* ---- Paleta (canais RGB) ---- */
+  --rgb-bg: 3 45 24;               /* #032D18 — fundo */
+  --rgb-surface: 5 55 30;          /* #05371E — cards, painéis */
+  --rgb-field: 11 137 74;          /* #0B894A — campos, itens ativos */
+  --rgb-primary: 13 135 72;        /* #0D8748 */
+  --rgb-accent: 68 216 142;        /* #44D88E — destaque */
+  --rgb-accent-strong: 22 232 121; /* #16E879 */
+  --rgb-text-muted: 184 245 225;   /* #B8F5E1 — texto secundário, bordas */
+  --rgb-white: 255 255 255;
+  --rgb-black: 0 0 0;
+
+  /* ---- Cores de apoio (séries dos gráficos, ícones do dashboard) ----
+     Também lidas pelos gráficos via constants/chartTheme.ts */
+  --rgb-mint: 32 255 181;          /* #20FFB5 */
+  --rgb-yellow: 242 202 53;        /* #F2CA35 */
+  --rgb-orange: 255 138 61;        /* #FF8A3D */
+  --rgb-gray: 174 187 181;         /* #AEBBB5 */
+  --rgb-violet: 126 101 255;       /* #7E65FF */
+
+  /* ---- Cores ---- */
+  --color-bg: rgb(var(--rgb-bg));
+  --color-surface: rgb(var(--rgb-surface));
+  --color-field: rgb(var(--rgb-field));
+  --color-primary: rgb(var(--rgb-primary));
+  --color-accent: rgb(var(--rgb-accent));
+  --color-accent-strong: rgb(var(--rgb-accent-strong));
+  --color-white: rgb(var(--rgb-white));
+  --color-text: rgb(var(--rgb-white));
+  --color-text-muted: rgb(var(--rgb-text-muted));
+  --color-text-faint: rgb(var(--rgb-text-muted) / 0.55);
+  --color-border: rgb(var(--rgb-text-muted) / 0.15);
+  --color-danger: #d32f2f;
+  --color-header-bg: #0B2101;
+
+  --gradient-bg: linear-gradient(to top, var(--color-surface) 0%, var(--color-accent) 100%);
+
+  /* ---- Vidro (superfícies translúcidas sobre o fundo) ---- */
+  --glass-bg: rgb(var(--rgb-white) / 0.10);
+  --glass-bg-hover: rgb(var(--rgb-white) / 0.16);
+  --glass-border: rgb(var(--rgb-white) / 0.18);
+  --glass-divider: rgb(var(--rgb-white) / 0.12);
+  --glass-outline-border: rgb(var(--rgb-white) / 0.35);
+  --glass-skeleton: rgb(var(--rgb-white) / 0.12);
+  --glass-placeholder-bg: rgb(var(--rgb-white) / 0.15);
+  --glass-placeholder-border: rgb(var(--rgb-white) / 0.4);
+  --glass-green-bg: rgb(var(--rgb-surface) / 0.55);
+  --glass-green-border: rgb(var(--rgb-accent) / 0.25);
+  --glass-accent-tag-bg: rgb(var(--rgb-accent) / 0.14);
+
+  /* ---- Navegação (header e bottom nav) ---- */
+  --nav-hover-bg: rgb(var(--rgb-text-muted) / 0.12);
+  --nav-active-bg: rgb(var(--rgb-accent) / 0.25);
+  --header-border: rgb(var(--rgb-text-muted) / 0.1);
+
+  /* ---- Sombras ---- */
+  --shadow: 0 2px 8px rgb(var(--rgb-black) / 0.3);
+  --shadow-text: rgb(var(--rgb-black) / 0.3);
+
+  /* ---- Layout ---- */
+  --container-max: 1950px;
+  --container-pad: 32px;
+  --gap-y: 25px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-card: 20px;
+}
+
+/* ============================================================
+   Breakpoints padrão (media query não aceita var(), então os
+   valores são escritos direto — use só estes quatro):
+     1400px  telas médias (ex.: grids de 3 colunas viram 1)
+     1024px  tablet: some a nav do header, aparece a bottom-nav
+      768px  celular grande
+      560px  celular pequeno
+   JS que depende de largura usa os mesmos valores
+   (ex.: SpeciesPage usa 768).
+   ============================================================ */
+
+@media (max-width: 1024px) {
+  :root { --container-pad: 20px; }
+}
+
+@media (max-width: 768px) {
+  :root { --container-pad: 16px; }
+}

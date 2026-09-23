@@ -30,12 +30,12 @@ export default function GlowSearch({ value, onChange, onFocus, onKeyDown, placeh
             <line stroke="url(#gsearch-gradl)" y2="16.65" y1="22" x2="16.65" x1="22" />
             <defs>
               <linearGradient gradientTransform="rotate(50)" id="gsearch-grad">
-                <stop style={{ stopColor: 'var(--green-light)' }} offset="0%" />
-                <stop style={{ stopColor: 'var(--green-accent)' }} offset="50%" />
+                <stop style={{ stopColor: 'var(--color-surface)' }} offset="0%" />
+                <stop style={{ stopColor: 'var(--color-accent-strong)' }} offset="50%" />
               </linearGradient>
               <linearGradient id="gsearch-gradl">
-                <stop style={{ stopColor: 'var(--green-accent)' }} offset="0%" />
-                <stop style={{ stopColor: 'var(--green-primary)' }} offset="50%" />
+                <stop style={{ stopColor: 'var(--color-accent-strong)' }} offset="0%" />
+                <stop style={{ stopColor: 'var(--color-accent)' }} offset="50%" />
               </linearGradient>
             </defs>
           </svg>

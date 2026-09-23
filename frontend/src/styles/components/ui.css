@@ -1,0 +1,44 @@
+/* ============================================================
+   Componentes reutilizáveis
+   ============================================================ */
+
+.stat-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 20px;
+  box-shadow: var(--shadow);
+}
+
+.stat-value { font-size: 2rem; font-weight: 800; color: var(--color-text); display: block; }
+
+.stat-label { font-size: 0.85rem; color: var(--color-text-muted); display: block; margin-top: 4px; }
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 24px;
+  box-shadow: var(--shadow);
+}
+
+.btn {
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.loading, .error, .empty-state {
+  padding: 24px;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.loading { animation: pulse-soft 1.5s ease-in-out infinite; }
+
+.error { color: var(--color-danger); }

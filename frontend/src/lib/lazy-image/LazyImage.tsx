@@ -32,11 +32,10 @@ export default function LazyImage({
   }
 
   return (
-    <div className="image-skeleton-wrapper" style={{ position: 'relative' }}>
+    <div className="image-skeleton-wrapper">
       {!loaded && (
         <div
           className={`skeleton ${skeletonClassName}`}
-          style={{ position: 'absolute', inset: 0 }}
           aria-label="Carregando imagem"
         />
       )}

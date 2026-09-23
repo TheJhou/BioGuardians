@@ -7,23 +7,23 @@
 
 .gsearch-main { position: relative; width: 100%; }
 .gsearch-input {
-  background: var(--blue-field);
+  background: var(--color-field);
   border: none;
   width: 100%;
   height: 44px;
   border-radius: 10px;
-  color: var(--text-on-dark);
+  color: var(--color-text);
   padding: 0 16px 0 52px;
   font-size: 15px;
 }
-.gsearch-input::placeholder { color: var(--text-on-dark-muted); }
+.gsearch-input::placeholder { color: var(--color-text-muted); }
 .gsearch-input:focus { outline: none; }
 .gsearch-accent-mask {
   pointer-events: none;
   width: 30px;
   height: 20px;
   position: absolute;
-  background: var(--blue-accent);
+  background: var(--color-accent);
   top: 6px;
   left: 5px;
   filter: blur(20px);

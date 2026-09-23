@@ -1,14 +1,9 @@
 import { Router } from 'express';
 import { query } from '../db/pool.js';
 import { validateId } from '../middleware/validateId.js';
-import { cacheMiddleware, cacheInvalidateAll, getTileCache, setTileCache } from '../cache/cache.js';
+import { cacheMiddleware, getTileCache, setTileCache } from '../cache/cache.js';
 import { parseParam, getParam } from '../utils/params.js';
-import {
-  getStoredAreaTile,
-  storeAreaTile,
-  invalidateAreaTilesForArea,
-  invalidateAreaTilesForGeom,
-} from '../tileStore.js';
+import { getStoredAreaTile, storeAreaTile } from '../tileStore.js';
 
 const router = Router();
 
@@ -230,96 +225,6 @@ router.get('/:id/especies', validateId, async (req, res, next) => {
     const id = parseParam(req.params.id)!;
     const { rows } = await query('SELECT * FROM especies_em_area($1)', [id]);
     res.json(rows);
-  } catch (err) { next(err); }
-});
-
-// POST /api/areas � accepts GeoJSON, converts to geometry
-router.post('/', async (req, res, next) => {
-  try {
-    const { nome, categoria_uc, esfera, bioma_id, area_ha, geojson } = req.body;
-
-    if (!nome || !categoria_uc || !esfera || !geojson) {
-      res.status(400).json({ error: 'nome, categoria_uc, esfera and geojson are required' });
-      return;
-    }
-
-    const result = await query(
-      `INSERT INTO area_protegida (nome, categoria_uc, esfera, bioma_id, area_ha, geom)
-       VALUES ($1, $2, $3, $4, $5,
-               ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON($6), 4326)))
-       RETURNING id`,
-      [nome, categoria_uc, esfera, bioma_id || null, area_ha || null, JSON.stringify(geojson)]
-    );
-
-    cacheInvalidateAll(['route:/api/areas', 'route:/api/dashboard']);
-    try { await invalidateAreaTilesForArea(result.rows[0].id); } catch { /* tiles se re-geram */ }
-    res.status(201).json({ id: result.rows[0].id, message: 'Area created' });
-  } catch (err) { next(err); }
-});
-
-// PUT /api/areas/:id
-router.put('/:id', validateId, async (req, res, next) => {
-  try {
-    const id = parseParam(req.params.id)!;
-    const { nome, categoria_uc, esfera, bioma_id, area_ha, geojson } = req.body;
-
-    let geomExpr = '';
-    const params: unknown[] = [];
-    let idx = 1;
-
-    if (nome) { params.push(nome); geomExpr += `nome = $${idx++}, `; }
-    if (categoria_uc) { params.push(categoria_uc); geomExpr += `categoria_uc = $${idx++}, `; }
-    if (esfera) { params.push(esfera); geomExpr += `esfera = $${idx++}, `; }
-    if (bioma_id !== undefined) { params.push(bioma_id); geomExpr += `bioma_id = $${idx++}, `; }
-    if (area_ha !== undefined) { params.push(area_ha); geomExpr += `area_ha = $${idx++}, `; }
-    if (geojson) {
-      params.push(JSON.stringify(geojson));
-      geomExpr += `geom = ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON($${idx++}), 4326)), `;
-    }
-
-    if (params.length === 0) {
-      res.status(400).json({ error: 'No fields to update' });
-      return;
-    }
-
-    // Remove trailing comma and space.
-    geomExpr = geomExpr.replace(/, $/, '');
-    params.push(id);
-
-    const { rowCount } = await query(
-      `UPDATE area_protegida SET ${geomExpr} WHERE id = $${idx}`,
-      params
-    );
-
-    if (rowCount === 0) {
-      res.status(404).json({ error: 'Area not found' });
-      return;
-    }
-
-    cacheInvalidateAll(['route:/api/areas', 'route:/api/dashboard']);
-    try { await invalidateAreaTilesForArea(id); } catch { /* tiles se re-geram */ }
-    res.json({ message: 'Area updated' });
-  } catch (err) { next(err); }
-});
-
-// DELETE /api/areas/:id
-router.delete('/:id', validateId, async (req, res, next) => {
-  try {
-    const id = parseParam(req.params.id)!;
-    // RETURNING geom: a geometria é necessária pra invalidar os tiles afetados.
-    const { rows, rowCount } = await query(
-      'DELETE FROM area_protegida WHERE id = $1 RETURNING geom',
-      [id]
-    );
-
-    if (rowCount === 0) {
-      res.status(404).json({ error: 'Area not found' });
-      return;
-    }
-
-    cacheInvalidateAll(['route:/api/areas', 'route:/api/dashboard']);
-    try { await invalidateAreaTilesForGeom(rows[0].geom); } catch { /* tiles se re-geram */ }
-    res.json({ message: 'Area deleted' });
   } catch (err) { next(err); }
 });
 

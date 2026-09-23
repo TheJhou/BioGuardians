@@ -1,0 +1,13 @@
+/* ============================================================
+   CategoryBadge — só o formato. Fundo e texto vêm de
+   CATEGORY_COLORS (constants/index.ts), aplicados inline pelo
+   componente components/ui/CategoryBadge.tsx.
+   ============================================================ */
+
+.cat-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
