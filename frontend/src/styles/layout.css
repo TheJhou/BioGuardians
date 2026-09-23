@@ -8,7 +8,7 @@
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
-  background: var(--bg-gradient);
+  background: var(--gradient-bg);
 }
 
 .page-main {
@@ -37,24 +37,16 @@
   padding-inline: var(--container-pad);
 }
 
-/* Home, Mapa e Dashboard ocupam 100% sem padding */
+/* Home e Mapa ocupam 100% sem padding (Dashboard: ver pages/dashboard.css) */
 .page-main:has(.home-page),
-.page-main:has(.map-page),
-.page-main:has(.dashboard-page) { padding-bottom: 0; overflow-x: hidden; }
+.page-main:has(.map-page) { padding-bottom: 0; overflow-x: hidden; }
 
 /* Espécies: padding inferior próprio (o scroll do page-main depende dele) */
 .page-main:has(.species-page) { padding-bottom: 12px; }
 
-/* Dashboard ocupa toda a área disponível abaixo do header */
-.page-main:has(.dashboard-page) {
-  padding: 0;
-  overflow-x: hidden;
-  min-width: 0;
-}
-
 .app-header {
-  background: #0B2101;
-  border-bottom: 1px solid var(--border);
+  background: var(--color-header-bg);
+  border-bottom: 1px solid var(--color-border);
   position: sticky;
   top: 0;
   z-index: 50;
@@ -71,8 +63,7 @@
 
 @media (max-width: 1024px) {
   .page-main { padding-bottom: 20px; }
-  .page-main:has(.home-page),
-  .page-main:has(.dashboard-page) { padding-bottom: 0; }
+  .page-main:has(.home-page) { padding-bottom: 0; }
   .page-main:has(.map-page) { padding-bottom: 64px; }
   .page-main:has(.species-page) { padding-bottom: 64px; }
 }

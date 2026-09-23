@@ -7,7 +7,7 @@ interface LeafIconProps {
 // Ícone de folha — verde por padrão, fundo transparente
 export default function LeafIcon({
   size = 24,
-  color = 'var(--green-primary)',
+  color = 'var(--color-accent)',
   className,
 }: LeafIconProps) {
   return (

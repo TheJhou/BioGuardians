@@ -7,7 +7,7 @@ interface DocumentIconProps {
 // Ícone de documento — verde por padrão, fundo transparente
 export default function DocumentIcon({
   size = 24,
-  color = 'var(--green-primary)',
+  color = 'var(--color-accent)',
   className,
 }: DocumentIconProps) {
   return (

@@ -2,71 +2,73 @@
    @import externo não chega ao início do bundle e o navegador o ignora. */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
+/* ============================================================
+   Design tokens
+
+   Cada cor da paleta existe uma única vez, como canais RGB
+   (--rgb-*). As cores (--color-*) e as transparências derivam
+   deles: rgb(var(--rgb-accent) / 0.25). Trocar a paleta = editar
+   só os --rgb-* abaixo.
+   ============================================================ */
+
 :root {
-  /* ============================================================
-     Paleta verde (dark UI)
-     ============================================================ */
-  --navy: #032D18;
-  --navy-2: #05371E;
-  --blue-field: #0B894A;
-  --blue-primary: #0D8748;
-  --blue-accent: #44D88E;
-  --blue-strong: #16E879;
-  --text-on-blue: #FFFFFF;
-  --text-on-blue-muted: #B8F5E1;
+  /* ---- Paleta (canais RGB) ---- */
+  --rgb-bg: 3 45 24;               /* #032D18 — fundo */
+  --rgb-surface: 5 55 30;          /* #05371E — cards, painéis */
+  --rgb-field: 11 137 74;          /* #0B894A — campos, itens ativos */
+  --rgb-primary: 13 135 72;        /* #0D8748 */
+  --rgb-accent: 68 216 142;        /* #44D88E — destaque */
+  --rgb-accent-strong: 22 232 121; /* #16E879 */
+  --rgb-text-muted: 184 245 225;   /* #B8F5E1 — texto secundário, bordas */
+  --rgb-white: 255 255 255;
+  --rgb-black: 0 0 0;
 
-  /* ---- Aliases semânticos (tema global) ---- */
-  --green-primary: var(--blue-accent);
-  --green-dark: var(--blue-primary);
-  --green-light: var(--navy-2);
-  --green-accent: var(--blue-strong);
-  --bg: var(--navy);
-  --bg-gradient: linear-gradient(to top, var(--navy-2) 0%, var(--blue-accent) 100%);
-  --white: #FFFFFF;
-  --text: var(--text-on-blue);
-  --text-secondary: var(--text-on-blue-muted);
-  --border: rgba(184, 245, 225, 0.15);
-  --danger: #d32f2f;
+  /* ---- Cores ---- */
+  --color-bg: rgb(var(--rgb-bg));
+  --color-surface: rgb(var(--rgb-surface));
+  --color-field: rgb(var(--rgb-field));
+  --color-primary: rgb(var(--rgb-primary));
+  --color-accent: rgb(var(--rgb-accent));
+  --color-accent-strong: rgb(var(--rgb-accent-strong));
+  --color-white: rgb(var(--rgb-white));
+  --color-text: rgb(var(--rgb-white));
+  --color-text-muted: rgb(var(--rgb-text-muted));
+  --color-text-faint: rgb(var(--rgb-text-muted) / 0.55);
+  --color-border: rgb(var(--rgb-text-muted) / 0.15);
+  --color-danger: #d32f2f;
+  --color-header-bg: #0B2101;
 
-  /* ---- Container reutilizável ---- */
+  --gradient-bg: linear-gradient(to top, var(--color-surface) 0%, var(--color-accent) 100%);
+
+  /* ---- Vidro (superfícies translúcidas sobre o fundo) ---- */
+  --glass-bg: rgb(var(--rgb-white) / 0.10);
+  --glass-bg-hover: rgb(var(--rgb-white) / 0.16);
+  --glass-border: rgb(var(--rgb-white) / 0.18);
+  --glass-divider: rgb(var(--rgb-white) / 0.12);
+  --glass-outline-border: rgb(var(--rgb-white) / 0.35);
+  --glass-skeleton: rgb(var(--rgb-white) / 0.12);
+  --glass-placeholder-bg: rgb(var(--rgb-white) / 0.15);
+  --glass-placeholder-border: rgb(var(--rgb-white) / 0.4);
+  --glass-green-bg: rgb(var(--rgb-surface) / 0.55);
+  --glass-green-border: rgb(var(--rgb-accent) / 0.25);
+  --glass-accent-tag-bg: rgb(var(--rgb-accent) / 0.14);
+
+  /* ---- Navegação (header e bottom nav) ---- */
+  --nav-hover-bg: rgb(var(--rgb-text-muted) / 0.12);
+  --nav-active-bg: rgb(var(--rgb-accent) / 0.25);
+  --header-border: rgb(var(--rgb-text-muted) / 0.1);
+
+  /* ---- Sombras ---- */
+  --shadow: 0 2px 8px rgb(var(--rgb-black) / 0.3);
+  --shadow-text: rgb(var(--rgb-black) / 0.3);
+
+  /* ---- Layout ---- */
   --container-max: 1950px;
   --container-pad: 32px;
-
-  --card-bg: var(--navy-2);
-  --shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-
+  --gap-y: 25px;
   --radius-sm: 8px;
   --radius-md: 12px;
-
-  /* ---- Dark/glass theme (Home + Header dark) ---- */
-  --glass-bg: rgba(255, 255, 255, 0.10);
-  --glass-bg-hover: rgba(255, 255, 255, 0.16);
-  --glass-border: rgba(255, 255, 255, 0.18);
-  --glass-divider: rgba(255, 255, 255, 0.12);
-  --glass-outline-border: rgba(255, 255, 255, 0.35);
-  --glass-skeleton: rgba(255, 255, 255, 0.12);
-  --glass-placeholder-bg: rgba(255, 255, 255, 0.15);
-  --glass-placeholder-border: rgba(255, 255, 255, 0.4);
-
-  --glass-green-bg: rgba(5, 55, 30, 0.55);
-  --glass-green-border: rgba(68, 216, 142, 0.25);
-  --glass-accent-tag-bg: rgba(68, 216, 142, 0.14);
-
-  --text-on-dark: var(--text-on-blue);
-  --text-on-dark-secondary: var(--text-on-blue);
-  --text-on-dark-muted: var(--text-on-blue-muted);
-  --text-on-dark-faint: rgba(184, 245, 225, 0.55);
-  --text-on-dark-subtle: var(--text-on-blue);
-
-  --nav-dark-text: var(--text-on-blue);
-  --nav-dark-hover-bg: rgba(184, 245, 225, 0.12);
-  --nav-dark-active-bg: rgba(68, 216, 142, 0.25);
-  --header-dark-border: rgba(184, 245, 225, 0.1);
-
-  --gap-y: 25px;
   --radius-card: 20px;
-
-  --shadow-text-light: rgba(0, 0, 0, 0.3);
 }
 
 @media (max-width: 1024px) {

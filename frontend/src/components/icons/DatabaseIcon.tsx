@@ -7,7 +7,7 @@ interface DatabaseIconProps {
 // Ícone de banco de dados — verde por padrão, fundo transparente
 export default function DatabaseIcon({
   size = 24,
-  color = 'var(--green-primary)',
+  color = 'var(--color-accent)',
   className,
 }: DatabaseIconProps) {
   return (

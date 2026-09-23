@@ -8,7 +8,7 @@ interface GraficoIconProps {
 // (as barras são vazadas pelo fill-rule, então aparece a cor da página atrás)
 export default function GraficoIcon({
   size = 24,
-  color = 'var(--green-primary)',
+  color = 'var(--color-accent)',
   className,
 }: GraficoIconProps) {
   return (

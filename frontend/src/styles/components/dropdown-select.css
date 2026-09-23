@@ -13,8 +13,8 @@
   padding: 10px 12px;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
-  background: var(--blue-field);
-  color: var(--text-on-dark);
+  background: var(--color-field);
+  color: var(--color-text);
   font-size: 0.9rem;
   cursor: pointer;
 }
@@ -29,7 +29,7 @@
 
 .dropdown-arrow {
   font-size: 0.8rem;
-  color: var(--text-on-dark-muted);
+  color: var(--color-text-muted);
   transition: transform 0.15s;
 }
 
@@ -43,10 +43,10 @@
   margin: 0;
   padding: 4px;
   list-style: none;
-  background: var(--navy-2);
-  border: 1px solid var(--border);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  box-shadow: 0 4px 12px rgb(var(--rgb-black) / 0.12);
   max-height: 190px; /* ~5 itens */
   overflow-y: auto;
   scrollbar-width: thin;
@@ -56,15 +56,15 @@
 .dropdown-item {
   padding: 9px 10px;
   font-size: 0.85rem;
-  color: var(--text-on-dark);
+  color: var(--color-text);
   border-radius: 4px;
   cursor: pointer;
 }
 
-.dropdown-item:hover { background: var(--blue-primary); }
+.dropdown-item:hover { background: var(--color-primary); }
 
 .dropdown-item.selected {
-  background: var(--blue-accent);
-  color: #fff;
+  background: var(--color-accent);
+  color: var(--color-white);
   font-weight: 600;
 }

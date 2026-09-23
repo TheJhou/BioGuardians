@@ -96,15 +96,15 @@ export default function HomePage() {
 
         <div className="hero-features">
           <div className="feature-item" data-reveal>
-            <div className="feature-icon"><DocumentIcon size={22} color="var(--green-accent)" /></div>
+            <div className="feature-icon"><DocumentIcon size={22} color="var(--color-accent-strong)" /></div>
             <span>Dados abertos <br className="br-desktop" />e confiáveis</span>
           </div>
           <div className="feature-item" data-reveal>
-            <div className="feature-icon"><GraficoIcon size={22} color="var(--green-accent)" /></div>
+            <div className="feature-icon"><GraficoIcon size={22} color="var(--color-accent-strong)" /></div>
             <span>Informação para <br className="br-desktop" />decisões reais</span>
           </div>
           <div className="feature-item" data-reveal>
-            <div className="feature-icon"><PersonsIcon size={22} color="var(--green-accent)" /></div>
+            <div className="feature-icon"><PersonsIcon size={22} color="var(--color-accent-strong)" /></div>
             <span>Contribuindo para um <br className="br-desktop" />futuro sustentável</span>
           </div>
         </div>
@@ -120,22 +120,22 @@ export default function HomePage() {
           ) : (
             <div className="stats-card">
               <div className="stats-section">
-                <LeafIcon size={52} color="var(--green-accent)" />
+                <LeafIcon size={52} color="var(--color-accent-strong)" />
                 <span className="stats-value">{error ? '—' : formatPlus(stats?.total_especies ?? 0)}</span>
                 <span className="stats-label">Espécies registradas</span>
               </div>
               <div className="stats-section">
-                <DocumentIcon size={52} color="var(--green-accent)" />
+                <DocumentIcon size={52} color="var(--color-accent-strong)" />
                 <span className="stats-value">{error ? '—' : formatPlus(stats?.total_ocorrencias ?? 0)}</span>
                 <span className="stats-label">Ocorrências registradas</span>
               </div>
               <div className="stats-section">
-                <ShieldIcon size={52} color="var(--green-accent)" />
+                <ShieldIcon size={52} color="var(--color-accent-strong)" />
                 <span className="stats-value">{error ? '—' : formatPlus(stats?.total_areas ?? 0)}</span>
                 <span className="stats-label">Unidades de Conservação</span>
               </div>
               <div className="stats-section">
-                <DatabaseIcon size={52} color="var(--green-accent)" />
+                <DatabaseIcon size={52} color="var(--color-accent-strong)" />
                 <span className="stats-value">{sourceCards.length}</span>
                 <span className="stats-label">Fontes oficiais</span>
               </div>

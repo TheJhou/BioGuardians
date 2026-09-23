@@ -11,20 +11,20 @@
   align-items: center;
   gap: 6px;
   padding: 4px 8px 4px 10px;
-  background: var(--green-primary);
-  color: #fff;
+  background: var(--color-accent);
+  color: var(--color-white);
   border-radius: 999px;
   font-size: 0.8rem;
   font-weight: 600;
 }
 
 .species-chip-remove {
-  background: rgba(255,255,255,0.25);
+  background: rgb(var(--rgb-white) / 0.25);
   border: none;
   border-radius: 50%;
   width: 18px;
   height: 18px;
-  color: var(--text);
+  color: var(--color-text);
   font-size: 0.85rem;
   line-height: 1;
   cursor: pointer;
@@ -34,4 +34,4 @@
   padding: 0;
 }
 
-.species-chip-remove:hover { background: rgba(255,255,255,0.45); }
+.species-chip-remove:hover { background: rgb(var(--rgb-white) / 0.45); }

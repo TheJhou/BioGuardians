@@ -69,7 +69,8 @@ docs/           PROJECT_PLAN, DATA_DICTIONARY, ERD, OBSERVABILITY, AREA_TILE_CAC
 - Estilos globais em `src/styles/`, com entrada única `index.css` (importado no `main.tsx`). A ordem dos `@import` define a cascata: `tokens.css` (variáveis + fonte) → `base.css` → `layout.css` → `components/*.css` → `pages/*.css`. Cada media query fica no arquivo da área que ela afeta
 - O `@import` da fonte precisa ficar no topo do `tokens.css`: em outro lugar o Vite o descarta ou ele não chega ao início do bundle
 - CSS próprio ao lado do componente só em `Glow*.css` e `lib/*` (importados pelo próprio componente)
-- Paleta atual: verde escuro (os tokens ainda se chamam `--blue-*`/`--navy` por herança da paleta anterior)
+- Paleta (verde escuro) em `styles/tokens.css`: cada cor existe uma vez como canais RGB (`--rgb-accent: 68 216 142`); as cores `--color-*` e as transparências derivam deles (`rgb(var(--rgb-accent) / 0.25)`). Não escreva hex/rgba da paleta direto no CSS: use `var(--color-*)` ou `rgb(var(--rgb-*) / a)`. Trocar a paleta = editar só os `--rgb-*`
+- Nomes de tokens: `--color-bg`, `--color-surface`, `--color-field`, `--color-primary`, `--color-accent`, `--color-accent-strong`, `--color-text`, `--color-text-muted`, `--color-text-faint`, `--color-border`, `--color-danger`, `--color-header-bg`, `--gradient-bg`, `--glass-*`, `--nav-*`, `--shadow*`, `--radius-*`
 - Busca de espécies com scroll infinito (15 por página)
 - Responsivo: header com navegação mobile + bottom nav, grids adaptáveis
 

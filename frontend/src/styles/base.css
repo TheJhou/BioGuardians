@@ -2,12 +2,12 @@
    Base — reset, body, scrollbar, animações e skeleton globais
    ============================================================ */
 
-* { margin: 0; padding: 0; box-sizing: border-box; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+* { margin: 0; padding: 0; box-sizing: border-box; scrollbar-width: thin; scrollbar-color: var(--color-border) transparent; }
 
 body {
   font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
-  background: var(--bg-gradient);
-  color: var(--text);
+  background: var(--gradient-bg);
+  color: var(--color-text);
   overflow-x: hidden;
 }
 
@@ -18,9 +18,9 @@ html { overflow-x: hidden; }
 
 ::-webkit-scrollbar-track { background: transparent; }
 
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 4px; }
 
-::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+::-webkit-scrollbar-thumb:hover { background: var(--color-text-muted); }
 
 img, svg, canvas, iframe, video { max-width: 100%; height: auto; }
 
@@ -40,7 +40,7 @@ a, button { transition: all 0.2s ease; }
 }
 
 .skeleton {
-  background: linear-gradient(90deg, var(--border) 0%, rgba(184, 245, 225, 0.25) 50%, var(--border) 100%);
+  background: linear-gradient(90deg, var(--color-border) 0%, rgb(var(--rgb-text-muted) / 0.25) 50%, var(--color-border) 100%);
   background-size: 200% 100%;
   animation: skeleton 1.2s ease-in-out infinite;
   border-radius: var(--radius-sm);

@@ -7,7 +7,7 @@ interface ShieldIconProps {
 // Ícone de escudo (proteção) — verde por padrão, fundo transparente
 export default function ShieldIcon({
   size = 24,
-  color = 'var(--green-primary)',
+  color = 'var(--color-accent)',
   className,
 }: ShieldIconProps) {
   return (

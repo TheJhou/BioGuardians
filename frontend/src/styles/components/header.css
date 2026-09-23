@@ -5,25 +5,25 @@
 
 /* ---- Header dark (global) ---- */
 .app-header--dark {
-  border-bottom: 1px solid var(--header-dark-border);
+  border-bottom: 1px solid var(--header-border);
 }
 
-.app-header--dark .brand-name { color: var(--text-on-blue); }
+.app-header--dark .brand-name { color: var(--color-text); }
 
-.app-header--dark .header-brand .brand-name { color: var(--text-on-blue); }
+.app-header--dark .header-brand .brand-name { color: var(--color-text); }
 
 .app-header--dark .header-nav-link {
-  color: var(--nav-dark-text);
+  color: var(--color-text);
 }
 
 .app-header--dark .header-nav-link:hover {
-  color: #fff;
-  background: var(--nav-dark-hover-bg);
+  color: var(--color-white);
+  background: var(--nav-hover-bg);
 }
 
 .app-header--dark .header-nav-link.active {
-  color: #fff;
-  background: var(--nav-dark-active-bg);
+  color: var(--color-white);
+  background: var(--nav-active-bg);
 }
 
 .header-brand {
@@ -37,7 +37,7 @@
   transform: translateY(-50%);
 }
 
-.header-brand .brand-name { font-size: 1.15rem; font-weight: 800; color: var(--green-dark); }
+.header-brand .brand-name { font-size: 1.15rem; font-weight: 800; color: var(--color-primary); }
 
 .header-nav {
   flex: 1;
@@ -52,7 +52,7 @@
   transform: translateY(-50%);
   height: calc(100% - 8px);
   border-radius: var(--radius-sm);
-  background: var(--nav-dark-active-bg);
+  background: var(--nav-active-bg);
   transition: left 0.3s cubic-bezier(0.22, 1, 0.36, 1), width 0.3s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
   z-index: 0;
   pointer-events: none;
@@ -61,7 +61,7 @@
 .header-nav-link {
   padding: 10px 16px;
   border-radius: var(--radius-sm);
-  color: var(--text-secondary);
+  color: var(--color-text-muted);
   text-decoration: none;
   font-size: 0.9rem;
   font-weight: 600;
@@ -71,13 +71,13 @@
   z-index: 1;
 }
 
-.header-nav-link:hover { color: var(--green-primary); background: var(--green-light); transform: translateY(-1px); }
+.header-nav-link:hover { color: var(--color-accent); background: var(--color-surface); transform: translateY(-1px); }
 
-.header-nav-link.active { color: var(--green-primary); }
+.header-nav-link.active { color: var(--color-accent); }
 
-.app-header--dark .header-nav-link:hover { color: #fff; background: var(--nav-dark-hover-bg); transform: none; }
+.app-header--dark .header-nav-link:hover { color: var(--color-white); background: var(--nav-hover-bg); transform: none; }
 
-.app-header--dark .header-nav-link.active { color: #fff; }
+.app-header--dark .header-nav-link.active { color: var(--color-white); }
 
 /* ---- Bottom navigation (mobile) ---- */
 .bottom-nav {
@@ -91,7 +91,7 @@
   justify-content: space-around;
   align-items: center;
   padding: 0 8px;
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 -2px 8px rgb(var(--rgb-black) / 0.3);
 }
 
 .bottom-nav-indicator {
@@ -100,7 +100,7 @@
   transform: translateY(-50%);
   height: calc(100% - 10px);
   border-radius: var(--radius-sm);
-  background: var(--nav-dark-active-bg);
+  background: var(--nav-active-bg);
   transition: left 0.3s cubic-bezier(0.22, 1, 0.36, 1), width 0.3s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
   z-index: 0;
   pointer-events: none;
@@ -124,12 +124,12 @@
   animation: nav-beam-rotate 4s linear infinite;
   background-image: conic-gradient(
     from var(--nav-beam-angle),
-    var(--green-dark),
-    var(--green-primary) 5%,
-    var(--green-dark) 38%,
-    var(--green-dark) 50%,
-    var(--green-accent) 60%,
-    var(--green-dark) 87%
+    var(--color-primary),
+    var(--color-accent) 5%,
+    var(--color-primary) 38%,
+    var(--color-primary) 50%,
+    var(--color-accent-strong) 60%,
+    var(--color-primary) 87%
   );
   pointer-events: none;
   z-index: 0;
@@ -143,7 +143,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: var(--navy);
+  background: var(--color-bg);
   z-index: 0;
   pointer-events: none;
 }
@@ -156,7 +156,7 @@
   gap: 4px;
   flex: 1;
   height: 100%;
-  color: var(--nav-dark-text);
+  color: var(--color-text);
   text-decoration: none;
   font-size: 0.65rem;
   font-weight: 600;
@@ -173,8 +173,8 @@
 
 .bottom-nav-link:hover,
 .bottom-nav-link.active {
-  color: #fff;
-  background: var(--nav-dark-active-bg);
+  color: var(--color-white);
+  background: var(--nav-active-bg);
 }
 
 @media (max-width: 1024px) {
