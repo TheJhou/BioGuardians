@@ -16,6 +16,12 @@ import cardUcsImg from '../images/card-unid-conservacao-home.png';
 import iconMapaImg from '../images/icon-mapa.png';
 import iconEspecieImg from '../images/icon-especie.png';
 import iconUcImg from '../images/icon-uc.png';
+import logoMma from '../images/sources/mma.png';
+import logoGbif from '../images/sources/gbif.png';
+import logoSpeciesLink from '../images/sources/specieslink.png';
+import logoWildlifeInsights from '../images/sources/wildlife-insights.png';
+import logoOpenRouter from '../images/sources/openrouter.png';
+import logoInaturalist from '../images/sources/inaturalist.png';
 
 const platformCards: { title: string; description: ReactNode; to: string; image?: string; icon?: string }[] = [
   {
@@ -42,13 +48,14 @@ const platformCards: { title: string; description: ReactNode; to: string; image?
 ];
 
 const sourceCards = [
-  { name: 'MMA', desc: 'Ministério do Meio Ambiente', detail: 'Lista oficial de espécies ameaçadas' },
-  { name: 'GBIF', desc: 'Global Biodiversity Information Facility', detail: 'Ocorrências globais de espécies' },
-  { name: 'speciesLink', desc: 'Repositório de dados da Rede SpeciesLink', detail: 'Dados de biodiversidade brasileira' },
-  { name: 'CNUC', desc: 'Cadastro Nacional de Unidades de Conservação', detail: 'Áreas protegidas do Brasil' },
-  { name: 'Wildlife Insights', desc: 'Imagens de camera trap', detail: 'Metadados de monitoramento' },
-  { name: 'IA (OpenRouter)', desc: 'Classificação de espécies', detail: 'Claude Sonnet 4' },
-  { name: 'iNaturalist', desc: 'Fotos e taxonomia', detail: 'Enriquecimento de espécies' },
+  { name: 'MMA', desc: 'Ministério do Meio Ambiente', detail: 'Lista oficial de espécies ameaçadas', logo: logoMma },
+  { name: 'GBIF', desc: 'Global Biodiversity Information Facility', detail: 'Ocorrências globais de espécies', logo: logoGbif },
+  { name: 'speciesLink', desc: 'Repositório de dados da Rede SpeciesLink', detail: 'Dados de biodiversidade brasileira', logo: logoSpeciesLink },
+  // O CNUC é mantido pelo MMA e não tem marca própria (o favicon do site é o logo padrão do React)
+  { name: 'CNUC', desc: 'Cadastro Nacional de Unidades de Conservação', detail: 'Áreas protegidas do Brasil', logo: logoMma },
+  { name: 'Wildlife Insights', desc: 'Imagens de camera trap', detail: 'Metadados de monitoramento', logo: logoWildlifeInsights },
+  { name: 'IA (OpenRouter)', desc: 'Classificação de espécies', detail: 'Claude Sonnet 4', logo: logoOpenRouter },
+  { name: 'iNaturalist', desc: 'Fotos e taxonomia', detail: 'Enriquecimento de espécies', logo: logoInaturalist },
 ];
 
 function formatPlus(value: number): string {
@@ -197,7 +204,7 @@ export default function HomePage() {
           <div className="sources-cards">
             {sourceCards.map((s) => (
               <div key={s.name} className="source-card" data-reveal>
-                <div className="icon-placeholder icon-placeholder--sm" data-label="ícone" />
+                <img src={s.logo} alt="" className="source-logo" loading="lazy" />
                 <div className="source-card-info">
                   <span className="source-name">{s.name}</span>
                   <span className="source-desc">{s.desc}</span>
