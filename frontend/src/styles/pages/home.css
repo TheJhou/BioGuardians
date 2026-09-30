@@ -410,6 +410,17 @@
 
 .source-card:hover { background: var(--glass-bg-hover); transform: translateY(-2px); }
 
+/* Fundo claro: alguns logos são escuros e sumiriam no tema verde escuro */
+.source-logo {
+  width: 44px;
+  height: 44px;
+  padding: 6px;
+  object-fit: contain;
+  flex-shrink: 0;
+  background: var(--color-white);
+  border-radius: var(--radius-sm);
+}
+
 .source-card-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 
 .source-name { font-size: 0.95rem; font-weight: 700; color: var(--color-white); }
@@ -494,8 +505,6 @@
   color: var(--color-text-faint);
   white-space: nowrap;
 }
-
-.icon-placeholder--sm { width: 36px; height: 36px; }
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }
